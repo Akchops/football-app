@@ -1,11 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
-import type { AppData, Competition, Match, MatchResult, Settings } from '../types';
-import { createId, emptyData, loadData, saveData } from './storage';
+import type { AppData, Competition, Match, MatchResult, Profile, Settings, Team } from '../types';
+import { createId, emptyData, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
 
 type Action =
   | { type: 'data/replace'; data: AppData }
   | { type: 'settings/update'; patch: Partial<Settings> }
+  | { type: 'profile/update'; patch: Partial<Profile> }
+  | { type: 'team/add'; team: Team }
+  | { type: 'team/update'; id: string; patch: Partial<Team> }
+  | { type: 'team/delete'; id: string }
+  | { type: 'match/addMany'; matches: Match[] }
   | { type: 'competition/add'; competition: Competition }
   | { type: 'competition/update'; id: string; patch: Partial<Competition> }
   | { type: 'competition/delete'; id: string }
@@ -24,6 +29,26 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...action.patch } };
+
+    case 'profile/update':
+      return { ...state, profile: { ...state.profile, ...action.patch } };
+
+    case 'team/add':
+      return { ...state, teams: [...state.teams, action.team] };
+
+    case 'team/update':
+      return { ...state, teams: state.teams.map((t) => (t.id === action.id ? { ...t, ...action.patch } : t)) };
+
+    case 'team/delete':
+      // Matches outlive their team, same as competitions.
+      return {
+        ...state,
+        teams: state.teams.filter((t) => t.id !== action.id),
+        matches: state.matches.map((m) => (m.teamId === action.id ? touch({ ...m, teamId: null }) : m)),
+      };
+
+    case 'match/addMany':
+      return { ...state, matches: [...state.matches, ...action.matches] };
 
     case 'competition/add':
       return { ...state, competitions: [...state.competitions, action.competition] };
@@ -63,6 +88,7 @@ export function reducer(state: AppData, action: Action): AppData {
 
 export interface NewMatchInput {
   competitionId: string | null;
+  teamId: string | null;
   opponent: string;
   date: string;
   time: string;
@@ -79,11 +105,34 @@ export interface NewCompetitionInput {
   notes: string;
 }
 
+export interface NewTeamInput {
+  name: string;
+  ageGroup: string;
+  position: string;
+  color: string;
+  notes: string;
+}
+
+/** One fixture inside a tournament being created in a single go. */
+export interface TournamentFixture {
+  opponent: string;
+  date: string;
+  time: string;
+}
+
+export interface NewTournamentInput extends NewCompetitionInput {
+  teamId: string | null;
+  location: string;
+  fixtures: TournamentFixture[];
+}
+
 interface StoreValue {
   data: AppData;
+  profile: Profile;
   settings: Settings;
   matches: Match[];
   competitions: Competition[];
+  teams: Team[];
   addMatch(input: NewMatchInput): Match;
   updateMatch(id: string, patch: Partial<Match>): void;
   deleteMatch(id: string): void;
@@ -96,8 +145,17 @@ interface StoreValue {
   addCompetition(input: NewCompetitionInput): Competition;
   updateCompetition(id: string, patch: Partial<Competition>): void;
   deleteCompetition(id: string): void;
+  /** Creates the tournament and all of its fixtures in one go. */
+  addTournament(input: NewTournamentInput): Competition;
+  addTeam(input: NewTeamInput): Team;
+  updateTeam(id: string, patch: Partial<Team>): void;
+  deleteTeam(id: string): void;
   updateSettings(patch: Partial<Settings>): void;
+  updateProfile(patch: Partial<Profile>): void;
   competitionOf(match: Match): Competition | null;
+  teamOf(match: Match): Team | null;
+  /** Calendar dot colour, following the colour-by setting. */
+  colorOf(match: Match): string;
   loadSampleData(): void;
   clearAllData(): void;
   importData(json: string): { ok: true } | { ok: false; error: string };
@@ -118,9 +176,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
     return {
       data,
+      profile: data.profile,
       settings: data.settings,
       matches: data.matches,
       competitions: data.competitions,
+      teams: data.teams,
 
       addMatch(input) {
         const match: Match = {
@@ -184,12 +244,74 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'competition/delete', id });
       },
 
+      addTournament(input) {
+        const { fixtures, teamId, location, ...competitionInput } = input;
+        const competition: Competition = {
+          id: createId('comp'),
+          ...competitionInput,
+          type: 'tournament',
+          archived: false,
+          createdAt: now(),
+        };
+        dispatch({ type: 'competition/add', competition });
+
+        const created = fixtures
+          .filter((f) => f.date)
+          .map<Match>((fixture) => ({
+            id: createId('match'),
+            competitionId: competition.id,
+            teamId,
+            opponent: fixture.opponent.trim() || 'TBC',
+            date: fixture.date,
+            time: fixture.time || '00:00',
+            venue: 'neutral',
+            location,
+            status: 'scheduled',
+            result: null,
+            notes: '',
+            remindAfter: null,
+            createdAt: now(),
+            updatedAt: now(),
+          }));
+        if (created.length) dispatch({ type: 'match/addMany', matches: created });
+        return competition;
+      },
+
+      addTeam(input) {
+        const team: Team = { id: createId('team'), ...input, createdAt: now() };
+        dispatch({ type: 'team/add', team });
+        return team;
+      },
+
+      updateTeam(id, patch) {
+        dispatch({ type: 'team/update', id, patch });
+      },
+
+      deleteTeam(id) {
+        dispatch({ type: 'team/delete', id });
+      },
+
       updateSettings(patch) {
         dispatch({ type: 'settings/update', patch });
       },
 
+      updateProfile(patch) {
+        dispatch({ type: 'profile/update', patch });
+      },
+
       competitionOf(match) {
         return data.competitions.find((c) => c.id === match.competitionId) ?? null;
+      },
+
+      teamOf(match) {
+        return data.teams.find((t) => t.id === match.teamId) ?? null;
+      },
+
+      colorOf(match) {
+        const competition = data.competitions.find((c) => c.id === match.competitionId);
+        const team = data.teams.find((t) => t.id === match.teamId);
+        const preferred = data.settings.calendarColorBy === 'team' ? team?.color : competition?.color;
+        return preferred ?? competition?.color ?? team?.color ?? 'var(--accent)';
       },
 
       loadSampleData() {
@@ -210,16 +332,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           if (!Array.isArray(parsed.matches) || !Array.isArray(parsed.competitions)) {
             return { ok: false, error: 'That file does not look like a Matchday backup.' };
           }
-          const base = emptyData();
-          dispatch({
-            type: 'data/replace',
-            data: {
-              version: base.version,
-              settings: { ...base.settings, ...(parsed.settings ?? {}) },
-              competitions: parsed.competitions as Competition[],
-              matches: parsed.matches as Match[],
-            },
-          });
+          // Reuse the loader so an older backup is migrated on the way in.
+          dispatch({ type: 'data/replace', data: parseData(json) });
           return { ok: true };
         } catch {
           return { ok: false, error: 'Could not read that file - is it valid JSON?' };

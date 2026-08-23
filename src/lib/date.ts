@@ -121,3 +121,36 @@ export function seasonLabel(now: Date = new Date()): string {
   // Northern-hemisphere season runs Aug -> May.
   return now.getMonth() >= 6 ? `${y}/${String(y + 1).slice(2)}` : `${y - 1}/${String(y).slice(2)}`;
 }
+
+/** Age on a given day, from a 'YYYY-MM-DD' date of birth. */
+export function ageOn(dob: string, on: Date): number | null {
+  if (!dob) return null;
+  const born = fromISODate(dob);
+  if (Number.isNaN(born.getTime())) return null;
+  let age = on.getFullYear() - born.getFullYear();
+  const beforeBirthday =
+    on.getMonth() < born.getMonth() ||
+    (on.getMonth() === born.getMonth() && on.getDate() < born.getDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 0 && age < 120 ? age : null;
+}
+
+export function currentAge(dob: string, now: Date = new Date()): number | null {
+  return ageOn(dob, now);
+}
+
+/**
+ * Youth football bands by age on 31 August of the current season, which is how
+ * English grassroots leagues set them.
+ */
+export function suggestAgeGroup(dob: string, now: Date = new Date()): string {
+  const seasonStart = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const age = ageOn(dob, new Date(seasonStart, 7, 31));
+  if (age === null) return '';
+  if (age < 6) return 'U7';
+  if (age < 18) return `U${age + 1}`;
+  if (age < 21) return 'U21';
+  if (age < 23) return 'U23';
+  if (age >= 35) return 'Veterans';
+  return 'Open age';
+}

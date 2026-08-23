@@ -1,5 +1,7 @@
-import type { Competition, Match, MatchResult, Settings, Venue } from '../types';
+import type { Competition, Match, MatchResult, MetricTotals, Settings, Team, Venue } from '../types';
 import { MONTH_NAMES, fromISODate, kickoffAt, toISODate } from './date';
+import { addMetrics } from './metrics';
+import { matchScore } from './score';
 
 export type Outcome = 'W' | 'D' | 'L';
 
@@ -72,6 +74,8 @@ export interface Stats extends Record_ {
   pointsPerGame: number;
   winRate: number;
   cleanSheets: number;
+  /** Clean sheets in matches the player actually featured in. */
+  cleanSheetsPlayed: number;
   failedToScore: number;
   shootoutWins: number;
   biggestWin: (Match & { result: MatchResult }) | null;
@@ -79,6 +83,8 @@ export interface Stats extends Record_ {
   /** Personal totals for the tracked player. */
   appearances: number;
   minutes: number;
+  /** Every position-specific counting stat, summed. */
+  totals: MetricTotals;
   goals: number;
   assists: number;
   contributions: number;
@@ -88,6 +94,8 @@ export interface Stats extends Record_ {
   averageRating: number | null;
   goalsPerMatch: number;
   minutesPerGoalContribution: number | null;
+  /** Average performance score out of 100 across matches played. */
+  averageScore: number | null;
   /** Most recent first, max 5. */
   form: Outcome[];
   streak: { type: Outcome; count: number } | null;
@@ -116,17 +124,19 @@ export function computeStats(matches: Match[]): Stats {
   const base = emptyRecord();
 
   let cleanSheets = 0;
+  let cleanSheetsPlayed = 0;
   let failedToScore = 0;
   let shootoutWins = 0;
   let appearances = 0;
   let minutes = 0;
-  let goals = 0;
-  let assists = 0;
   let yellowCards = 0;
   let redCards = 0;
   let motm = 0;
   let ratingSum = 0;
   let ratingCount = 0;
+  let scoreSum = 0;
+  let scoreCount = 0;
+  const totals: MetricTotals = {};
   let biggestWin: (Match & { result: MatchResult }) | null = null;
   let heaviestDefeat: (Match & { result: MatchResult }) | null = null;
 
@@ -140,15 +150,17 @@ export function computeStats(matches: Match[]): Stats {
     if (r.didPlay) {
       appearances += 1;
       minutes += r.minutes;
-      goals += r.goals;
-      assists += r.assists;
+      addMetrics(totals, r.metrics);
       yellowCards += r.yellowCards;
       redCards += r.redCards;
+      if (r.goalsAgainst === 0) cleanSheetsPlayed += 1;
       if (r.motm) motm += 1;
       if (r.rating !== null) {
         ratingSum += r.rating;
         ratingCount += 1;
       }
+      scoreSum += matchScore(r).score;
+      scoreCount += 1;
     }
 
     const margin = r.goalsFor - r.goalsAgainst;
@@ -173,6 +185,8 @@ export function computeStats(matches: Match[]): Stats {
   }
 
   const points = base.wins * 3 + base.draws;
+  const goals = totals.goals ?? 0;
+  const assists = totals.assists ?? 0;
   const contributions = goals + assists;
 
   return {
@@ -182,12 +196,14 @@ export function computeStats(matches: Match[]): Stats {
     pointsPerGame: base.played ? points / base.played : 0,
     winRate: base.played ? base.wins / base.played : 0,
     cleanSheets,
+    cleanSheetsPlayed,
     failedToScore,
     shootoutWins,
     biggestWin,
     heaviestDefeat,
     appearances,
     minutes,
+    totals,
     goals,
     assists,
     contributions,
@@ -197,6 +213,7 @@ export function computeStats(matches: Match[]): Stats {
     averageRating: ratingCount ? ratingSum / ratingCount : null,
     goalsPerMatch: appearances ? goals / appearances : 0,
     minutesPerGoalContribution: contributions ? minutes / contributions : null,
+    averageScore: scoreCount ? scoreSum / scoreCount : null,
     form,
     streak,
   };
@@ -228,8 +245,8 @@ export function statsByCompetition(matches: Match[], competitions: Competition[]
     }
     addToRecord(entry, match.result);
     if (match.result.didPlay) {
-      entry.goals += match.result.goals;
-      entry.assists += match.result.assists;
+      entry.goals += match.result.metrics.goals ?? 0;
+      entry.assists += match.result.metrics.assists ?? 0;
     }
   }
 
@@ -293,8 +310,8 @@ export function statsByMonth(matches: Match[], count = 6, now: Date = new Date()
     else if (outcome === 'D') bucket.draws += 1;
     else bucket.losses += 1;
     if (match.result.didPlay) {
-      bucket.goals += match.result.goals;
-      bucket.assists += match.result.assists;
+      bucket.goals += match.result.metrics.goals ?? 0;
+      bucket.assists += match.result.metrics.assists ?? 0;
     }
   }
   return buckets;
@@ -342,4 +359,47 @@ export function daysSinceLastMatch(matches: Match[], now: Date = new Date()): nu
   const a = fromISODate(last.date).getTime();
   const b = fromISODate(toISODate(now)).getTime();
   return Math.round((b - a) / 86400000);
+}
+
+export interface TeamBreakdown extends Record_ {
+  team: Team | null;
+  appearances: number;
+  points: number;
+}
+
+export function statsByTeam(matches: Match[], teams: Team[]): TeamBreakdown[] {
+  const byId = new Map<string, TeamBreakdown>();
+
+  for (const match of playedMatches(matches)) {
+    const key = match.teamId ?? '__none__';
+    let entry = byId.get(key);
+    if (!entry) {
+      entry = {
+        ...emptyRecord(),
+        team: teams.find((t) => t.id === match.teamId) ?? null,
+        appearances: 0,
+        points: 0,
+      };
+      byId.set(key, entry);
+    }
+    addToRecord(entry, match.result);
+    if (match.result.didPlay) entry.appearances += 1;
+  }
+
+  const out = [...byId.values()];
+  for (const entry of out) entry.points = entry.wins * 3 + entry.draws;
+  return out.sort((a, b) => b.played - a.played);
+}
+
+export interface ScoredMatch {
+  match: Match & { result: MatchResult };
+  score: number;
+}
+
+/** The player's last `count` performances, most recent first, for the score trend. */
+export function recentScores(matches: Match[], count = 5): ScoredMatch[] {
+  return playedMatches(matches)
+    .filter((m) => m.result.didPlay)
+    .slice(0, count)
+    .map((match) => ({ match, score: matchScore(match.result).score }));
 }

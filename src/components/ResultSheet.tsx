@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { POSITIONS, emptyResult, type Match, type MatchResult } from '../types';
+import {
+  ALL_POSITIONS, POSITIONS_BY_GROUP, POSITION_GROUP_LABEL, emptyResult, groupForPosition,
+  type MatchResult, type Match, type MetricId, type PositionGroup,
+} from '../types';
 import { formatDateShort, formatTime } from '../lib/date';
+import { formMetricsFor, pruneMetrics } from '../lib/metrics';
+import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
 import { Field, Sheet, Stepper } from './ui';
 
 /**
- * Entering a result for one match. Also used by the post-kickoff prompt,
- * where `onSkip` offers "remind me later" instead of a plain cancel.
+ * Entering a result for one match. The stats it asks for follow the position
+ * played - saves and goals conceded for a keeper, shots and chances for a forward.
  */
 export function ResultSheet({
   match,
@@ -23,8 +28,11 @@ export function ResultSheet({
   onSkip?: () => void;
   headline?: string;
 }) {
-  const { saveResult, updateMatch, settings, competitionOf, cancelMatch } = useStore();
-  const [result, setResult] = useState<MatchResult>(() => emptyResult(settings.defaultPosition));
+  const { saveResult, updateMatch, profile, competitionOf, teamOf, cancelMatch } = useStore();
+  const team = match ? teamOf(match) : null;
+  const defaultPosition = team?.position || profile.position;
+
+  const [result, setResult] = useState<MatchResult>(() => emptyResult(defaultPosition));
   const [notes, setNotes] = useState('');
   const [showPens, setShowPens] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -32,19 +40,34 @@ export function ResultSheet({
   useEffect(() => {
     if (!match) return;
     const existing = match.result;
-    setResult(existing ?? emptyResult(settings.defaultPosition));
+    setResult(existing ?? emptyResult(team?.position || profile.position));
     setNotes(match.notes ?? '');
     setShowPens(existing?.penaltiesFor !== null && existing?.penaltiesFor !== undefined);
     setShowDetail(Boolean(existing));
-  }, [match, settings.defaultPosition]);
+  }, [match, profile.position, team]);
+
+  const group = result.positionGroup;
+  const metricDefs = useMemo(() => formMetricsFor(group, result.metrics), [group, result.metrics]);
+  const primary = metricDefs.filter((m) => m.primary);
+  const secondary = metricDefs.filter((m) => !m.primary);
+  const preview = useMemo(() => matchScore(result), [result]);
 
   if (!match) return null;
 
   const competition = competitionOf(match);
   const patch = (over: Partial<MatchResult>) => setResult((r) => ({ ...r, ...over }));
+  const setMetric = (id: MetricId, value: number) =>
+    setResult((r) => ({ ...r, metrics: { ...r.metrics, [id]: value } }));
   const isDraw = result.goalsFor === result.goalsAgainst;
-  const us = settings.teamName.trim() || 'Us';
+  const us = team?.name?.trim() || 'Us';
   const them = match.opponent.trim() || 'Them';
+
+  const changeGroup = (nextGroup: PositionGroup) => {
+    const nextPosition = POSITIONS_BY_GROUP[nextGroup].includes(result.position)
+      ? result.position
+      : POSITIONS_BY_GROUP[nextGroup][0];
+    patch({ positionGroup: nextGroup, position: nextPosition });
+  };
 
   const save = () => {
     const cleaned: MatchResult = {
@@ -52,12 +75,11 @@ export function ResultSheet({
       penaltiesFor: showPens && isDraw ? result.penaltiesFor ?? 0 : null,
       penaltiesAgainst: showPens && isDraw ? result.penaltiesAgainst ?? 0 : null,
       minutes: result.didPlay ? result.minutes : 0,
-      goals: result.didPlay ? result.goals : 0,
-      assists: result.didPlay ? result.assists : 0,
-      yellowCards: result.didPlay ? result.yellowCards : 0,
-      redCards: result.didPlay ? result.redCards : 0,
       motm: result.didPlay ? result.motm : false,
       rating: result.didPlay ? result.rating : null,
+      yellowCards: result.didPlay ? result.yellowCards : 0,
+      redCards: result.didPlay ? result.redCards : 0,
+      metrics: result.didPlay ? pruneMetrics(result.metrics) : {},
     };
     saveResult(match.id, cleaned);
     if (notes !== match.notes) updateMatch(match.id, { notes });
@@ -131,9 +153,39 @@ export function ResultSheet({
 
       {result.didPlay && (
         <>
+          <Field label="Position played" hint="Changes which stats are tracked below">
+            <div className="chip-wrap">
+              {(Object.keys(POSITIONS_BY_GROUP) as PositionGroup[]).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  className={g === group ? 'filter-chip on' : 'filter-chip'}
+                  onClick={() => changeGroup(g)}
+                >
+                  {POSITION_GROUP_LABEL[g]}
+                </button>
+              ))}
+            </div>
+          </Field>
+
           <div className="stat-steppers">
-            <Stepper label="Goals" value={result.goals} onChange={(v) => patch({ goals: v })} max={20} />
-            <Stepper label="Assists" value={result.assists} onChange={(v) => patch({ assists: v })} max={20} />
+            {primary.map((m) => (
+              <Stepper
+                key={m.id}
+                label={m.label}
+                value={result.metrics[m.id] ?? 0}
+                onChange={(v) => setMetric(m.id, v)}
+                max={m.max}
+              />
+            ))}
+          </div>
+
+          <div className={`score-preview band-${scoreBand(preview.score)}`}>
+            <span className="score-preview-value">{preview.score}</span>
+            <span className="score-preview-text">
+              <strong>{scoreVerdict(preview.score)}</strong>
+              <span>Match rating out of 100, updates as you type</span>
+            </span>
           </div>
 
           <button className="link-btn" onClick={() => setShowDetail((s) => !s)}>
@@ -142,6 +194,20 @@ export function ResultSheet({
 
           {showDetail && (
             <div className="detail-block">
+              {secondary.length > 0 && (
+                <div className="stat-steppers">
+                  {secondary.map((m) => (
+                    <Stepper
+                      key={m.id}
+                      label={m.label}
+                      value={result.metrics[m.id] ?? 0}
+                      onChange={(v) => setMetric(m.id, v)}
+                      max={m.max}
+                    />
+                  ))}
+                </div>
+              )}
+
               <div className="stat-steppers">
                 <Stepper label="Minutes" value={result.minutes} onChange={(v) => patch({ minutes: v })} max={130} step={5} />
                 <Stepper label="Yellows" value={result.yellowCards} onChange={(v) => patch({ yellowCards: v })} max={2} />
@@ -150,8 +216,12 @@ export function ResultSheet({
 
               <div className="row two">
                 <Field label="Position">
-                  <select className="input" value={result.position} onChange={(e) => patch({ position: e.target.value })}>
-                    {POSITIONS.map((p) => (
+                  <select
+                    className="input"
+                    value={result.position}
+                    onChange={(e) => patch({ position: e.target.value, positionGroup: groupForPosition(e.target.value) })}
+                  >
+                    {ALL_POSITIONS.map((p) => (
                       <option key={p} value={p}>
                         {p}
                       </option>
@@ -182,7 +252,13 @@ export function ResultSheet({
       )}
 
       <Field label="Match notes" hint="Optional">
-        <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering?" />
+        <textarea
+          className="input"
+          rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Anything worth remembering?"
+        />
       </Field>
 
       <button

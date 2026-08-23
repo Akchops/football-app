@@ -1,7 +1,9 @@
-import type { Competition, Match } from '../types';
+import { useStore } from '../store/AppStore';
+import type { Match } from '../types';
 import { VENUE_LABEL } from '../types';
 import { countdown, formatDateShort, formatTime, kickoffAt } from '../lib/date';
 import { outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
+import { matchScore, scoreBand } from '../lib/score';
 
 export function ResultBadge({ match }: { match: Match }) {
   if (match.status === 'cancelled') return <span className="badge cancelled">Called off</span>;
@@ -18,27 +20,29 @@ export function ResultBadge({ match }: { match: Match }) {
 
 export function MatchCard({
   match,
-  competition,
   showDate = false,
   onOpen,
   onEnterResult,
   now = new Date(),
 }: {
   match: Match;
-  competition: Competition | null;
   showDate?: boolean;
   onOpen: () => void;
   onEnterResult?: () => void;
   now?: Date;
 }) {
+  const { competitionOf, teamOf, colorOf, teams } = useStore();
+  const competition = competitionOf(match);
+  const team = teamOf(match);
   const kickoff = kickoffAt(match.date, match.time);
   const awaitingResult = match.status === 'scheduled' && kickoff.getTime() <= now.getTime();
   const upcoming = match.status === 'scheduled' && kickoff.getTime() > now.getTime();
+  const performance = match.result?.didPlay ? matchScore(match.result) : null;
 
   return (
     <div className={`match-card${match.status === 'cancelled' ? ' is-cancelled' : ''}`}>
       <button className="match-main" onClick={onOpen}>
-        <span className="match-rail" style={{ background: competition?.color ?? 'var(--line)' }} aria-hidden="true" />
+        <span className="match-rail" style={{ background: colorOf(match) }} aria-hidden="true" />
         <span className="match-when">
           {showDate && <span className="match-date">{formatDateShort(match.date)}</span>}
           <span className="match-time">{formatTime(match.time)}</span>
@@ -48,6 +52,11 @@ export function MatchCard({
             <span className="vs">{match.venue === 'away' ? '@' : 'vs'}</span> {match.opponent || 'TBC'}
           </span>
           <span className="match-meta">
+            {teams.length > 1 && team && (
+              <span className="meta-chip" style={{ color: team.color }}>
+                {team.name}
+              </span>
+            )}
             {competition && <span className="meta-chip">{competition.name}</span>}
             <span className="meta-chip subtle">{VENUE_LABEL[match.venue]}</span>
             {match.location && <span className="meta-chip subtle">{match.location}</span>}
@@ -55,6 +64,7 @@ export function MatchCard({
         </span>
         <span className="match-right">
           <ResultBadge match={match} />
+          {performance && <span className={`score-pill band-${scoreBand(performance.score)}`}>{performance.score}</span>}
           {upcoming && <span className="countdown">{countdown(kickoff, now)}</span>}
           {awaitingResult && <span className="badge pending">Result?</span>}
         </span>

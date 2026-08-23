@@ -1,9 +1,15 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { COMPETITION_TYPE_LABEL, POSITIONS, type Competition } from '../types';
+import {
+  AGE_GROUPS, COMPETITION_TYPE_LABEL, POSITIONS_BY_GROUP, POSITION_GROUP_BLURB, POSITION_GROUP_LABEL,
+  type Competition, type PositionGroup, type Team,
+} from '../types';
+import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats } from '../lib/stats';
+import { formatBytes, listAllMedia } from '../store/media';
 import { EmptyState, Field, Section } from './ui';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
+import type { TeamFormTarget } from './TeamFormSheet';
 
 const PROMPT_DELAYS = [
   { value: 0, label: 'At kickoff' },
@@ -12,13 +18,31 @@ const PROMPT_DELAYS = [
   { value: 480, label: 'Later that day' },
 ];
 
-export function SetupScreen({ onEditCompetition }: { onEditCompetition: (t: CompetitionFormTarget) => void }) {
+const GROUPS: PositionGroup[] = ['goalkeeper', 'defender', 'midfielder', 'forward'];
+
+export function SetupScreen({
+  onEditCompetition,
+  onEditTeam,
+}: {
+  onEditCompetition: (t: CompetitionFormTarget) => void;
+  onEditTeam: (t: TeamFormTarget) => void;
+}) {
   const store = useStore();
-  const { settings, competitions, matches, updateSettings, deleteCompetition } = store;
+  const { settings, profile, competitions, teams, matches, updateSettings, updateProfile, deleteCompetition, deleteTeam } =
+    store;
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
+  const [mediaUsage, setMediaUsage] = useState<{ count: number; bytes: number } | null>(null);
 
+  useEffect(() => {
+    listAllMedia()
+      .then((items) => setMediaUsage({ count: items.length, bytes: items.reduce((sum, i) => sum + i.size, 0) }))
+      .catch(() => setMediaUsage(null));
+  }, [matches]);
+
+  const age = currentAge(profile.dateOfBirth);
   const matchCount = (c: Competition) => matches.filter((m) => m.competitionId === c.id).length;
+  const teamMatchCount = (t: Team) => matches.filter((m) => m.teamId === t.id).length;
 
   const removeCompetition = (c: Competition) => {
     const count = matchCount(c);
@@ -26,6 +50,14 @@ export function SetupScreen({ onEditCompetition }: { onEditCompetition: (t: Comp
       ? `Delete "${c.name}"? Its ${count} match${count === 1 ? '' : 'es'} will be kept but left without a competition.`
       : `Delete "${c.name}"?`;
     if (confirm(warning)) deleteCompetition(c.id);
+  };
+
+  const removeTeam = (t: Team) => {
+    const count = teamMatchCount(t);
+    const warning = count
+      ? `Delete "${t.name}"? Its ${count} match${count === 1 ? '' : 'es'} will be kept but left without a team.`
+      : `Delete "${t.name}"?`;
+    if (confirm(warning)) deleteTeam(t.id);
   };
 
   const exportBackup = () => {
@@ -36,7 +68,7 @@ export function SetupScreen({ onEditCompetition }: { onEditCompetition: (t: Comp
     a.download = `matchday-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    setMessage('Backup downloaded.');
+    setMessage('Backup downloaded. Videos and photos stay on the device — they are not in the backup file.');
   };
 
   const importBackup = async (file: File) => {
@@ -45,11 +77,125 @@ export function SetupScreen({ onEditCompetition }: { onEditCompetition: (t: Comp
     setMessage(result.ok ? 'Backup restored.' : result.error);
   };
 
+  const pickGroup = (group: PositionGroup) => {
+    const position = POSITIONS_BY_GROUP[group].includes(profile.position)
+      ? profile.position
+      : POSITIONS_BY_GROUP[group][0];
+    updateProfile({ positionGroup: group, position });
+  };
+
   return (
     <div className="screen">
       <div className="screen-head">
         <h1>Setup</h1>
       </div>
+
+      <Section title="Your profile">
+        <Field label="Name">
+          <input className="input" value={profile.name} onChange={(e) => updateProfile({ name: e.target.value })} />
+        </Field>
+        <div className="row two">
+          <Field label="Date of birth" hint={age !== null ? `Age ${age}` : undefined}>
+            <input
+              className="input"
+              type="date"
+              value={profile.dateOfBirth}
+              onChange={(e) => updateProfile({ dateOfBirth: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Age group"
+            hint={
+              profile.dateOfBirth && suggestAgeGroup(profile.dateOfBirth) !== profile.ageGroup
+                ? `Suggested: ${suggestAgeGroup(profile.dateOfBirth)}`
+                : undefined
+            }
+          >
+            <select className="input" value={profile.ageGroup} onChange={(e) => updateProfile({ ageGroup: e.target.value })}>
+              <option value="">Not set</option>
+              {AGE_GROUPS.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Position">
+        <p className="muted small">This decides which stats the app tracks and how your match score is worked out.</p>
+        <div className="position-grid">
+          {GROUPS.map((g) => (
+            <button
+              key={g}
+              type="button"
+              className={g === profile.positionGroup ? 'position-card on' : 'position-card'}
+              onClick={() => pickGroup(g)}
+            >
+              <span className="position-name">{POSITION_GROUP_LABEL[g]}</span>
+              <span className="position-blurb">{POSITION_GROUP_BLURB[g]}</span>
+            </button>
+          ))}
+        </div>
+        {POSITIONS_BY_GROUP[profile.positionGroup].length > 1 && (
+          <Field label="More specifically">
+            <div className="chip-wrap">
+              {POSITIONS_BY_GROUP[profile.positionGroup].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className={p === profile.position ? 'filter-chip on' : 'filter-chip'}
+                  onClick={() => updateProfile({ position: p })}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
+      </Section>
+
+      <Section
+        title="Your teams"
+        action={
+          <button className="ghost-btn" onClick={() => onEditTeam({ mode: 'create' })}>
+            + New
+          </button>
+        }
+      >
+        {teams.length === 0 ? (
+          <EmptyState
+            icon="👕"
+            title="No teams yet"
+            message="Add every team you play for. Each gets its own colour on the calendar."
+            action={
+              <button className="primary-btn" onClick={() => onEditTeam({ mode: 'create' })}>
+                Add a team
+              </button>
+            }
+          />
+        ) : (
+          <div className="list">
+            {teams.map((t) => (
+              <div key={t.id} className="comp-row">
+                <span className="swatch" style={{ background: t.color }} />
+                <button className="comp-main" onClick={() => onEditTeam({ mode: 'edit', team: t })}>
+                  <span className="comp-name">{t.name}</span>
+                  <span className="comp-meta">
+                    {[t.ageGroup, t.position].filter(Boolean).join(' · ')}
+                    {t.ageGroup || t.position ? ' · ' : ''}
+                    {teamMatchCount(t)} match{teamMatchCount(t) === 1 ? '' : 'es'}
+                  </span>
+                </button>
+                <button className="icon-btn" onClick={() => removeTeam(t)} aria-label={`Delete ${t.name}`}>
+                  🗑
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
 
       <Section
         title="Competitions"
@@ -95,37 +241,6 @@ export function SetupScreen({ onEditCompetition }: { onEditCompetition: (t: Comp
         )}
       </Section>
 
-      <Section title="You & your team">
-        <Field label="Team name" hint="Used on the scoreboard when you log a result">
-          <input
-            className="input"
-            value={settings.teamName}
-            onChange={(e) => updateSettings({ teamName: e.target.value })}
-            placeholder="e.g. Wanderers FC"
-          />
-        </Field>
-        <Field label="Your name" hint="Optional">
-          <input
-            className="input"
-            value={settings.playerName}
-            onChange={(e) => updateSettings({ playerName: e.target.value })}
-          />
-        </Field>
-        <Field label="Usual position">
-          <select
-            className="input"
-            value={settings.defaultPosition}
-            onChange={(e) => updateSettings({ defaultPosition: e.target.value })}
-          >
-            {POSITIONS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </Section>
-
       <Section title="Match defaults">
         <Field label="Ask me for the result" hint="When a match has kicked off, the app prompts you next time you open it.">
           <select
@@ -140,29 +255,44 @@ export function SetupScreen({ onEditCompetition }: { onEditCompetition: (t: Comp
             ))}
           </select>
         </Field>
-        <Field label="Default kickoff time">
-          <input
-            className="input"
-            type="time"
-            value={settings.defaultKickoff}
-            onChange={(e) => updateSettings({ defaultKickoff: e.target.value })}
-          />
-        </Field>
-        <Field label="Week starts on">
+        <Field label="Colour the calendar by" hint="Which colour the dots on a match day use">
           <select
             className="input"
-            value={settings.weekStartsOn}
-            onChange={(e) => updateSettings({ weekStartsOn: Number(e.target.value) === 0 ? 0 : 1 })}
+            value={settings.calendarColorBy}
+            onChange={(e) => updateSettings({ calendarColorBy: e.target.value === 'team' ? 'team' : 'competition' })}
           >
-            <option value={1}>Monday</option>
-            <option value={0}>Sunday</option>
+            <option value="competition">Competition</option>
+            <option value="team">Team</option>
           </select>
         </Field>
+        <div className="row two">
+          <Field label="Default kickoff time">
+            <input
+              className="input"
+              type="time"
+              value={settings.defaultKickoff}
+              onChange={(e) => updateSettings({ defaultKickoff: e.target.value })}
+            />
+          </Field>
+          <Field label="Week starts on">
+            <select
+              className="input"
+              value={settings.weekStartsOn}
+              onChange={(e) => updateSettings({ weekStartsOn: Number(e.target.value) === 0 ? 0 : 1 })}
+            >
+              <option value={1}>Monday</option>
+              <option value={0}>Sunday</option>
+            </select>
+          </Field>
+        </div>
       </Section>
 
       <Section title="Your data">
         <p className="muted small">
           Everything is stored on this device only — nothing is uploaded. Back it up before changing phones.
+          {mediaUsage && mediaUsage.count > 0
+            ? ` Videos and photos use ${formatBytes(mediaUsage.bytes)} across ${mediaUsage.count} file${mediaUsage.count === 1 ? '' : 's'}.`
+            : ''}
         </p>
         {message && <p className="notice">{message}</p>}
         <div className="button-row">
@@ -199,7 +329,7 @@ export function SetupScreen({ onEditCompetition }: { onEditCompetition: (t: Comp
           <button
             className="danger-link"
             onClick={() => {
-              if (confirm('Delete every match, competition and setting? This cannot be undone.')) {
+              if (confirm('Delete every match, team, competition and setting? This cannot be undone.')) {
                 store.clearAllData();
                 setMessage('All data cleared.');
               }

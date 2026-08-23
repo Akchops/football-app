@@ -1,26 +1,52 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { VENUE_LABEL } from '../types';
+import { POSITION_GROUP_LABEL, VENUE_LABEL, type PositionGroup } from '../types';
 import { formatDateShort } from '../lib/date';
+import { positionStatCards, showsTeamAttack } from '../lib/metrics';
+import { scoreBand, scoreVerdict } from '../lib/score';
 import {
-  computeStats, recordSummary, scoreline, statsByCompetition, statsByMonth, statsByOpponent, statsByVenue,
+  computeStats, recentScores, recordSummary, scoreline, statsByCompetition, statsByMonth,
+  statsByOpponent, statsByTeam, statsByVenue,
 } from '../lib/stats';
 import { EmptyState, Section, StatTile } from './ui';
 
 export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: () => void }) {
-  const { matches, competitions, settings } = useStore();
+  const { matches, competitions, teams, profile } = useStore();
   const [competitionId, setCompetitionId] = useState<string>('all');
+  const [teamId, setTeamId] = useState<string>('all');
 
   const scoped = useMemo(
-    () => (competitionId === 'all' ? matches : matches.filter((m) => (m.competitionId ?? '') === competitionId)),
-    [matches, competitionId],
+    () =>
+      matches
+        .filter((m) => competitionId === 'all' || (m.competitionId ?? '') === competitionId)
+        .filter((m) => teamId === 'all' || (m.teamId ?? '') === teamId),
+    [matches, competitionId, teamId],
   );
 
   const stats = useMemo(() => computeStats(scoped), [scoped]);
   const byComp = useMemo(() => statsByCompetition(matches, competitions), [matches, competitions]);
+  const byTeam = useMemo(() => statsByTeam(matches, teams), [matches, teams]);
   const byMonth = useMemo(() => statsByMonth(scoped, 6, now), [scoped, now]);
   const byVenue = useMemo(() => statsByVenue(scoped), [scoped]);
   const byOpponent = useMemo(() => statsByOpponent(scoped), [scoped]);
+  const trend = useMemo(() => recentScores(scoped, 5), [scoped]);
+
+  // Judge the player by the position they actually played most in this selection.
+  const group: PositionGroup = useMemo(() => {
+    const counts = new Map<PositionGroup, number>();
+    for (const m of scoped) {
+      if (m.result?.didPlay) counts.set(m.result.positionGroup, (counts.get(m.result.positionGroup) ?? 0) + 1);
+    }
+    let best: PositionGroup = profile.positionGroup;
+    let bestCount = 0;
+    for (const [g, count] of counts) {
+      if (count > bestCount) {
+        best = g;
+        bestCount = count;
+      }
+    }
+    return best;
+  }, [scoped, profile.positionGroup]);
 
   if (stats.played === 0) {
     return (
@@ -31,7 +57,7 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
         <EmptyState
           icon="📊"
           title="No stats yet"
-          message="Log a couple of results and this page fills up: record, goals, assists, form and more."
+          message="Log a couple of results and this page fills up with the numbers that matter for your position."
           action={
             <button className="primary-btn" onClick={onGoToMatches}>
               Go to matches
@@ -47,12 +73,42 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
   const drawPct = stats.played ? Math.round((stats.draws / stats.played) * 100) : 0;
   const lossPct = Math.max(0, 100 - winPct - drawPct);
 
+  const positionCards = positionStatCards(group, {
+    appearances: stats.appearances,
+    played: stats.played,
+    minutes: stats.minutes,
+    cleanSheetsPlayed: stats.cleanSheetsPlayed,
+    goalsAgainst: stats.goalsAgainst,
+    totals: stats.totals,
+  });
+
   return (
     <div className="screen">
       <div className="screen-head">
         <h1>Stats</h1>
-        {settings.playerName && <span className="muted small">{settings.playerName}</span>}
+        <span className="muted small">
+          {profile.name ? `${profile.name} · ` : ''}
+          {POSITION_GROUP_LABEL[group]}
+        </span>
       </div>
+
+      {teams.length > 1 && (
+        <div className="chip-scroll">
+          <button className={teamId === 'all' ? 'filter-chip on' : 'filter-chip'} onClick={() => setTeamId('all')}>
+            All teams
+          </button>
+          {teams.map((t) => (
+            <button
+              key={t.id}
+              className={teamId === t.id ? 'filter-chip on' : 'filter-chip'}
+              onClick={() => setTeamId(t.id)}
+              style={teamId === t.id ? { borderColor: t.color, color: t.color } : undefined}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {competitions.length > 0 && (
         <div className="chip-scroll">
@@ -111,20 +167,78 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
       </div>
 
       <div className="tile-grid">
-        <StatTile label="Goals for" value={stats.goalsFor} sub={`${(stats.goalsFor / stats.played).toFixed(1)} per game`} />
-        <StatTile label="Goals against" value={stats.goalsAgainst} sub={`${(stats.goalsAgainst / stats.played).toFixed(1)} per game`} />
+        {showsTeamAttack(group) && (
+          <StatTile label="Goals for" value={stats.goalsFor} sub={`${(stats.goalsFor / stats.played).toFixed(1)} per game`} />
+        )}
+        <StatTile
+          label="Goals against"
+          value={stats.goalsAgainst}
+          sub={`${(stats.goalsAgainst / stats.played).toFixed(1)} per game`}
+        />
         <StatTile label="Goal difference" value={stats.goalDifference > 0 ? `+${stats.goalDifference}` : stats.goalDifference} />
-        <StatTile label="Clean sheets" value={stats.cleanSheets} sub={`${stats.failedToScore} blanks`} />
+        <StatTile label="Clean sheets" value={stats.cleanSheets} sub={`${stats.played - stats.cleanSheets} conceded in`} />
       </div>
 
-      <Section title="Your game">
+      <Section title={`Your game · ${POSITION_GROUP_LABEL[group]}`}>
+        {trend.length > 0 && (
+          <div className="trend">
+            <div className="trend-head">
+              <div>
+                <div className="trend-value">{stats.averageScore ? Math.round(stats.averageScore) : '–'}</div>
+                <div className="trend-label">Average match score</div>
+              </div>
+              <div className="trend-verdict">
+                {stats.averageScore !== null && (
+                  <>
+                    <strong>{scoreVerdict(stats.averageScore)}</strong>
+                    <span>{stats.appearances} appearances</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="trend-bars">
+              {[...trend].reverse().map(({ match, score }) => (
+                <div key={match.id} className="trend-col">
+                  <span className={`trend-score band-${scoreBand(score)}`}>{score}</span>
+                  <div className="trend-track">
+                    <div className={`trend-fill band-${scoreBand(score)}`} style={{ height: `${score}%` }} />
+                  </div>
+                  <span className="trend-opponent">{match.opponent.slice(0, 8)}</span>
+                  <span className="trend-date">{formatDateShort(match.date).slice(4)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="muted small">Out of 100, from the stats that matter in your position. Oldest to newest.</p>
+          </div>
+        )}
+
         <div className="tile-grid">
-          <StatTile label="Appearances" value={stats.appearances} sub={`${stats.minutes} mins`} />
-          <StatTile label="Goals" value={stats.goals} sub={`${stats.goalsPerMatch.toFixed(2)} per game`} />
-          <StatTile label="Assists" value={stats.assists} />
-          <StatTile label="G + A" value={stats.contributions} sub={stats.minutesPerGoalContribution ? `1 every ${Math.round(stats.minutesPerGoalContribution)} mins` : undefined} />
-          <StatTile label="Avg rating" value={stats.averageRating ? stats.averageRating.toFixed(1) : '–'} sub="out of 10" />
-          <StatTile label="MOTM" value={stats.motm} sub={`${stats.yellowCards}Y / ${stats.redCards}R`} />
+          {positionCards.map((card) => (
+            <StatTile key={card.label} label={card.label} value={card.value} sub={card.sub} />
+          ))}
+        </div>
+
+        <div className="table">
+          <div className="table-row">
+            <span className="table-name">Minutes played</span>
+            <span className="table-value">{stats.minutes}</span>
+            <span className="table-sub">{stats.appearances} appearances</span>
+          </div>
+          <div className="table-row">
+            <span className="table-name">Discipline</span>
+            <span className="table-value">
+              {stats.yellowCards}Y / {stats.redCards}R
+            </span>
+            <span className="table-sub">{stats.motm} man of the match</span>
+          </div>
+          {stats.averageRating !== null && (
+            <div className="table-row">
+              <span className="table-name">Your own rating</span>
+              <span className="table-value">{stats.averageRating.toFixed(1)}</span>
+              <span className="table-sub">out of 10, self-rated</span>
+            </div>
+          )}
         </div>
       </Section>
 
@@ -142,11 +256,26 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
             </div>
           ))}
         </div>
-        <p className="muted small">
-          {byMonth.reduce((sum, b) => sum + b.goals, 0)} goals and {byMonth.reduce((sum, b) => sum + b.assists, 0)} assists
-          in this window.
-        </p>
       </Section>
+
+      {byTeam.length > 1 && teamId === 'all' && (
+        <Section title="By team">
+          <div className="table">
+            {byTeam.map((row, i) => (
+              <div key={row.team?.id ?? `none-${i}`} className="table-row">
+                <span className="table-name">
+                  <span className="swatch" style={{ background: row.team?.color ?? 'var(--line)' }} />
+                  {row.team?.name ?? 'No team set'}
+                </span>
+                <span className="table-value">{recordSummary(row)}</span>
+                <span className="table-sub">
+                  {row.appearances} apps · {row.goalsFor}:{row.goalsAgainst}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {byComp.length > 0 && competitionId === 'all' && (
         <Section title="By competition">

@@ -20,7 +20,7 @@ export function ResultPrompt({
   onEnterResult: (match: Match) => void;
   onDismiss: () => void;
 }) {
-  const { competitionOf, snoozeMatch, cancelMatch, settings } = useStore();
+  const { competitionOf, colorOf, snoozeMatch, cancelMatch, profile } = useStore();
   if (pending.length === 0) return null;
 
   const snoozeAll = () => {
@@ -54,7 +54,7 @@ export function ResultPrompt({
     >
       <p className="prompt-lead">
         {many
-          ? `Tap a match to add the score${settings.playerName ? ` and ${settings.playerName}'s stats` : ' and your stats'}.`
+          ? `Tap a match to add the score${profile.name ? ` and ${profile.name}'s stats` : ' and your stats'}.`
           : 'Add the score and your stats while it’s fresh — it all feeds the stats page.'}
       </p>
 
@@ -63,7 +63,7 @@ export function ResultPrompt({
           const competition = competitionOf(m);
           return (
             <div key={m.id} className="prompt-row">
-              <span className="prompt-rail" style={{ background: competition?.color ?? 'var(--accent)' }} />
+              <span className="prompt-rail" style={{ background: colorOf(m) }} />
               <div className="prompt-info">
                 <div className="prompt-opponent">
                   {m.venue === 'away' ? '@' : 'vs'} {m.opponent || 'TBC'}

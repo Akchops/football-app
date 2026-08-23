@@ -15,14 +15,16 @@ export function CalendarScreen({
   now,
   onOpenMatch,
   onAddMatch,
+  onAddTournament,
   onEnterResult,
 }: {
   now: Date;
   onOpenMatch: (match: Match) => void;
   onAddMatch: (dateISO: string) => void;
+  onAddTournament: () => void;
   onEnterResult: (match: Match) => void;
 }) {
-  const { matches, settings, competitionOf } = useStore();
+  const { matches, settings, colorOf, teams, competitions, updateSettings } = useStore();
   const [cursor, setCursor] = useState(() => startOfMonth(now));
   const [selected, setSelected] = useState(() => todayISO(now));
 
@@ -83,6 +85,26 @@ export function CalendarScreen({
         </div>
       </div>
 
+      <div className="quick-row">
+        <button className="quick-btn" onClick={() => onAddMatch(selected)}>
+          + Match
+        </button>
+        <button className="quick-btn" onClick={onAddTournament}>
+          + Tournament
+        </button>
+        {(teams.length > 1 || competitions.length > 1) && (
+          <button
+            className="quick-btn subtle"
+            onClick={() =>
+              updateSettings({ calendarColorBy: settings.calendarColorBy === 'team' ? 'competition' : 'team' })
+            }
+            title="Switch what the calendar colours represent"
+          >
+            Colours: {settings.calendarColorBy === 'team' ? 'team' : 'competition'}
+          </button>
+        )}
+      </div>
+
       <div className="cal-grid" role="grid">
         {weekdayLabels(settings.weekStartsOn).map((d) => (
           <div key={d} className="cal-weekday" role="columnheader">
@@ -120,7 +142,7 @@ export function CalendarScreen({
                     <span
                       key={m.id}
                       className={`dot${m.status === 'played' ? ' filled' : ''}`}
-                      style={{ background: competitionOf(m)?.color ?? 'var(--accent)' }}
+                      style={{ background: colorOf(m) }}
                     />
                   ))}
                 </span>
@@ -147,7 +169,6 @@ export function CalendarScreen({
               <MatchCard
                 key={m.id}
                 match={m}
-                competition={competitionOf(m)}
                 now={now}
                 onOpen={() => onOpenMatch(m)}
                 onEnterResult={() => onEnterResult(m)}
@@ -160,13 +181,7 @@ export function CalendarScreen({
       {next ? (
         <div className="next-up">
           <div className="next-label">Next up · {countdown(kickoffAt(next.date, next.time), now)}</div>
-          <MatchCard
-            match={next}
-            competition={competitionOf(next)}
-            showDate
-            now={now}
-            onOpen={() => onOpenMatch(next)}
-          />
+          <MatchCard match={next} showDate now={now} onOpen={() => onOpenMatch(next)} />
         </div>
       ) : matches.length === 0 ? (
         <EmptyState

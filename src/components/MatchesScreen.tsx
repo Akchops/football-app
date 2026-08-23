@@ -19,13 +19,17 @@ export function MatchesScreen({
   onAddMatch: (dateISO?: string) => void;
   onEnterResult: (match: Match) => void;
 }) {
-  const { matches, competitions, competitionOf, settings } = useStore();
+  const { matches, competitions, teams, settings } = useStore();
   const [tab, setTab] = useState<Tab>('upcoming');
   const [competitionId, setCompetitionId] = useState<string>('all');
+  const [teamId, setTeamId] = useState<string>('all');
 
   const filtered = useMemo(
-    () => (competitionId === 'all' ? matches : matches.filter((m) => (m.competitionId ?? '') === competitionId)),
-    [matches, competitionId],
+    () =>
+      matches
+        .filter((m) => competitionId === 'all' || (m.competitionId ?? '') === competitionId)
+        .filter((m) => teamId === 'all' || (m.teamId ?? '') === teamId),
+    [matches, competitionId, teamId],
   );
 
   const pending = pendingResultMatches(filtered, settings, now);
@@ -57,7 +61,6 @@ export function MatchesScreen({
             <MatchCard
               key={m.id}
               match={m}
-              competition={competitionOf(m)}
               showDate={showDate}
               now={now}
               onOpen={() => onOpenMatch(m)}
@@ -86,6 +89,24 @@ export function MatchesScreen({
         value={tab}
         onChange={setTab}
       />
+
+      {teams.length > 1 && (
+        <div className="chip-scroll">
+          <button className={teamId === 'all' ? 'filter-chip on' : 'filter-chip'} onClick={() => setTeamId('all')}>
+            All teams
+          </button>
+          {teams.map((t) => (
+            <button
+              key={t.id}
+              className={teamId === t.id ? 'filter-chip on' : 'filter-chip'}
+              onClick={() => setTeamId(t.id)}
+              style={teamId === t.id ? { borderColor: t.color, color: t.color } : undefined}
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {competitions.length > 0 && (
         <div className="chip-scroll">
@@ -118,7 +139,6 @@ export function MatchesScreen({
                   <MatchCard
                     key={m.id}
                     match={m}
-                    competition={competitionOf(m)}
                     showDate
                     now={now}
                     onOpen={() => onOpenMatch(m)}

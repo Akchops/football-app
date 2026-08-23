@@ -13,6 +13,9 @@ import { MatchDetailSheet } from './components/MatchDetailSheet';
 import { ResultSheet } from './components/ResultSheet';
 import { ResultPrompt } from './components/ResultPrompt';
 import { CompetitionFormSheet, type CompetitionFormTarget } from './components/CompetitionFormSheet';
+import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
+import { TournamentSheet } from './components/TournamentSheet';
+import { OnboardingScreen } from './components/OnboardingScreen';
 import { BallIcon, CalendarIcon, ChartIcon, GearIcon } from './components/icons';
 
 type Tab = 'calendar' | 'matches' | 'stats' | 'setup';
@@ -25,7 +28,7 @@ const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
 ];
 
 function Shell() {
-  const { matches, settings } = useStore();
+  const { matches, settings, profile } = useStore();
   const now = useNow();
 
   const [tab, setTab] = useState<Tab>('calendar');
@@ -33,6 +36,8 @@ function Shell() {
   const [detailMatch, setDetailMatch] = useState<Match | null>(null);
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [competitionForm, setCompetitionForm] = useState<CompetitionFormTarget | null>(null);
+  const [teamForm, setTeamForm] = useState<TeamFormTarget | null>(null);
+  const [tournamentOpen, setTournamentOpen] = useState(false);
   const [promptHidden, setPromptHidden] = useState(false);
 
   const pending = useMemo(() => pendingResultMatches(matches, settings, now), [matches, settings, now]);
@@ -46,6 +51,9 @@ function Shell() {
   };
 
   const showPrompt = !promptHidden && pending.length > 0 && !resultMatch && !matchForm;
+
+  // First run: collect the player's details before showing the app proper.
+  if (!profile.onboardedAt) return <OnboardingScreen />;
 
   return (
     <div className="app">
@@ -69,6 +77,7 @@ function Shell() {
             now={now}
             onOpenMatch={setDetailMatch}
             onAddMatch={(dateISO) => setMatchForm({ mode: 'create', dateISO })}
+            onAddTournament={() => setTournamentOpen(true)}
             onEnterResult={openResult}
           />
         )}
@@ -81,7 +90,7 @@ function Shell() {
           />
         )}
         {tab === 'stats' && <StatsScreen now={now} onGoToMatches={() => setTab('matches')} />}
-        {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} />}
+        {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
       </main>
 
       <nav className="tabbar">
@@ -132,6 +141,10 @@ function Shell() {
       />
 
       <CompetitionFormSheet target={competitionForm} onClose={() => setCompetitionForm(null)} />
+
+      <TeamFormSheet target={teamForm} onClose={() => setTeamForm(null)} />
+
+      <TournamentSheet open={tournamentOpen} onClose={() => setTournamentOpen(false)} />
     </div>
   );
 }

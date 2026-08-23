@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  countdown, daysBetween, formatDateShort, formatTime, fromISODate, kickoffAt, monthGrid,
-  relativeDayLabel, seasonLabel, toISODate, weekdayLabels,
+  ageOn, countdown, daysBetween, formatDateShort, formatTime, fromISODate, kickoffAt, monthGrid,
+  relativeDayLabel, seasonLabel, suggestAgeGroup, toISODate, weekdayLabels,
 } from './date';
 
 describe('date helpers', () => {
@@ -73,5 +73,21 @@ describe('date helpers', () => {
   it('rolls the season over in July', () => {
     expect(seasonLabel(new Date(2026, 7, 1))).toBe('2026/27');
     expect(seasonLabel(new Date(2026, 2, 1))).toBe('2025/26');
+  });
+});
+
+describe('age helpers', () => {
+  it('works out age, allowing for a birthday that has not happened yet', () => {
+    expect(ageOn('2010-04-12', new Date(2026, 7, 23))).toBe(16);
+    expect(ageOn('2010-12-12', new Date(2026, 7, 23))).toBe(15);
+    expect(ageOn('', new Date(2026, 7, 23))).toBeNull();
+  });
+
+  it('suggests a youth age group from age on 31 August', () => {
+    // Turns 15 in April 2026, so 15 on 31 Aug 2026 -> U16 for the 2026/27 season.
+    expect(suggestAgeGroup('2011-04-12', new Date(2026, 8, 15))).toBe('U16');
+    expect(suggestAgeGroup('2000-04-12', new Date(2026, 8, 15))).toBe('Open age');
+    expect(suggestAgeGroup('2007-04-12', new Date(2026, 8, 15))).toBe('U21');
+    expect(suggestAgeGroup('', new Date(2026, 8, 15))).toBe('');
   });
 });

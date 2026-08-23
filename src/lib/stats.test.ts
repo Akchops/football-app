@@ -11,6 +11,7 @@ function match(over: Partial<Match> = {}): Match {
   return {
     id: `m${seq}`,
     competitionId: null,
+    teamId: null,
     opponent: 'Opponent',
     date: '2026-04-10',
     time: '16:30',
@@ -26,16 +27,20 @@ function match(over: Partial<Match> = {}): Match {
   };
 }
 
-function played(goalsFor: number, goalsAgainst: number, over: Partial<Match & MatchResult> = {}): Match {
-  const { date, time, venue, competitionId, opponent, ...resultOver } = over as Partial<Match> & Partial<MatchResult>;
+type PlayedOver = Partial<Pick<Match, 'date' | 'time' | 'venue' | 'competitionId' | 'teamId' | 'opponent'>> &
+  Partial<MatchResult>;
+
+function played(goalsFor: number, goalsAgainst: number, over: PlayedOver = {}): Match {
+  const { date, time, venue, competitionId, teamId, opponent, ...resultOver } = over;
   return match({
     status: 'played',
     date: date ?? '2026-04-10',
     time: time ?? '16:30',
     venue: venue ?? 'home',
     competitionId: competitionId ?? null,
+    teamId: teamId ?? null,
     opponent: opponent ?? 'Opponent',
-    result: { ...emptyResult('CM'), goalsFor, goalsAgainst, ...(resultOver as Partial<MatchResult>) },
+    result: { ...emptyResult('CM'), goalsFor, goalsAgainst, ...resultOver },
   });
 }
 
@@ -117,10 +122,10 @@ describe('upcomingMatches', () => {
 
 describe('computeStats', () => {
   const list = [
-    played(2, 1, { date: '2026-04-01', goals: 1, assists: 1, rating: 8, motm: true }),
+    played(2, 1, { date: '2026-04-01', metrics: { goals: 1, assists: 1 }, rating: 8, motm: true }),
     played(0, 3, { date: '2026-04-08', minutes: 65, rating: 5 }),
-    played(1, 1, { date: '2026-04-15', penaltiesFor: 4, penaltiesAgainst: 3, assists: 1 }),
-    played(3, 0, { date: '2026-04-22', goals: 2, venue: 'away' }),
+    played(1, 1, { date: '2026-04-15', penaltiesFor: 4, penaltiesAgainst: 3, metrics: { assists: 1 } }),
+    played(3, 0, { date: '2026-04-22', metrics: { goals: 2 }, venue: 'away' }),
     match({ date: '2026-05-01' }), // still scheduled - must not count
   ];
   const stats = computeStats(list);
@@ -154,7 +159,10 @@ describe('computeStats', () => {
   });
 
   it('excludes matches you sat out from personal totals but not the team record', () => {
-    const withBench = computeStats([played(2, 0, { didPlay: false, goals: 0 }), played(1, 0, { goals: 1 })]);
+    const withBench = computeStats([
+      played(2, 0, { didPlay: false }),
+      played(1, 0, { metrics: { goals: 1 } }),
+    ]);
     expect(withBench.played).toBe(2);
     expect(withBench.appearances).toBe(1);
     expect(withBench.goals).toBe(1);
@@ -203,7 +211,7 @@ describe('breakdowns', () => {
   it('buckets recent months and ignores anything older', () => {
     const now = new Date(2026, 3, 20);
     const buckets = statsByMonth(
-      [played(1, 0, { date: '2026-04-02', goals: 1 }), played(0, 1, { date: '2025-04-02' })],
+      [played(1, 0, { date: '2026-04-02', metrics: { goals: 1 } }), played(0, 1, { date: '2025-04-02' })],
       6,
       now,
     );

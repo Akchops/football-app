@@ -26,13 +26,14 @@ export function MatchFormSheet({
   /** Fired with the new match so the caller can follow up - e.g. ask for the result of a match that has already been played. */
   onCreated?: (match: Match) => void;
 }) {
-  const { addMatch, updateMatch, competitions, settings } = useStore();
+  const { addMatch, updateMatch, competitions, teams, settings } = useStore();
   const editing = target?.mode === 'edit' ? target.match ?? null : null;
 
   const [opponent, setOpponent] = useState('');
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(settings.defaultKickoff);
   const [competitionId, setCompetitionId] = useState<string>('');
+  const [teamId, setTeamId] = useState<string>('');
   const [venue, setVenue] = useState<Venue>('home');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
@@ -47,6 +48,7 @@ export function MatchFormSheet({
       setDate(m.date);
       setTime(m.time);
       setCompetitionId(m.competitionId ?? '');
+      setTeamId(m.teamId ?? '');
       setVenue(m.venue);
       setLocation(m.location);
       setNotes(m.notes);
@@ -56,11 +58,12 @@ export function MatchFormSheet({
       setTime(settings.defaultKickoff);
       // Default to the only competition when there is just one - one less tap.
       setCompetitionId(competitions.length === 1 ? competitions[0].id : '');
+      setTeamId(teams.length >= 1 ? teams[0].id : '');
       setVenue('home');
       setLocation('');
       setNotes('');
     }
-  }, [target, settings.defaultKickoff, competitions]);
+  }, [target, settings.defaultKickoff, competitions, teams]);
 
   if (!target) return null;
 
@@ -78,6 +81,7 @@ export function MatchFormSheet({
       date,
       time: time || '00:00',
       competitionId: competitionId || null,
+      teamId: teamId || null,
       venue,
       location: location.trim(),
       notes: notes.trim(),
@@ -129,6 +133,20 @@ export function MatchFormSheet({
           <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </Field>
       </div>
+
+      {teams.length > 0 && (
+        <Field label="Playing for" hint={teams.length === 1 ? undefined : 'Which of your teams is this match for?'}>
+          <select className="input" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+            <option value="">No team set</option>
+            {teams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+                {t.ageGroup ? ` (${t.ageGroup})` : ''}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       <Field label="Home or away">
         <Segmented options={VENUE_OPTIONS} value={venue} onChange={setVenue} />

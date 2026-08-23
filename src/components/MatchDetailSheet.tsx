@@ -1,7 +1,9 @@
 import { useStore } from '../store/AppStore';
-import { VENUE_LABEL, type Match } from '../types';
+import { METRIC_BY_ID, VENUE_LABEL, type Match, type MetricId } from '../types';
 import { formatDateLong, formatTime, kickoffAt, relativeDayLabel } from '../lib/date';
 import { outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
+import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
+import { MediaGallery } from './MediaGallery';
 import { Sheet } from './ui';
 
 export function MatchDetailSheet({
@@ -17,13 +19,16 @@ export function MatchDetailSheet({
   onEdit: (match: Match) => void;
   onEnterResult: (match: Match) => void;
 }) {
-  const { competitionOf, deleteMatch, cancelMatch, restoreMatch, settings } = useStore();
+  const { competitionOf, teamOf, deleteMatch, cancelMatch, restoreMatch } = useStore();
   if (!match) return null;
 
   const competition = competitionOf(match);
+  const team = teamOf(match);
   const kickoff = kickoffAt(match.date, match.time);
   const started = kickoff.getTime() <= now.getTime();
-  const us = settings.teamName.trim() || 'Us';
+  const us = team?.name?.trim() || 'Us';
+  const result = match.result;
+  const performance = result?.didPlay ? matchScore(result) : null;
 
   const remove = () => {
     if (confirm(`Delete the match against ${match.opponent}? This can't be undone.`)) {
@@ -45,23 +50,81 @@ export function MatchDetailSheet({
           </button>
           {match.status !== 'cancelled' && (
             <button className="primary-btn wide" onClick={() => onEnterResult(match)}>
-              {match.result ? 'Edit result' : started ? 'Enter result' : 'Log result early'}
+              {result ? 'Edit result' : started ? 'Enter result' : 'Log result early'}
             </button>
           )}
         </>
       }
     >
-      {match.result && (
-        <div className={`result-hero outcome-${outcomeOf(match.result).toLowerCase()}`}>
-          <div className="result-score">{scoreline(match.result)}</div>
+      {result && (
+        <div className={`result-hero outcome-${outcomeOf(result).toLowerCase()}`}>
+          <div className="result-score">{scoreline(result)}</div>
           <div className="result-caption">
-            {outcomeOf(match.result) === 'W' ? 'Win' : outcomeOf(match.result) === 'L' ? 'Defeat' : 'Draw'}
-            {shootoutWinner(match.result) === 'us' && ' · won on penalties'}
-            {shootoutWinner(match.result) === 'them' && ' · lost on penalties'}
+            {outcomeOf(result) === 'W' ? 'Win' : outcomeOf(result) === 'L' ? 'Defeat' : 'Draw'}
+            {shootoutWinner(result) === 'us' && ' · won on penalties'}
+            {shootoutWinner(result) === 'them' && ' · lost on penalties'}
             {` · ${us} ${match.venue === 'away' ? 'away' : match.venue === 'home' ? 'at home' : 'neutral venue'}`}
           </div>
         </div>
       )}
+
+      {performance && result && (
+        <div className="performance">
+          <div className={`perf-head band-${scoreBand(performance.score)}`}>
+            <div className="perf-score">
+              {performance.score}
+              <span>/100</span>
+            </div>
+            <div className="perf-verdict">
+              <strong>{scoreVerdict(performance.score)}</strong>
+              <span>
+                {result.position} · {result.minutes} mins
+                {result.motm ? ' · Man of the match' : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="perf-stats">
+            {(Object.keys(result.metrics) as MetricId[])
+              .filter((id) => (result.metrics[id] ?? 0) !== 0)
+              .map((id) => (
+                <div key={id} className="perf-stat">
+                  <span className="perf-stat-value">{result.metrics[id]}</span>
+                  <span className="perf-stat-label">{METRIC_BY_ID[id]?.short ?? id}</span>
+                </div>
+              ))}
+            {result.goalsAgainst === 0 && (
+              <div className="perf-stat">
+                <span className="perf-stat-value">✓</span>
+                <span className="perf-stat-label">Clean sheet</span>
+              </div>
+            )}
+            {result.rating !== null && (
+              <div className="perf-stat">
+                <span className="perf-stat-value">{result.rating}</span>
+                <span className="perf-stat-label">Your rating</span>
+              </div>
+            )}
+          </div>
+
+          <details className="perf-breakdown">
+            <summary>How this score was worked out</summary>
+            <ul>
+              {performance.breakdown.map((part, i) => (
+                <li key={i}>
+                  <span>{part.label}</span>
+                  <span className={part.points > 0 ? 'plus' : part.points < 0 ? 'minus' : 'neutral'}>
+                    {part.points > 0 ? '+' : ''}
+                    {part.points === 0 ? '—' : Math.round(part.points * 10) / 10}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      )}
+
+      {result && !result.didPlay && <p className="muted small">You didn't feature in this match.</p>}
 
       <dl className="detail-list">
         <div>
@@ -71,8 +134,15 @@ export function MatchDetailSheet({
           </dd>
         </div>
         <div>
+          <dt>Team</dt>
+          <dd>{team ? `${team.name}${team.ageGroup ? ` · ${team.ageGroup}` : ''}` : 'Not set'}</dd>
+        </div>
+        <div>
           <dt>Venue</dt>
-          <dd>{VENUE_LABEL[match.venue]}{match.location ? ` · ${match.location}` : ''}</dd>
+          <dd>
+            {VENUE_LABEL[match.venue]}
+            {match.location ? ` · ${match.location}` : ''}
+          </dd>
         </div>
         <div>
           <dt>Competition</dt>
@@ -84,23 +154,7 @@ export function MatchDetailSheet({
         </div>
       </dl>
 
-      {match.result?.didPlay && (
-        <div className="your-game">
-          <h3>Your game</h3>
-          <div className="chips">
-            <span className="chip">{match.result.goals} goals</span>
-            <span className="chip">{match.result.assists} assists</span>
-            <span className="chip">{match.result.minutes} mins</span>
-            <span className="chip">{match.result.position}</span>
-            {match.result.rating !== null && <span className="chip">{match.result.rating}/10</span>}
-            {match.result.yellowCards > 0 && <span className="chip warn">{match.result.yellowCards} yellow</span>}
-            {match.result.redCards > 0 && <span className="chip danger">{match.result.redCards} red</span>}
-            {match.result.motm && <span className="chip gold">Man of the match</span>}
-          </div>
-        </div>
-      )}
-
-      {match.result && !match.result.didPlay && <p className="muted small">You didn't feature in this match.</p>}
+      <MediaGallery matchId={match.id} />
 
       {match.notes && (
         <div className="notes-block">
