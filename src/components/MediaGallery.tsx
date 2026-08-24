@@ -1,54 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  addMedia, deleteMedia, formatBytes, formatDuration, getMediaBlob, listMedia, type MediaMeta,
-} from '../store/media';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { addMedia, deleteMedia, formatBytes, listMedia, type MediaMeta } from '../store/media';
+import { MediaTile, MediaViewer } from './MediaViewer';
 
 /**
- * Videos and photos for one match. Files live in IndexedDB on the device -
- * a phone clip is far too big for localStorage, and nothing is uploaded.
+ * Videos and photos for one match, shown on the match itself. Files live in
+ * IndexedDB on the device - a phone clip is far bigger than localStorage allows.
  */
-export function MediaGallery({ matchId }: { matchId: string }) {
+export function MediaGallery({ matchId, onSeeAll }: { matchId: string; onSeeAll?: () => void }) {
   const [items, setItems] = useState<MediaMeta[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [viewing, setViewing] = useState<MediaMeta | null>(null);
-  const [viewUrl, setViewUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     listMedia(matchId)
       .then(setItems)
       .catch(() => setError('Could not read saved media on this device.'));
-  };
+  }, [matchId]);
 
-  useEffect(refresh, [matchId]);
-
-  // Object URLs are created only while a clip is open, and revoked on close.
-  useEffect(() => {
-    if (!viewing) {
-      setViewUrl(null);
-      return;
-    }
-    let url: string | null = null;
-    let cancelled = false;
-    getMediaBlob(viewing.id).then((blob) => {
-      if (!blob || cancelled) return;
-      url = URL.createObjectURL(blob);
-      setViewUrl(url);
-    });
-    return () => {
-      cancelled = true;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [viewing]);
+  useEffect(refresh, [refresh]);
 
   const onFiles = async (files: FileList) => {
     setBusy(true);
     setError('');
     try {
-      for (const file of Array.from(files)) {
-        await addMedia(matchId, file);
-      }
+      for (const file of Array.from(files)) await addMedia(matchId, file);
       refresh();
     } catch {
       setError("Couldn't save that file — the device may be out of space.");
@@ -97,30 +74,20 @@ export function MediaGallery({ matchId }: { matchId: string }) {
         <>
           <div className="media-grid">
             {items.map((item) => (
-              <div key={item.id} className="media-tile">
-                <button className="media-open" onClick={() => setViewing(item)}>
-                  {item.thumbnail ? (
-                    <img src={item.thumbnail} alt={item.name} />
-                  ) : (
-                    <span className="media-fallback">{item.kind === 'video' ? '🎬' : '🖼'}</span>
-                  )}
-                  {item.kind === 'video' && (
-                    <span className="media-play" aria-hidden="true">
-                      ▶
-                    </span>
-                  )}
-                  {item.duration ? <span className="media-duration">{formatDuration(item.duration)}</span> : null}
-                </button>
-                <button className="media-delete" onClick={() => remove(item)} aria-label={`Delete ${item.name}`}>
-                  ✕
-                </button>
-              </div>
+              <MediaTile key={item.id} item={item} onOpen={() => setViewing(item)} onDelete={() => void remove(item)} />
             ))}
           </div>
-          <p className="muted small">
-            {items.length} file{items.length === 1 ? '' : 's'} ·{' '}
-            {formatBytes(items.reduce((sum, i) => sum + i.size, 0))} on this device
-          </p>
+          <div className="media-foot">
+            <span className="muted small">
+              {items.length} file{items.length === 1 ? '' : 's'} ·{' '}
+              {formatBytes(items.reduce((sum, i) => sum + i.size, 0))}
+            </span>
+            {onSeeAll && (
+              <button className="link-btn" onClick={onSeeAll}>
+                See all media
+              </button>
+            )}
+          </div>
         </>
       )}
 
@@ -138,29 +105,7 @@ export function MediaGallery({ matchId }: { matchId: string }) {
         </div>
       )}
 
-      {viewing && (
-        <div className="viewer" onClick={() => setViewing(null)}>
-          <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
-            <div className="viewer-head">
-              <span>{viewing.name}</span>
-              <button className="icon-btn" onClick={() => setViewing(null)} aria-label="Close">
-                ✕
-              </button>
-            </div>
-            {!viewUrl ? (
-              <p className="muted small">Loading…</p>
-            ) : viewing.kind === 'video' ? (
-              <video src={viewUrl} controls autoPlay playsInline className="viewer-media" />
-            ) : (
-              <img src={viewUrl} alt={viewing.name} className="viewer-media" />
-            )}
-            <p className="muted small">
-              {formatBytes(viewing.size)}
-              {viewing.duration ? ` · ${formatDuration(viewing.duration)}` : ''}
-            </p>
-          </div>
-        </div>
-      )}
+      <MediaViewer item={viewing} onClose={() => setViewing(null)} />
     </div>
   );
 }

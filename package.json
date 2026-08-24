@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Football match tracker - calendar, results and stats",
+  "author": "Akchops",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

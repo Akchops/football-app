@@ -59,13 +59,22 @@ server, nothing uploaded.
 - You can switch position for a single match (a keeper filling in outfield) and
   the form follows
 
+**Media tab**
+- Every photo and clip in one place, grouped by match, newest match first
+- Adding a file asks which match it's from — recent matches you've actually
+  played are offered first, since that's nearly always the answer
+- "Not sure yet" keeps it unfiled at the top of the tab until you pick a match
+- Any clip can be moved to a different match later, or opened straight to its
+  match
+- Filter by video or photos
+
 **Each match**
 - Tap any match for that individual performance: score out of 100, a verdict,
   your stat line, and an expandable breakdown of exactly how the score was
   reached (`+18 clean sheet`, `+12.5 5 saves`, `−4 1 conceded`)
 - Attach videos and photos of the match — clips of saves, goals, big moments.
-  Files are stored in IndexedDB on the device, with thumbnails generated
-  automatically, and are never uploaded
+  The same files appear in the Media tab. Files are stored in IndexedDB on the
+  device, with thumbnails generated automatically, and are never uploaded
 
 **Stats**
 - Team record, win rate, points per game, form guide, streak
@@ -172,6 +181,16 @@ The logic modules are the parts worth trusting, so they're covered by tests
 (`npm test`, 65 of them): date handling around month boundaries and local
 midnight, every stat the app reports, the scoring engine's position awareness,
 and the migration from the old data format.
+
+## Licence
+
+Matchday is proprietary. Copyright (c) 2026 Akchops, all rights reserved — see
+[LICENSE](LICENSE). The repository is public so the app can be hosted and run,
+but that is not permission to copy it: no licence to reuse, modify or
+redistribute the code is granted.
+
+Third-party components are used under their own licences, listed in
+[NOTICE](NOTICE).
 
 ## Ideas for later
 

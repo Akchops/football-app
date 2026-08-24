@@ -52,3 +52,13 @@ export function GearIcon() {
     </svg>
   );
 }
+
+export function MediaIcon() {
+  return (
+    <svg {...base}>
+      <rect x="3" y="5" width="18" height="14" rx="3" />
+      <path d="M3 9.5h18M8 5v4.5M16 5v4.5" />
+      <path d="M11 12.4l3.4 2-3.4 2z" fill="currentColor" />
+    </svg>
+  );
+}

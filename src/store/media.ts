@@ -8,8 +8,12 @@ const DB_NAME = 'matchday.media';
 const DB_VERSION = 1;
 const STORE = 'media';
 
+/** Media not yet tied to a match is stored under this id. */
+export const UNASSIGNED = '__unassigned__';
+
 export interface MediaItem {
   id: string;
+  /** The match this belongs to, or UNASSIGNED until one is chosen. */
   matchId: string;
   kind: 'video' | 'photo';
   name: string;
@@ -92,6 +96,13 @@ export async function updateMediaNote(id: string, note: string): Promise<void> {
   const item = await tx<MediaItem | undefined>('readonly', (store) => store.get(id));
   if (!item) return;
   await tx<IDBValidKey>('readwrite', (store) => store.put({ ...item, note }));
+}
+
+/** Move a photo or clip to a different match, or to no match at all. */
+export async function updateMediaMatch(id: string, matchId: string): Promise<void> {
+  const item = await tx<MediaItem | undefined>('readonly', (store) => store.get(id));
+  if (!item) return;
+  await tx<IDBValidKey>('readwrite', (store) => store.put({ ...item, matchId: matchId || UNASSIGNED }));
 }
 
 /** Grabs a frame from a video so the gallery has something to show. */
@@ -183,7 +194,7 @@ export async function addMedia(matchId: string, file: File): Promise<MediaMeta> 
 
   const item: MediaItem = {
     id: createId('media'),
-    matchId,
+    matchId: matchId || UNASSIGNED,
     kind,
     name: file.name || (kind === 'video' ? 'Clip' : 'Photo'),
     type: file.type,

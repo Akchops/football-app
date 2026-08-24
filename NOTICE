@@ -1,0 +1,14 @@
+Matchday — Football Tracker
+Copyright (c) 2026 Akchops. All rights reserved.
+
+Matchday is proprietary software. See LICENSE for terms.
+
+Third-party components used under their own licences:
+  React, React DOM        MIT     https://github.com/facebook/react
+  Vite                    MIT     https://github.com/vitejs/vite
+  vite-plugin-pwa         MIT     https://github.com/vite-pwa/vite-plugin-pwa
+  Workbox                 MIT     https://github.com/GoogleChrome/workbox
+  Vitest                  MIT     https://github.com/vitest-dev/vitest
+  TypeScript              Apache-2.0  https://github.com/microsoft/TypeScript
+
+Their licences apply to those components only, not to Matchday itself.

@@ -12,12 +12,14 @@ export function MatchDetailSheet({
   onClose,
   onEdit,
   onEnterResult,
+  onSeeAllMedia,
 }: {
   match: Match | null;
   now: Date;
   onClose: () => void;
   onEdit: (match: Match) => void;
   onEnterResult: (match: Match) => void;
+  onSeeAllMedia?: () => void;
 }) {
   const { competitionOf, teamOf, deleteMatch, cancelMatch, restoreMatch } = useStore();
   if (!match) return null;
@@ -158,7 +160,7 @@ export function MatchDetailSheet({
         </div>
       </dl>
 
-      <MediaGallery matchId={match.id} />
+      <MediaGallery matchId={match.id} onSeeAll={onSeeAllMedia} />
 
       {match.notes && (
         <div className="notes-block">

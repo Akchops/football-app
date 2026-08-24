@@ -16,15 +16,17 @@ import { CompetitionFormSheet, type CompetitionFormTarget } from './components/C
 import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
 import { TournamentSheet } from './components/TournamentSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
+import { MediaScreen } from './components/MediaScreen';
 import { InstallBanner } from './components/InstallBanner';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { BallIcon, CalendarIcon, ChartIcon, GearIcon } from './components/icons';
+import { BallIcon, CalendarIcon, ChartIcon, GearIcon, MediaIcon } from './components/icons';
 
-type Tab = 'calendar' | 'matches' | 'stats' | 'setup';
+type Tab = 'calendar' | 'matches' | 'media' | 'stats' | 'setup';
 
 const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
   { id: 'calendar', label: 'Calendar', Icon: CalendarIcon },
   { id: 'matches', label: 'Matches', Icon: BallIcon },
+  { id: 'media', label: 'Media', Icon: MediaIcon },
   { id: 'stats', label: 'Stats', Icon: ChartIcon },
   { id: 'setup', label: 'Setup', Icon: GearIcon },
 ];
@@ -92,6 +94,7 @@ function Shell() {
             onEnterResult={openResult}
           />
         )}
+        {tab === 'media' && <MediaScreen onOpenMatch={setDetailMatch} />}
         {tab === 'stats' && <StatsScreen now={now} onGoToMatches={() => setTab('matches')} />}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
       </main>
@@ -135,6 +138,10 @@ function Shell() {
           setMatchForm({ mode: 'edit', match: m });
         }}
         onEnterResult={openResult}
+        onSeeAllMedia={() => {
+          setDetailMatch(null);
+          setTab('media');
+        }}
       />
 
       <ResultSheet

@@ -359,7 +359,10 @@ export function SetupScreen({
         </p>
       </Section>
 
-      <p className="version-note">Matchday · {matches.length} matches tracked</p>
+      <p className="version-note">
+        Matchday · {matches.length} matches tracked
+        <br />© {new Date().getFullYear()} Akchops. All rights reserved.
+      </p>
     </div>
   );
 }
