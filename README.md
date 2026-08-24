@@ -112,8 +112,28 @@ npm test         # unit tests for the date, stats, scoring and migration logic
 ```
 
 `npm run dev` serves on the local network too, so you can open it on a phone at
-`http://<your-computer-ip>:5173` and add it to the home screen — it's set up as
-a standalone web app.
+`http://<your-computer-ip>:5173/football-app/` and add it to the home screen.
+The app is served from the `/football-app/` sub-path to match GitHub Pages; set
+`VITE_BASE=/` to serve it from a domain root instead.
+
+## Installing it on a phone
+
+Matchday is a progressive web app, so it installs to the home screen and runs
+like any other app — its own icon, full screen with no browser chrome, and it
+works with **no signal at all**, which is the normal state at a pitch. Every
+asset is precached by a service worker on first visit.
+
+- **Android:** open the link in Chrome and tap the "Install app" prompt the app
+  shows, or Chrome's own "Add to Home screen".
+- **iPhone:** open the link in Safari, tap Share, then Add to Home Screen. The
+  app shows these steps for you.
+
+When a new version is deployed, the app offers a Reload rather than refreshing
+underneath you mid-result.
+
+It is not an App Store or Play Store download. A store listing would need a
+native wrapper plus developer accounts (Apple $99/year and a Mac; Google $25
+one-off) — everything else about the app would stay the same.
 
 ## Hosting it
 

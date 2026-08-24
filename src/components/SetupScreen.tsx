@@ -348,6 +348,17 @@ export function SetupScreen({
         </div>
       </Section>
 
+      <Section title="The app on your phone">
+        <p className="muted small">
+          Matchday installs to your home screen and runs like any other app — full screen, its own icon, and it
+          works with no signal, which is the normal state at a pitch. On Android, use the Install prompt when it
+          appears. On iPhone, open it in Safari and tap Share → Add to Home Screen.
+        </p>
+        <p className="muted small">
+          It stores everything on this device, so each phone that opens it keeps its own separate data.
+        </p>
+      </Section>
+
       <p className="version-note">Matchday · {matches.length} matches tracked</p>
     </div>
   );

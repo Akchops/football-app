@@ -16,6 +16,8 @@ import { CompetitionFormSheet, type CompetitionFormTarget } from './components/C
 import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
 import { TournamentSheet } from './components/TournamentSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
+import { InstallBanner } from './components/InstallBanner';
+import { UpdatePrompt } from './components/UpdatePrompt';
 import { BallIcon, CalendarIcon, ChartIcon, GearIcon } from './components/icons';
 
 type Tab = 'calendar' | 'matches' | 'stats' | 'setup';
@@ -72,6 +74,7 @@ function Shell() {
       </header>
 
       <main className="content">
+        <InstallBanner />
         {tab === 'calendar' && (
           <CalendarScreen
             now={now}
@@ -152,6 +155,8 @@ function Shell() {
 export default function App() {
   return (
     <AppStoreProvider>
+      {/* Sits outside Shell so the service worker registers during onboarding too. */}
+      <UpdatePrompt />
       <Shell />
     </AppStoreProvider>
   );
