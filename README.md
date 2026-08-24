@@ -101,6 +101,12 @@ server, nothing uploaded.
 - **Milestones**: appearances, wins, clean sheets, saves, goals, assists and
   man-of-the-match awards, with progress to the next tier and a star for each
   one already banked
+- **Missions and stars**: weekly and monthly targets — train twice, play a
+  match, five saves, two clean sheets, eight hours of training — each worth
+  stars. Stars from missions and milestones add up to a rank, from Rookie
+  through to Club Legend, with the running total shown on the home screen.
+  Missions are position-aware and worked out from what's already logged, so
+  nothing has to be claimed or ticked off by hand
 - Six-month W/D/L chart, and breakdowns by team, competition, home/away and
   most-played opponents
 

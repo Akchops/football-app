@@ -47,6 +47,13 @@ export function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
+/** Midnight on the first day of the week containing `d`. */
+export function startOfWeek(d: Date, weekStartsOn: 0 | 1): Date {
+  const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const offset = (start.getDay() - weekStartsOn + 7) % 7;
+  return addDays(start, -offset);
+}
+
 export function isSameDay(a: Date, b: Date): boolean {
   return toISODate(a) === toISODate(b);
 }

@@ -8,6 +8,7 @@ import {
 import { matchesOnDate, upcomingMatches } from '../lib/stats';
 import { MatchCard } from './MatchCard';
 import { Avatar } from './Avatar';
+import { StarBadge } from './MissionBoard';
 import { TRAINING_TYPE_LABEL } from '../types';
 import { EmptyState } from './ui';
 
@@ -86,6 +87,7 @@ export function CalendarScreen({
             {[profile.position, profile.ageGroup, teams[0]?.name].filter(Boolean).join(' · ') || 'Set up your profile'}
           </span>
         </div>
+        <StarBadge group={profile.positionGroup} now={now} />
       </div>
 
       <div className="cal-head">

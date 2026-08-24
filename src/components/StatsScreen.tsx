@@ -11,6 +11,7 @@ import {
 import { milestones, personalBests } from '../lib/records';
 import { TRAINING_TYPE_LABEL } from '../types';
 import { Avatar } from './Avatar';
+import { MissionBoard } from './MissionBoard';
 import { EmptyState, Section, StatTile } from './ui';
 
 export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: () => void }) {
@@ -259,6 +260,8 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
           )}
         </div>
       </Section>
+
+      <MissionBoard group={group} now={now} />
 
       {bests.length > 0 && (
         <Section title="Personal bests">

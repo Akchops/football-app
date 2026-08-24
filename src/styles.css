@@ -1323,3 +1323,78 @@ select.input { background-image: none; }
 
 .sheet-extra { display: flex; flex-direction: column; gap: 8px; }
 .sheet-extra .ghost-btn { width: 100%; }
+
+/* ---------- missions & stars ---------- */
+.star-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  background: rgba(245, 196, 81, 0.14);
+  border: 1px solid rgba(245, 196, 81, 0.36);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 13px;
+  font-weight: 800;
+  flex: none;
+}
+
+.rank-card {
+  background: linear-gradient(160deg, rgba(245, 196, 81, 0.12), var(--surface));
+  border: 1px solid rgba(245, 196, 81, 0.3);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.rank-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+
+.star-total { display: flex; align-items: baseline; gap: 6px; }
+.star-icon { color: var(--gold); font-size: 26px; line-height: 1; }
+.star-count { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.star-word { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+.rank-name { text-align: right; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rank-name strong { font-size: 16px; color: var(--gold); }
+.rank-name span { font-size: 11.5px; color: var(--muted); }
+
+.rank-track { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.rank-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--accent)); border-radius: 999px; }
+
+.star-split { display: flex; gap: 16px; font-size: 12px; color: var(--muted); }
+.star-split strong { color: var(--text); }
+
+.mission-group { display: flex; flex-direction: column; gap: 8px; }
+.mission-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.mission-group-head h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.mission {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mission.done { border-color: rgba(41, 209, 124, 0.4); background: rgba(41, 209, 124, 0.08); }
+
+.mission-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mission-label { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.mission-tick { color: var(--win); font-weight: 800; }
+.mission-reward { color: var(--gold); font-size: 13px; letter-spacing: 1px; flex: none; }
+
+.mission-track { height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.mission-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.mission.done .mission-fill { background: var(--win); }
+
+.mission-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11.5px; color: var(--muted); }
+.mission-progress { font-weight: 700; flex: none; }
