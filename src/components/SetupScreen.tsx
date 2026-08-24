@@ -4,11 +4,12 @@ import {
   AGE_GROUPS, COMPETITION_TYPE_LABEL, POSITIONS_BY_GROUP, POSITION_GROUP_BLURB, POSITION_GROUP_LABEL,
   type Competition, type PositionGroup, type Team,
 } from '../types';
-import { MATCH_LENGTHS } from '../types';
+import { MATCH_LENGTHS, REMINDER_LEADS, TRAINING_LENGTHS } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
 import { DurationPicker, EmptyState, Field, Section } from './ui';
+import { AvatarPicker } from './Avatar';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
 import type { TeamFormTarget } from './TeamFormSheet';
 
@@ -92,6 +93,11 @@ export function SetupScreen({
       </div>
 
       <Section title="Your profile">
+        <AvatarPicker
+          photo={profile.photo}
+          name={profile.name}
+          onChange={(photo) => updateProfile({ photo })}
+        />
         <Field label="Name">
           <input className="input" value={profile.name} onChange={(e) => updateProfile({ name: e.target.value })} />
         </Field>
@@ -255,6 +261,26 @@ export function SetupScreen({
               </option>
             ))}
           </select>
+        </Field>
+        <Field label="Remind me before a match" hint="Used by the alarm on calendar entries you add to your phone.">
+          <select
+            className="input"
+            value={settings.reminderLeadMinutes}
+            onChange={(e) => updateSettings({ reminderLeadMinutes: Number(e.target.value) })}
+          >
+            {REMINDER_LEADS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Default training length">
+          <DurationPicker
+            value={settings.defaultTrainingLength}
+            onChange={(minutes) => updateSettings({ defaultTrainingLength: minutes })}
+            presets={TRAINING_LENGTHS}
+          />
         </Field>
         <Field label="Colour the calendar by" hint="Which colour the dots on a match day use">
           <select

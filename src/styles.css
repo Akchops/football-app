@@ -891,7 +891,7 @@ select.input { background-image: none; }
   font-size: 13px;
   font-weight: 700;
 }
-.quick-btn.subtle { color: var(--muted); font-weight: 600; margin-left: auto; text-transform: capitalize; }
+.quick-btn.subtle { color: var(--muted); font-weight: 600; text-transform: capitalize; }
 
 /* ---------- score bands ---------- */
 .band-great { --band: var(--win); }
@@ -1229,3 +1229,97 @@ select.input { background-image: none; }
 .picker-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .picker-opponent { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .picker-meta { font-size: 12px; color: var(--muted); }
+
+/* ---------- profile photo ---------- */
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-weight: 800;
+  flex: none;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.avatar-picker { display: flex; align-items: center; gap: 14px; }
+.avatar-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; min-width: 0; }
+
+.profile-header { display: flex; align-items: center; gap: 12px; padding: 2px 0 2px; }
+.profile-header-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.profile-header-text strong { font-size: 15px; }
+.profile-header-text span {
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-who { display: flex; align-items: center; gap: 10px; }
+
+/* ---------- training ---------- */
+.cal-day.has-training { background: var(--surface); }
+.cal-training {
+  position: absolute;
+  bottom: 5px;
+  width: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--muted);
+  opacity: 0.85;
+}
+.cal-day.selected .cal-training { background: var(--accent-ink); }
+
+.training-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px 10px 0;
+  overflow: hidden;
+}
+.training-rail { width: 4px; align-self: stretch; background: var(--muted); opacity: 0.5; flex: none; border-radius: 0 4px 4px 0; }
+.training-time { font-size: 13px; font-weight: 700; padding-left: 8px; min-width: 46px; }
+.training-body { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.training-title { font-weight: 600; font-size: 14px; }
+.training-focus { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.training-meta { font-size: 12px; color: var(--muted); font-weight: 600; flex: none; }
+
+/* ---------- records & milestones ---------- */
+.best-value { color: var(--accent); font-size: 16px; }
+
+.milestones { display: flex; flex-direction: column; gap: 8px; }
+.milestone {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.milestone.done { border-color: rgba(41, 209, 124, 0.4); background: rgba(41, 209, 124, 0.07); }
+.milestone-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.milestone-label { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.milestone-badge {
+  background: rgba(245, 196, 81, 0.16);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.milestone-count { font-size: 13px; color: var(--muted); font-weight: 700; }
+.milestone-track { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.milestone-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.milestone-sub { font-size: 11.5px; color: var(--muted); }
+
+.sheet-extra { display: flex; flex-direction: column; gap: 8px; }
+.sheet-extra .ghost-btn { width: 100%; }

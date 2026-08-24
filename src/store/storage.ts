@@ -1,10 +1,11 @@
 import {
   DEFAULT_MATCH_LENGTH, DEFAULT_PROFILE, DEFAULT_SETTINGS, TEAM_COLORS, groupForPosition,
   type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Team,
+  type TrainingSession,
 } from '../types';
 
 export const STORAGE_KEY = 'matchday.data.v1';
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 export function emptyData(): AppData {
   return {
@@ -14,6 +15,7 @@ export function emptyData(): AppData {
     teams: [],
     competitions: [],
     matches: [],
+    training: [],
   };
 }
 
@@ -126,6 +128,7 @@ export function parseData(raw: string | null): AppData {
       teams,
       competitions: Array.isArray(parsed.competitions) ? (parsed.competitions as Competition[]) : [],
       matches,
+      training: Array.isArray(parsed.training) ? (parsed.training as TrainingSession[]) : [],
     };
   } catch {
     return emptyData();

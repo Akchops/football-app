@@ -174,8 +174,38 @@ export interface Match {
 }
 
 /** The player this app is tracking. Local only - there is no account or server. */
+export type TrainingType = 'team' | 'keeper' | 'gym' | 'individual' | 'recovery' | 'other';
+
+export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
+  team: 'Team training',
+  keeper: 'Keeper session',
+  gym: 'Gym / strength',
+  individual: 'Individual work',
+  recovery: 'Recovery',
+  other: 'Other',
+};
+
+/** Everything that isn't a match: sessions, gym work, extra keeper drills. */
+export interface TrainingSession {
+  id: string;
+  teamId: string | null;
+  type: TrainingType;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  /** How hard it was, 1 (easy) to 5 (flat out). */
+  intensity: number;
+  /** What it was about, e.g. "Distribution, crosses". */
+  focus: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Profile {
   name: string;
+  /** Square JPEG data URL, or '' for none. Kept small so it fits in localStorage. */
+  photo: string;
   /** 'YYYY-MM-DD', or '' if they'd rather not say. */
   dateOfBirth: string;
   /** Age group they currently play in, e.g. 'U16'. */
@@ -196,6 +226,10 @@ export interface Settings {
   weekStartsOn: 0 | 1;
   /** Whether calendar dots take their colour from the competition or the team. */
   calendarColorBy: 'competition' | 'team';
+  /** How long before kickoff a calendar reminder should fire, in minutes. */
+  reminderLeadMinutes: number;
+  /** Default length of a new training session, in minutes. */
+  defaultTrainingLength: number;
 }
 
 export interface AppData {
@@ -205,6 +239,7 @@ export interface AppData {
   teams: Team[];
   competitions: Competition[];
   matches: Match[];
+  training: TrainingSession[];
 }
 
 export const COMPETITION_TYPE_LABEL: Record<CompetitionType, string> = {
@@ -238,6 +273,17 @@ export const TEAM_COLORS = [
 /** Common match lengths, from small-sided youth football up to a full game. */
 export const MATCH_LENGTHS = [30, 40, 50, 60, 70, 80, 90];
 
+export const TRAINING_LENGTHS = [30, 45, 60, 75, 90, 120];
+
+/** How far before kickoff the phone calendar reminder fires. */
+export const REMINDER_LEADS = [
+  { value: 60, label: '1 hour before' },
+  { value: 120, label: '2 hours before' },
+  { value: 180, label: '3 hours before' },
+  { value: 720, label: '12 hours before' },
+  { value: 1440, label: 'The day before' },
+];
+
 export const DEFAULT_MATCH_LENGTH = 90;
 
 export function emptyResult(position: string, group?: PositionGroup, durationMinutes = DEFAULT_MATCH_LENGTH): MatchResult {
@@ -260,6 +306,7 @@ export function emptyResult(position: string, group?: PositionGroup, durationMin
 
 export const DEFAULT_PROFILE: Profile = {
   name: '',
+  photo: '',
   dateOfBirth: '',
   ageGroup: '',
   position: 'GK',
@@ -273,4 +320,6 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultMatchLength: DEFAULT_MATCH_LENGTH,
   weekStartsOn: 1,
   calendarColorBy: 'competition',
+  reminderLeadMinutes: 120,
+  defaultTrainingLength: 60,
 };

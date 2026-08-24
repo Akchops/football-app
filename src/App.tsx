@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { useNow } from './useNow';
 import type { Match } from './types';
@@ -15,6 +15,7 @@ import { ResultPrompt } from './components/ResultPrompt';
 import { CompetitionFormSheet, type CompetitionFormTarget } from './components/CompetitionFormSheet';
 import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
 import { TournamentSheet } from './components/TournamentSheet';
+import { TrainingFormSheet, type TrainingFormTarget } from './components/TrainingFormSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { MediaScreen } from './components/MediaScreen';
 import { InstallBanner } from './components/InstallBanner';
@@ -32,7 +33,7 @@ const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
 ];
 
 function Shell() {
-  const { matches, settings, profile } = useStore();
+  const { matches, settings, profile, training } = useStore();
   const now = useNow();
 
   const [tab, setTab] = useState<Tab>('calendar');
@@ -42,7 +43,15 @@ function Shell() {
   const [competitionForm, setCompetitionForm] = useState<CompetitionFormTarget | null>(null);
   const [teamForm, setTeamForm] = useState<TeamFormTarget | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
+  const [trainingForm, setTrainingForm] = useState<TrainingFormTarget | null>(null);
   const [promptHidden, setPromptHidden] = useState(false);
+  const contentRef = useRef<HTMLElement>(null);
+
+  // The scroll container is shared across tabs, so reset it or you land halfway
+  // down the next screen.
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [tab]);
 
   const pending = useMemo(() => pendingResultMatches(matches, settings, now), [matches, settings, now]);
 
@@ -75,7 +84,7 @@ function Shell() {
         )}
       </header>
 
-      <main className="content">
+      <main className="content" ref={contentRef}>
         <InstallBanner />
         {tab === 'calendar' && (
           <CalendarScreen
@@ -83,6 +92,11 @@ function Shell() {
             onOpenMatch={setDetailMatch}
             onAddMatch={(dateISO) => setMatchForm({ mode: 'create', dateISO })}
             onAddTournament={() => setTournamentOpen(true)}
+            onAddTraining={(dateISO) => setTrainingForm({ mode: 'create', dateISO })}
+            onOpenTraining={(id) => {
+              const session = training.find((t) => t.id === id);
+              if (session) setTrainingForm({ mode: 'edit', session });
+            }}
             onEnterResult={openResult}
           />
         )}
@@ -155,6 +169,8 @@ function Shell() {
       <TeamFormSheet target={teamForm} onClose={() => setTeamForm(null)} />
 
       <TournamentSheet open={tournamentOpen} onClose={() => setTournamentOpen(false)} />
+
+      <TrainingFormSheet target={trainingForm} onClose={() => setTrainingForm(null)} />
     </div>
   );
 }

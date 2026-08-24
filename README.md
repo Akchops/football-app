@@ -15,6 +15,8 @@ server, nothing uploaded.
 **Setup (first run)**
 - Name, date of birth (age worked out for you), and the age group you play in —
   suggested from your date of birth using the 31 August cutoff
+- A profile photo, which appears above the calendar, on the stats page and on
+  shared match cards. Stored on the device, shrunk to a few kilobytes
 - Position: goalkeeper, defender, midfielder or forward. This decides which
   stats the whole app tracks
 - Every team you play for — add as many as you like. Each gets its own colour,
@@ -72,17 +74,33 @@ server, nothing uploaded.
 - Tap any match for that individual performance: score out of 100, a verdict,
   your stat line, and an expandable breakdown of exactly how the score was
   reached (`+18 clean sheet`, `+12.5 5 saves`, `−4 1 conceded`)
+- **Share a match card**: generates an image of the performance — photo, score,
+  match rating out of 100 and the position stats — through the phone's share
+  sheet, or as a download
+- **Add to phone calendar**: exports the fixture as a calendar entry with an
+  alarm at your chosen lead time, so the phone's own reminders do the nudging
 - Attach videos and photos of the match — clips of saves, goals, big moments.
   The same files appear in the Media tab. Files are stored in IndexedDB on the
   device, with thumbnails generated automatically, and are never uploaded
 
-**Stats**
+**Training**
+- Log sessions as well as matches: team training, keeper sessions, gym,
+  individual work, recovery — with length, intensity and what you worked on
+- Sessions show on the calendar under the day, marked differently to matches
+- Training hours and session counts feed the stats page
+
+**Media tab**
 - Team record, win rate, points per game, form guide, streak
 - Goals against, goal difference, clean sheets (goals *for* is hidden for
   keepers — it isn't their job)
 - **Your game**: average match score, plus your last five performances out of
   100 as a trend, then the six stats that matter for your position
 - Minutes, discipline, self-rating
+- **Personal bests**: most saves in a match, longest clean sheet run, longest
+  unbeaten run, best match score — each showing where it happened
+- **Milestones**: appearances, wins, clean sheets, saves, goals, assists and
+  man-of-the-match awards, with progress to the next tier and a star for each
+  one already banked
 - Six-month W/D/L chart, and breakdowns by team, competition, home/away and
   most-played opponents
 
@@ -197,7 +215,8 @@ Third-party components are used under their own licences, listed in
 - **AI analysis of match clips.** The videos are stored and ready; the analysis
   itself needs a server to do the processing, so that's the next thing to build
   rather than something that can run on the phone.
-- Notifications so the result prompt reaches you without opening the app
+- Cloud backup and sync, so the data survives a lost phone
+- Push notifications (needs a server; calendar alarms cover reminders today)
 - Season filter on the stats page
 - Per-competition league table
 - Goalkeeper extras: distribution accuracy, sweeper-keeper actions by zone

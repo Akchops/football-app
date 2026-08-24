@@ -7,6 +7,8 @@ import {
 } from '../lib/date';
 import { matchesOnDate, upcomingMatches } from '../lib/stats';
 import { MatchCard } from './MatchCard';
+import { Avatar } from './Avatar';
+import { TRAINING_TYPE_LABEL } from '../types';
 import { EmptyState } from './ui';
 
 const MAX_DOTS = 3;
@@ -16,15 +18,19 @@ export function CalendarScreen({
   onOpenMatch,
   onAddMatch,
   onAddTournament,
+  onAddTraining,
+  onOpenTraining,
   onEnterResult,
 }: {
   now: Date;
   onOpenMatch: (match: Match) => void;
   onAddMatch: (dateISO: string) => void;
   onAddTournament: () => void;
+  onAddTraining: (dateISO: string) => void;
+  onOpenTraining: (id: string) => void;
   onEnterResult: (match: Match) => void;
 }) {
-  const { matches, settings, colorOf, teams, competitions, updateSettings } = useStore();
+  const { matches, settings, colorOf, teams, competitions, updateSettings, profile, training } = useStore();
   const [cursor, setCursor] = useState(() => startOfMonth(now));
   const [selected, setSelected] = useState(() => todayISO(now));
 
@@ -42,6 +48,17 @@ export function CalendarScreen({
     for (const list of map.values()) list.sort((a, b) => a.time.localeCompare(b.time));
     return map;
   }, [matches]);
+
+  const trainingByDate = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const session of training) map.set(session.date, (map.get(session.date) ?? 0) + 1);
+    return map;
+  }, [training]);
+
+  const selectedTraining = useMemo(
+    () => training.filter((t) => t.date === selected).sort((a, b) => a.time.localeCompare(b.time)),
+    [training, selected],
+  );
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
   const monthMatches = matches.filter((m) => m.date.startsWith(monthKey));
@@ -61,6 +78,16 @@ export function CalendarScreen({
 
   return (
     <div className="screen">
+      <div className="profile-header">
+        <Avatar photo={profile.photo} name={profile.name} size={46} />
+        <div className="profile-header-text">
+          <strong>{profile.name ? `Hi, ${profile.name}` : 'Matchday'}</strong>
+          <span>
+            {[profile.position, profile.ageGroup, teams[0]?.name].filter(Boolean).join(' · ') || 'Set up your profile'}
+          </span>
+        </div>
+      </div>
+
       <div className="cal-head">
         <div>
           <h1 className="cal-title">
@@ -92,6 +119,9 @@ export function CalendarScreen({
         <button className="quick-btn" onClick={onAddTournament}>
           + Tournament
         </button>
+        <button className="quick-btn" onClick={() => onAddTraining(selected)}>
+          + Training
+        </button>
         {(teams.length > 1 || competitions.length > 1) && (
           <button
             className="quick-btn subtle"
@@ -100,7 +130,7 @@ export function CalendarScreen({
             }
             title="Switch what the calendar colours represent"
           >
-            Colours: {settings.calendarColorBy === 'team' ? 'team' : 'competition'}
+            🎨 {settings.calendarColorBy === 'team' ? 'Team' : 'Competition'}
           </button>
         )}
       </div>
@@ -116,6 +146,7 @@ export function CalendarScreen({
           const iso = toISODate(day);
           const dayMatches = byDate.get(iso) ?? [];
           const live = dayMatches.filter((m) => m.status !== 'cancelled');
+          const trainingCount = trainingByDate.get(iso) ?? 0;
           const outside = day.getMonth() !== month;
           const classes = [
             'cal-day',
@@ -123,6 +154,7 @@ export function CalendarScreen({
             iso === todayIso ? 'today' : '',
             iso === selected ? 'selected' : '',
             live.length ? 'has-matches' : '',
+            trainingCount && !live.length ? 'has-training' : '',
           ]
             .filter(Boolean)
             .join(' ');
@@ -148,6 +180,7 @@ export function CalendarScreen({
                 </span>
               )}
               {live.length > 1 && <span className="cal-count">{live.length}</span>}
+              {trainingCount > 0 && <span className="cal-training" aria-hidden="true" />}
             </button>
           );
         })}
@@ -161,7 +194,23 @@ export function CalendarScreen({
           </button>
         </div>
 
-        {selectedMatches.length === 0 ? (
+        {selectedTraining.length > 0 && (
+          <div className="list">
+            {selectedTraining.map((session) => (
+              <button key={session.id} className="training-row" onClick={() => onOpenTraining(session.id)}>
+                <span className="training-rail" aria-hidden="true" />
+                <span className="training-time">{session.time}</span>
+                <span className="training-body">
+                  <span className="training-title">{TRAINING_TYPE_LABEL[session.type]}</span>
+                  {session.focus && <span className="training-focus">{session.focus}</span>}
+                </span>
+                <span className="training-meta">{session.durationMinutes}m</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {selectedMatches.length === 0 && selectedTraining.length === 0 ? (
           <p className="muted small">Nothing scheduled. Tap “+ Match” to add one.</p>
         ) : (
           <div className="list">

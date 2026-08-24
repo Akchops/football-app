@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { METRIC_BY_ID, VENUE_LABEL, type Match, type MetricId } from '../types';
 import { formatDateLong, formatTime, kickoffAt, relativeDayLabel } from '../lib/date';
 import { outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
+import { downloadICS, matchToICS } from '../lib/ics';
+import { renderShareCard, shareCard } from '../lib/share';
 import { MediaGallery } from './MediaGallery';
 import { Sheet } from './ui';
 
@@ -21,7 +24,8 @@ export function MatchDetailSheet({
   onEnterResult: (match: Match) => void;
   onSeeAllMedia?: () => void;
 }) {
-  const { competitionOf, teamOf, deleteMatch, cancelMatch, restoreMatch } = useStore();
+  const { competitionOf, teamOf, deleteMatch, cancelMatch, restoreMatch, profile, settings } = useStore();
+  const [shareState, setShareState] = useState<'idle' | 'working' | 'done' | 'failed'>('idle');
   if (!match) return null;
 
   const competition = competitionOf(match);
@@ -31,6 +35,35 @@ export function MatchDetailSheet({
   const us = team?.name?.trim() || 'Us';
   const result = match.result;
   const performance = result?.didPlay ? matchScore(result, match.durationMinutes) : null;
+
+  const addToCalendar = () => {
+    downloadICS(
+      matchToICS(match, team, competition, settings.reminderLeadMinutes),
+      `${match.opponent.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'match'}.ics`,
+    );
+  };
+
+  const share = async () => {
+    if (!result) return;
+    setShareState('working');
+    try {
+      const blob = await renderShareCard({
+        match: { ...match, result },
+        team,
+        competition,
+        profile,
+      });
+      if (!blob) return setShareState('failed');
+      await shareCard(
+        blob,
+        `${match.opponent.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'match'}.png`,
+        `${match.venue === 'away' ? '@' : 'vs'} ${match.opponent} — ${scoreline(result)}`,
+      );
+      setShareState('done');
+    } catch {
+      setShareState('failed');
+    }
+  };
 
   const remove = () => {
     if (confirm(`Delete the match against ${match.opponent}? This can't be undone.`)) {
@@ -168,6 +201,21 @@ export function MatchDetailSheet({
           <p>{match.notes}</p>
         </div>
       )}
+
+      <div className="sheet-extra">
+        {result && (
+          <button className="ghost-btn" onClick={() => void share()} disabled={shareState === 'working'}>
+            {shareState === 'working' ? 'Making image…' : '📤 Share match card'}
+          </button>
+        )}
+        {match.status === 'scheduled' && (
+          <button className="ghost-btn" onClick={addToCalendar}>
+            🔔 Add to phone calendar
+          </button>
+        )}
+      </div>
+      {shareState === 'done' && <p className="notice">Image ready — saved or shared.</p>}
+      {shareState === 'failed' && <p className="form-error">Couldn't make the image on this device.</p>}
 
       <div className="sheet-actions">
         {match.status === 'cancelled' ? (

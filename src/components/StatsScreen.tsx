@@ -8,10 +8,13 @@ import {
   computeStats, recentScores, recordSummary, scoreline, statsByCompetition, statsByMonth,
   statsByOpponent, statsByTeam, statsByVenue,
 } from '../lib/stats';
+import { milestones, personalBests } from '../lib/records';
+import { TRAINING_TYPE_LABEL } from '../types';
+import { Avatar } from './Avatar';
 import { EmptyState, Section, StatTile } from './ui';
 
 export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: () => void }) {
-  const { matches, competitions, teams, profile } = useStore();
+  const { matches, competitions, teams, profile, training } = useStore();
   const [competitionId, setCompetitionId] = useState<string>('all');
   const [teamId, setTeamId] = useState<string>('all');
 
@@ -30,6 +33,15 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
   const byVenue = useMemo(() => statsByVenue(scoped), [scoped]);
   const byOpponent = useMemo(() => statsByOpponent(scoped), [scoped]);
   const trend = useMemo(() => recentScores(scoped, 5), [scoped]);
+  const trainingSummary = useMemo(() => {
+    const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const recent = training.filter((t) => new Date(t.date) >= cutoff);
+    const minutes = recent.reduce((sum, t) => sum + t.durationMinutes, 0);
+    const byType = new Map<string, number>();
+    for (const t of recent) byType.set(t.type, (byType.get(t.type) ?? 0) + 1);
+    const top = [...byType.entries()].sort((a, b) => b[1] - a[1])[0];
+    return { sessions: recent.length, minutes, top };
+  }, [training, now]);
 
   // Judge the player by the position they actually played most in this selection.
   const group: PositionGroup = useMemo(() => {
@@ -47,6 +59,9 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
     }
     return best;
   }, [scoped, profile.positionGroup]);
+
+  const bests = useMemo(() => personalBests(scoped, group), [scoped, group]);
+  const goals = useMemo(() => milestones(scoped, group), [scoped, group]);
 
   if (stats.played === 0) {
     return (
@@ -86,10 +101,13 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
     <div className="screen">
       <div className="screen-head">
         <h1>Stats</h1>
-        <span className="muted small">
-          {profile.name ? `${profile.name} · ` : ''}
-          {POSITION_GROUP_LABEL[group]}
-        </span>
+        <div className="stats-who">
+          <span className="muted small">
+            {profile.name ? `${profile.name} · ` : ''}
+            {POSITION_GROUP_LABEL[group]}
+          </span>
+          <Avatar photo={profile.photo} name={profile.name} size={34} />
+        </div>
       </div>
 
       {teams.length > 1 && (
@@ -241,6 +259,63 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
           )}
         </div>
       </Section>
+
+      {bests.length > 0 && (
+        <Section title="Personal bests">
+          <div className="table">
+            {bests.map((best) => (
+              <div key={best.id} className="table-row">
+                <span className="table-name">{best.label}</span>
+                <span className="table-value best-value">{best.value}</span>
+                <span className="table-sub">{best.detail}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section title="Milestones">
+        <div className="milestones">
+          {goals.map((m) => {
+            const pct = Math.min(100, Math.round((m.current / m.target) * 100));
+            return (
+              <div key={m.id} className={m.achieved ? 'milestone done' : 'milestone'}>
+                <div className="milestone-head">
+                  <span className="milestone-label">
+                    {m.label}
+                    {m.banked > 0 && <span className="milestone-badge">{m.banked}★</span>}
+                  </span>
+                  <span className="milestone-count">
+                    {m.achieved ? `${m.current}` : `${m.current} / ${m.target}`}
+                  </span>
+                </div>
+                <div className="milestone-track">
+                  <div className="milestone-fill" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="milestone-sub">
+                  {m.achieved
+                    ? 'Every milestone hit — keep going'
+                    : `${m.target - m.current} more to reach ${m.target}`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      {trainingSummary.sessions > 0 && (
+        <Section title="Training">
+          <div className="tile-grid">
+            <StatTile label="Sessions" value={trainingSummary.sessions} sub="last 3 months" />
+            <StatTile label="Hours" value={(trainingSummary.minutes / 60).toFixed(1)} sub="time on the grass" />
+            <StatTile
+              label="Most often"
+              value={trainingSummary.top ? String(trainingSummary.top[1]) : '0'}
+              sub={trainingSummary.top ? TRAINING_TYPE_LABEL[trainingSummary.top[0] as keyof typeof TRAINING_TYPE_LABEL] : undefined}
+            />
+          </div>
+        </Section>
+      )}
 
       <Section title="Last 6 months">
         <div className="bar-chart">

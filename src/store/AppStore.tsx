@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
-import type { AppData, Competition, Match, MatchResult, Profile, Settings, Team } from '../types';
+import type {
+  AppData, Competition, Match, MatchResult, Profile, Settings, Team, TrainingSession,
+} from '../types';
 import { createId, emptyData, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
 
@@ -16,7 +18,10 @@ type Action =
   | { type: 'competition/delete'; id: string }
   | { type: 'match/add'; match: Match }
   | { type: 'match/update'; id: string; patch: Partial<Match> }
-  | { type: 'match/delete'; id: string };
+  | { type: 'match/delete'; id: string }
+  | { type: 'training/add'; session: TrainingSession }
+  | { type: 'training/update'; id: string; patch: Partial<TrainingSession> }
+  | { type: 'training/delete'; id: string };
 
 function touch(match: Match): Match {
   return { ...match, updatedAt: new Date().toISOString() };
@@ -49,6 +54,20 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'match/addMany':
       return { ...state, matches: [...state.matches, ...action.matches] };
+
+    case 'training/add':
+      return { ...state, training: [...state.training, action.session] };
+
+    case 'training/update':
+      return {
+        ...state,
+        training: state.training.map((t) =>
+          t.id === action.id ? { ...t, ...action.patch, updatedAt: new Date().toISOString() } : t,
+        ),
+      };
+
+    case 'training/delete':
+      return { ...state, training: state.training.filter((t) => t.id !== action.id) };
 
     case 'competition/add':
       return { ...state, competitions: [...state.competitions, action.competition] };
@@ -106,6 +125,17 @@ export interface NewCompetitionInput {
   notes: string;
 }
 
+export interface NewTrainingInput {
+  teamId: string | null;
+  type: TrainingSession['type'];
+  date: string;
+  time: string;
+  durationMinutes: number;
+  intensity: number;
+  focus: string;
+  notes: string;
+}
+
 export interface NewTeamInput {
   name: string;
   ageGroup: string;
@@ -136,6 +166,7 @@ interface StoreValue {
   matches: Match[];
   competitions: Competition[];
   teams: Team[];
+  training: TrainingSession[];
   addMatch(input: NewMatchInput): Match;
   updateMatch(id: string, patch: Partial<Match>): void;
   deleteMatch(id: string): void;
@@ -150,6 +181,9 @@ interface StoreValue {
   deleteCompetition(id: string): void;
   /** Creates the tournament and all of its fixtures in one go. */
   addTournament(input: NewTournamentInput): Competition;
+  addTraining(input: NewTrainingInput): TrainingSession;
+  updateTraining(id: string, patch: Partial<TrainingSession>): void;
+  deleteTraining(id: string): void;
   addTeam(input: NewTeamInput): Team;
   updateTeam(id: string, patch: Partial<Team>): void;
   deleteTeam(id: string): void;
@@ -184,6 +218,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       matches: data.matches,
       competitions: data.competitions,
       teams: data.teams,
+      training: data.training,
 
       addMatch(input) {
         const match: Match = {
@@ -279,6 +314,25 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           }));
         if (created.length) dispatch({ type: 'match/addMany', matches: created });
         return competition;
+      },
+
+      addTraining(input) {
+        const session: TrainingSession = {
+          id: createId('train'),
+          ...input,
+          createdAt: now(),
+          updatedAt: now(),
+        };
+        dispatch({ type: 'training/add', session });
+        return session;
+      },
+
+      updateTraining(id, patch) {
+        dispatch({ type: 'training/update', id, patch });
+      },
+
+      deleteTraining(id) {
+        dispatch({ type: 'training/delete', id });
       },
 
       addTeam(input) {
