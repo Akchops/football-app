@@ -2,7 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [claude/football-match-tracker-n5cq0n]
+    # The working branch today, and main in case the default branch is renamed later.
+    branches: [claude/football-match-tracker-n5cq0n, main]
   workflow_dispatch:
 
 permissions:

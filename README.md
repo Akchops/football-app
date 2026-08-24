@@ -115,6 +115,24 @@ npm test         # unit tests for the date, stats, scoring and migration logic
 `http://<your-computer-ip>:5173` and add it to the home screen — it's set up as
 a standalone web app.
 
+## Hosting it
+
+`.github/workflows/deploy.yml` builds the app, runs the tests, and publishes it
+to GitHub Pages on every push to the working branch (or on demand from the
+Actions tab). It needs Pages enabled once, by hand:
+
+1. **Settings → Pages → Source: GitHub Actions**
+2. GitHub Pages needs the repository to be public, or a GitHub Pro plan for a
+   private one.
+
+Once that's set, the site is served from
+`https://<user>.github.io/football-app/`. The build uses relative asset paths,
+so it works from that subpath without extra configuration.
+
+Because everything is stored in the browser, each phone that opens the link
+keeps its own separate data — there's no shared server and nothing syncs
+between devices. Use Export/Import in Setup to move data across.
+
 ## How it's put together
 
 - React + TypeScript + Vite, no backend
