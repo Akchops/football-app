@@ -4,10 +4,11 @@ import {
   AGE_GROUPS, COMPETITION_TYPE_LABEL, POSITIONS_BY_GROUP, POSITION_GROUP_BLURB, POSITION_GROUP_LABEL,
   type Competition, type PositionGroup, type Team,
 } from '../types';
+import { MATCH_LENGTHS } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
-import { EmptyState, Field, Section } from './ui';
+import { DurationPicker, EmptyState, Field, Section } from './ui';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
 import type { TeamFormTarget } from './TeamFormSheet';
 
@@ -264,6 +265,13 @@ export function SetupScreen({
             <option value="competition">Competition</option>
             <option value="team">Team</option>
           </select>
+        </Field>
+        <Field label="Default match length" hint="Starting point for a new match — each match can override it.">
+          <DurationPicker
+            value={settings.defaultMatchLength}
+            onChange={(minutes) => updateSettings({ defaultMatchLength: minutes })}
+            presets={MATCH_LENGTHS}
+          />
         </Field>
         <div className="row two">
           <Field label="Default kickoff time">

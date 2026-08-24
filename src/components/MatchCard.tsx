@@ -37,7 +37,7 @@ export function MatchCard({
   const kickoff = kickoffAt(match.date, match.time);
   const awaitingResult = match.status === 'scheduled' && kickoff.getTime() <= now.getTime();
   const upcoming = match.status === 'scheduled' && kickoff.getTime() > now.getTime();
-  const performance = match.result?.didPlay ? matchScore(match.result) : null;
+  const performance = match.result?.didPlay ? matchScore(match.result, match.durationMinutes) : null;
 
   return (
     <div className={`match-card${match.status === 'cancelled' ? ' is-cancelled' : ''}`}>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { COMPETITION_COLORS } from '../types';
+import { COMPETITION_COLORS, MATCH_LENGTHS } from '../types';
 import { seasonLabel, todayISO } from '../lib/date';
-import { Field, Sheet } from './ui';
+import { DurationPicker, Field, Sheet } from './ui';
 
 interface FixtureDraft {
   opponent: string;
@@ -17,7 +17,7 @@ const START_TIMES = ['09:30', '11:00', '12:30'];
  * competition and all of its fixtures in one go rather than one at a time.
  */
 export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { addTournament, teams, competitions } = useStore();
+  const { addTournament, teams, competitions, settings } = useStore();
 
   const [name, setName] = useState('');
   const [date, setDate] = useState(todayISO());
@@ -25,6 +25,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
   const [location, setLocation] = useState('');
   const [color, setColor] = useState(COMPETITION_COLORS[3]);
   const [multiDay, setMultiDay] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState(settings.defaultMatchLength);
   const [fixtures, setFixtures] = useState<FixtureDraft[]>([]);
   const [error, setError] = useState('');
 
@@ -37,9 +38,11 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     setLocation('');
     setColor(COMPETITION_COLORS[(competitions.length + 3) % COMPETITION_COLORS.length]);
     setMultiDay(false);
+    // Tournament games are nearly always shorter than a league fixture.
+    setDurationMinutes(Math.min(settings.defaultMatchLength, 40));
     setFixtures(START_TIMES.map((time) => ({ opponent: '', time, date: today })));
     setError('');
-  }, [open, teams, competitions.length]);
+  }, [open, teams, competitions.length, settings.defaultMatchLength]);
 
   if (!open) return null;
 
@@ -74,6 +77,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
       notes: '',
       teamId: teamId || null,
       location: location.trim(),
+      durationMinutes,
       fixtures: used.map((f) => ({
         opponent: f.opponent.trim() || 'TBC',
         time: f.time,
@@ -152,6 +156,10 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
             />
           ))}
         </div>
+      </Field>
+
+      <Field label="Match length" hint="Applied to every match in this tournament">
+        <DurationPicker value={durationMinutes} onChange={setDurationMinutes} presets={MATCH_LENGTHS} />
       </Field>
 
       <label className="toggle-row">

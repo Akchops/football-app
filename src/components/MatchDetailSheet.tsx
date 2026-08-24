@@ -28,7 +28,7 @@ export function MatchDetailSheet({
   const started = kickoff.getTime() <= now.getTime();
   const us = team?.name?.trim() || 'Us';
   const result = match.result;
-  const performance = result?.didPlay ? matchScore(result) : null;
+  const performance = result?.didPlay ? matchScore(result, match.durationMinutes) : null;
 
   const remove = () => {
     if (confirm(`Delete the match against ${match.opponent}? This can't be undone.`)) {
@@ -78,7 +78,7 @@ export function MatchDetailSheet({
             <div className="perf-verdict">
               <strong>{scoreVerdict(performance.score)}</strong>
               <span>
-                {result.position} · {result.minutes} mins
+                {result.position} · {result.minutes} of {match.durationMinutes} mins
                 {result.motm ? ' · Man of the match' : ''}
               </span>
             </div>
@@ -136,6 +136,10 @@ export function MatchDetailSheet({
         <div>
           <dt>Team</dt>
           <dd>{team ? `${team.name}${team.ageGroup ? ` · ${team.ageGroup}` : ''}` : 'Not set'}</dd>
+        </div>
+        <div>
+          <dt>Match length</dt>
+          <dd>{match.durationMinutes} minutes</dd>
         </div>
         <div>
           <dt>Venue</dt>

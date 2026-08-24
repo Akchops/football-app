@@ -60,6 +60,30 @@ describe('matchScore', () => {
     expect(cameo.score).toBeLessThan(75);
   });
 
+  it('treats a full game as a full game however long the match is', () => {
+    // 60 minutes in a 60-minute youth match is a full shift, not two thirds of one.
+    const shortGame = matchScore(keeper({ goalsAgainst: 0, minutes: 60, metrics: { saves: 4 } }), 60);
+    const fullNinety = matchScore(keeper({ goalsAgainst: 0, minutes: 90, metrics: { saves: 4 } }), 90);
+    expect(shortGame.score).toBe(fullNinety.score);
+  });
+
+  it('still discounts a cameo measured against the real match length', () => {
+    const cameo = matchScore(keeper({ goalsAgainst: 0, minutes: 10, metrics: { saves: 4 } }), 60);
+    const wholeGame = matchScore(keeper({ goalsAgainst: 0, minutes: 60, metrics: { saves: 4 } }), 60);
+    expect(cameo.score).toBeLessThan(wholeGame.score);
+  });
+
+  it('does not punish a 40-minute tournament game for not being 90 minutes', () => {
+    const tournamentGame = matchScore(keeper({ goalsAgainst: 0, minutes: 40, metrics: { saves: 3 } }), 40);
+    const judgedAsNinety = matchScore(keeper({ goalsAgainst: 0, minutes: 40, metrics: { saves: 3 } }), 90);
+    expect(tournamentGame.score).toBeGreaterThan(judgedAsNinety.score);
+  });
+
+  it('falls back to 90 minutes when no length is given', () => {
+    const result = keeper({ goalsAgainst: 0, minutes: 90, metrics: { saves: 4 } });
+    expect(matchScore(result).score).toBe(matchScore(result, 90).score);
+  });
+
   it('stays inside 1-100 however extreme the stat line', () => {
     const huge = matchScore(keeper({ goalsAgainst: 0, metrics: { saves: 40, penaltiesSaved: 10 }, motm: true }));
     const awful = matchScore(keeper({ goalsFor: 0, goalsAgainst: 12, metrics: { conceded: 12 }, redCards: 1 }));

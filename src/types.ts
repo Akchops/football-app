@@ -162,6 +162,8 @@ export interface Match {
   time: string;
   venue: Venue;
   location: string;
+  /** How long this match is, in minutes. Youth and small-sided games are rarely 90. */
+  durationMinutes: number;
   status: MatchStatus;
   result: MatchResult | null;
   notes: string;
@@ -189,6 +191,8 @@ export interface Settings {
   resultPromptDelayMinutes: number;
   /** Default kickoff time pre-filled on a new match. */
   defaultKickoff: string;
+  /** Match length pre-filled on a new match, in minutes. */
+  defaultMatchLength: number;
   weekStartsOn: 0 | 1;
   /** Whether calendar dots take their colour from the competition or the team. */
   calendarColorBy: 'competition' | 'team';
@@ -231,14 +235,19 @@ export const TEAM_COLORS = [
   '#38bdf8', '#f472b6', '#facc15', '#34d399', '#c084fc', '#fb923c', '#60a5fa', '#e879f9',
 ];
 
-export function emptyResult(position: string, group?: PositionGroup): MatchResult {
+/** Common match lengths, from small-sided youth football up to a full game. */
+export const MATCH_LENGTHS = [30, 40, 50, 60, 70, 80, 90];
+
+export const DEFAULT_MATCH_LENGTH = 90;
+
+export function emptyResult(position: string, group?: PositionGroup, durationMinutes = DEFAULT_MATCH_LENGTH): MatchResult {
   return {
     goalsFor: 0,
     goalsAgainst: 0,
     penaltiesFor: null,
     penaltiesAgainst: null,
     didPlay: true,
-    minutes: 90,
+    minutes: durationMinutes,
     position,
     positionGroup: group ?? groupForPosition(position),
     rating: null,
@@ -261,6 +270,7 @@ export const DEFAULT_PROFILE: Profile = {
 export const DEFAULT_SETTINGS: Settings = {
   resultPromptDelayMinutes: 0,
   defaultKickoff: '16:30',
+  defaultMatchLength: DEFAULT_MATCH_LENGTH,
   weekStartsOn: 1,
   calendarColorBy: 'competition',
 };

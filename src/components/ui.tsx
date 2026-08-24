@@ -168,3 +168,47 @@ export function Section({ title, action, children }: { title: string; action?: R
     </section>
   );
 }
+
+/** Match length in minutes: quick presets plus anything else you want to type. */
+export function DurationPicker({
+  value,
+  onChange,
+  presets,
+}: {
+  value: number;
+  onChange: (minutes: number) => void;
+  presets: number[];
+}) {
+  return (
+    <div className="duration-picker">
+      <div className="chip-wrap">
+        {presets.map((minutes) => (
+          <button
+            key={minutes}
+            type="button"
+            className={minutes === value ? 'filter-chip on' : 'filter-chip'}
+            onClick={() => onChange(minutes)}
+          >
+            {minutes} min
+          </button>
+        ))}
+      </div>
+      <div className="duration-custom">
+        <input
+          className="input"
+          type="number"
+          min={1}
+          max={200}
+          step={5}
+          value={value}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            if (Number.isFinite(next)) onChange(Math.max(1, Math.min(200, next)));
+          }}
+          aria-label="Match length in minutes"
+        />
+        <span className="duration-unit">minutes</span>
+      </div>
+    </div>
+  );
+}

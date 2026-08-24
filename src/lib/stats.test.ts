@@ -17,6 +17,7 @@ function match(over: Partial<Match> = {}): Match {
     time: '16:30',
     venue: 'home',
     location: '',
+    durationMinutes: 90,
     status: 'scheduled',
     result: null,
     notes: '',

@@ -1,4 +1,4 @@
-import type { MatchResult, MetricId, PositionGroup } from '../types';
+import { DEFAULT_MATCH_LENGTH, type MatchResult, type MetricId, type PositionGroup } from '../types';
 
 export interface ScorePart {
   label: string;
@@ -70,8 +70,11 @@ const CLEAN_SHEET_POINTS: Record<PositionGroup, number> = {
 /**
  * Rates a performance out of 100 using the stats that matter for the position
  * played. A keeper's 4 saves and a clean sheet score like a striker's two goals.
+ *
+ * `durationMinutes` is the length of this particular match, so a full game in a
+ * 60-minute youth fixture counts as a full game.
  */
-export function matchScore(result: MatchResult): MatchScore {
+export function matchScore(result: MatchResult, durationMinutes = DEFAULT_MATCH_LENGTH): MatchScore {
   if (!result.didPlay) return { score: 0, breakdown: [] };
 
   const group = result.positionGroup;
@@ -129,9 +132,12 @@ export function matchScore(result: MatchResult): MatchScore {
     breakdown.push({ label: 'Man of the match', points: 5 });
   }
 
-  // A short cameo shouldn't swing as hard as a full 90 in either direction.
-  const minutes = Math.max(0, Math.min(120, result.minutes));
-  const weight = minutes >= 60 ? 1 : Math.max(0.45, minutes / 60);
+  // A short cameo shouldn't swing as hard as a full game in either direction,
+  // measured against how long this match actually was.
+  const fullMatch = Math.max(1, durationMinutes || DEFAULT_MATCH_LENGTH);
+  const substantial = fullMatch * (2 / 3);
+  const minutes = Math.max(0, Math.min(fullMatch * 1.5, result.minutes));
+  const weight = minutes >= substantial ? 1 : Math.max(0.45, minutes / substantial);
   let score = BASE + (positionPoints + resultPoints + discipline + motm) * weight;
 
   // Blend in a self rating when one was given - they watched the game, the app didn't.

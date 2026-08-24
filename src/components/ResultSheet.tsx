@@ -32,7 +32,8 @@ export function ResultSheet({
   const team = match ? teamOf(match) : null;
   const defaultPosition = team?.position || profile.position;
 
-  const [result, setResult] = useState<MatchResult>(() => emptyResult(defaultPosition));
+  const duration = match?.durationMinutes ?? 90;
+  const [result, setResult] = useState<MatchResult>(() => emptyResult(defaultPosition, undefined, duration));
   const [notes, setNotes] = useState('');
   const [showPens, setShowPens] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -40,7 +41,7 @@ export function ResultSheet({
   useEffect(() => {
     if (!match) return;
     const existing = match.result;
-    setResult(existing ?? emptyResult(team?.position || profile.position));
+    setResult(existing ?? emptyResult(team?.position || profile.position, undefined, match.durationMinutes));
     setNotes(match.notes ?? '');
     setShowPens(existing?.penaltiesFor !== null && existing?.penaltiesFor !== undefined);
     setShowDetail(Boolean(existing));
@@ -50,7 +51,7 @@ export function ResultSheet({
   const metricDefs = useMemo(() => formMetricsFor(group, result.metrics), [group, result.metrics]);
   const primary = metricDefs.filter((m) => m.primary);
   const secondary = metricDefs.filter((m) => !m.primary);
-  const preview = useMemo(() => matchScore(result), [result]);
+  const preview = useMemo(() => matchScore(result, duration), [result, duration]);
 
   if (!match) return null;
 
@@ -209,7 +210,13 @@ export function ResultSheet({
               )}
 
               <div className="stat-steppers">
-                <Stepper label="Minutes" value={result.minutes} onChange={(v) => patch({ minutes: v })} max={130} step={5} />
+                <Stepper
+                  label={`Minutes (of ${duration})`}
+                  value={result.minutes}
+                  onChange={(v) => patch({ minutes: v })}
+                  max={Math.round(duration * 1.5)}
+                  step={5}
+                />
                 <Stepper label="Yellows" value={result.yellowCards} onChange={(v) => patch({ yellowCards: v })} max={2} />
                 <Stepper label="Reds" value={result.redCards} onChange={(v) => patch({ redCards: v })} max={1} />
               </div>

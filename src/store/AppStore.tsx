@@ -90,6 +90,7 @@ export interface NewMatchInput {
   competitionId: string | null;
   teamId: string | null;
   opponent: string;
+  durationMinutes: number;
   date: string;
   time: string;
   venue: Match['venue'];
@@ -123,6 +124,8 @@ export interface TournamentFixture {
 export interface NewTournamentInput extends NewCompetitionInput {
   teamId: string | null;
   location: string;
+  /** Tournament games are usually short - applied to every fixture. */
+  durationMinutes: number;
   fixtures: TournamentFixture[];
 }
 
@@ -245,7 +248,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       },
 
       addTournament(input) {
-        const { fixtures, teamId, location, ...competitionInput } = input;
+        const { fixtures, teamId, location, durationMinutes: _duration, ...competitionInput } = input;
         const competition: Competition = {
           id: createId('comp'),
           ...competitionInput,
@@ -266,6 +269,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             time: fixture.time || '00:00',
             venue: 'neutral',
             location,
+            durationMinutes: input.durationMinutes,
             status: 'scheduled',
             result: null,
             notes: '',

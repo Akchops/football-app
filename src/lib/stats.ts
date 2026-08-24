@@ -159,7 +159,7 @@ export function computeStats(matches: Match[]): Stats {
         ratingSum += r.rating;
         ratingCount += 1;
       }
-      scoreSum += matchScore(r).score;
+      scoreSum += matchScore(r, match.durationMinutes).score;
       scoreCount += 1;
     }
 
@@ -401,5 +401,5 @@ export function recentScores(matches: Match[], count = 5): ScoredMatch[] {
   return playedMatches(matches)
     .filter((m) => m.result.didPlay)
     .slice(0, count)
-    .map((match) => ({ match, score: matchScore(match.result).score }));
+    .map((match) => ({ match, score: matchScore(match.result, match.durationMinutes).score }));
 }

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import type { Match, Venue } from '../types';
+import { MATCH_LENGTHS, type Match, type Venue } from '../types';
 import { todayISO } from '../lib/date';
-import { Field, Segmented, Sheet } from './ui';
+import { DurationPicker, Field, Segmented, Sheet } from './ui';
 
 export interface MatchFormTarget {
   mode: 'create' | 'edit';
@@ -35,6 +35,7 @@ export function MatchFormSheet({
   const [competitionId, setCompetitionId] = useState<string>('');
   const [teamId, setTeamId] = useState<string>('');
   const [venue, setVenue] = useState<Venue>('home');
+  const [durationMinutes, setDurationMinutes] = useState(settings.defaultMatchLength);
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -50,6 +51,7 @@ export function MatchFormSheet({
       setCompetitionId(m.competitionId ?? '');
       setTeamId(m.teamId ?? '');
       setVenue(m.venue);
+      setDurationMinutes(m.durationMinutes);
       setLocation(m.location);
       setNotes(m.notes);
     } else {
@@ -60,6 +62,8 @@ export function MatchFormSheet({
       setCompetitionId(competitions.length === 1 ? competitions[0].id : '');
       setTeamId(teams.length >= 1 ? teams[0].id : '');
       setVenue('home');
+      // A team that plays shorter games keeps its length as the starting point.
+      setDurationMinutes(settings.defaultMatchLength);
       setLocation('');
       setNotes('');
     }
@@ -83,6 +87,7 @@ export function MatchFormSheet({
       competitionId: competitionId || null,
       teamId: teamId || null,
       venue,
+      durationMinutes,
       location: location.trim(),
       notes: notes.trim(),
     };
@@ -165,6 +170,13 @@ export function MatchFormSheet({
             </option>
           ))}
         </select>
+      </Field>
+
+      <Field
+        label="Match length"
+        hint="Youth and small-sided games are rarely 90 minutes — this sets how long a full game is for this match."
+      >
+        <DurationPicker value={durationMinutes} onChange={setDurationMinutes} presets={MATCH_LENGTHS} />
       </Field>
 
       <Field label="Ground / pitch" hint="Optional">

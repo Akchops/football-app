@@ -1,10 +1,10 @@
 import {
-  DEFAULT_PROFILE, DEFAULT_SETTINGS, TEAM_COLORS, groupForPosition,
+  DEFAULT_MATCH_LENGTH, DEFAULT_PROFILE, DEFAULT_SETTINGS, TEAM_COLORS, groupForPosition,
   type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Team,
 } from '../types';
 
 export const STORAGE_KEY = 'matchday.data.v1';
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
 
 export function emptyData(): AppData {
   return {
@@ -65,6 +65,8 @@ function normaliseMatch(m: Match): Match {
     competitionId: m.competitionId ?? null,
     teamId: m.teamId ?? null,
     location: m.location ?? '',
+    // v2 and earlier assumed every match was 90 minutes.
+    durationMinutes: m.durationMinutes ?? DEFAULT_MATCH_LENGTH,
     notes: m.notes ?? '',
     result: migrateResult(m.result ?? null),
     remindAfter: m.remindAfter ?? null,

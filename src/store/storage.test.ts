@@ -63,6 +63,16 @@ describe('parseData', () => {
     expect(result?.rating).toBe(8);
   });
 
+  it('gives matches from before match lengths existed the standard 90', () => {
+    expect(parseData(V1_BACKUP).matches[0].durationMinutes).toBe(90);
+  });
+
+  it('keeps a match length that was already set', () => {
+    const withLength = JSON.parse(V1_BACKUP);
+    withLength.matches[0].durationMinutes = 60;
+    expect(parseData(JSON.stringify(withLength)).matches[0].durationMinutes).toBe(60);
+  });
+
   it('leaves already-migrated data alone', () => {
     const migrated = parseData(V1_BACKUP);
     const round2 = parseData(JSON.stringify(migrated));
