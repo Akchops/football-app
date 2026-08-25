@@ -83,6 +83,22 @@ server, nothing uploaded.
   The same files appear in the Media tab. Files are stored in IndexedDB on the
   device, with thumbnails generated automatically, and are never uploaded
 
+**Coach (AI)**
+- **Drills on demand**: say what you want to work on — "improve my diving",
+  "better footwork across the goal" — and get a session back: warm-up, three to
+  five drills with setup, reps and one coaching cue each, kit needed, and how to
+  progress it. Suggestions are position-specific.
+- **Clip analysis**: pick a saved clip (or one from the phone), say which player
+  you are, and get a rating out of 100, what you did well, and what to work on
+  with a drill for each. Frames are sampled from the clip in the browser and
+  read by Claude — it reports its own confidence and says plainly what it
+  couldn't judge from stills.
+- Needs your own Anthropic API key, added in Setup. It is stored on the device
+  in its own entry, is never included in a backup export, and is used for
+  nothing else. The Coach tab is the only part of the app that needs signal.
+- Clips are capped at two minutes. Full-match automatic stat extraction is not
+  offered — see below.
+
 **Training**
 - Log sessions as well as matches: team training, keeper sessions, gym,
   individual work, recovery — with length, intensity and what you worked on
@@ -218,9 +234,13 @@ Third-party components are used under their own licences, listed in
 
 ## Ideas for later
 
-- **AI analysis of match clips.** The videos are stored and ready; the analysis
-  itself needs a server to do the processing, so that's the next thing to build
-  rather than something that can run on the phone.
+- **Automatic stats from a full match.** Deliberately not attempted. Claude
+  reads images, not video, so a clip becomes sampled frames; a 90-minute match
+  would be thousands of frames, far past any context window and expensive, and
+  picking one player out of wide amateur footage frame by frame is a tracking
+  problem that dedicated systems still get wrong. Short-clip coaching is
+  genuinely useful and is what the Coach tab does; counting every save
+  automatically is not something this app can do honestly.
 - Cloud backup and sync, so the data survives a lost phone
 - Push notifications (needs a server; calendar alarms cover reminders today)
 - Season filter on the stats page

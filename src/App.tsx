@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { useNow } from './useNow';
 import type { Match } from './types';
@@ -18,16 +18,20 @@ import { TournamentSheet } from './components/TournamentSheet';
 import { TrainingFormSheet, type TrainingFormTarget } from './components/TrainingFormSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { MediaScreen } from './components/MediaScreen';
+// The Anthropic SDK is only needed on the Coach tab, so it stays out of the
+// bundle that has to load before the calendar appears.
+const AIScreen = lazy(() => import('./components/AIScreen'));
 import { InstallBanner } from './components/InstallBanner';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { BallIcon, CalendarIcon, ChartIcon, GearIcon, MediaIcon } from './components/icons';
+import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, MediaIcon } from './components/icons';
 
-type Tab = 'calendar' | 'matches' | 'media' | 'stats' | 'setup';
+type Tab = 'calendar' | 'matches' | 'media' | 'coach' | 'stats' | 'setup';
 
 const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
   { id: 'calendar', label: 'Calendar', Icon: CalendarIcon },
   { id: 'matches', label: 'Matches', Icon: BallIcon },
   { id: 'media', label: 'Media', Icon: MediaIcon },
+  { id: 'coach', label: 'Coach', Icon: CoachIcon },
   { id: 'stats', label: 'Stats', Icon: ChartIcon },
   { id: 'setup', label: 'Setup', Icon: GearIcon },
 ];
@@ -109,6 +113,11 @@ function Shell() {
           />
         )}
         {tab === 'media' && <MediaScreen onOpenMatch={setDetailMatch} />}
+        {tab === 'coach' && (
+          <Suspense fallback={<div className="screen"><p className="muted small">Loading the coach…</p></div>}>
+            <AIScreen onOpenSetup={() => setTab('setup')} />
+          </Suspense>
+        )}
         {tab === 'stats' && <StatsScreen now={now} onGoToMatches={() => setTab('matches')} />}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
       </main>

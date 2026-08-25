@@ -8,6 +8,7 @@ import { MATCH_LENGTHS, REMINDER_LEADS, TRAINING_LENGTHS } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
+import { getApiKey, setApiKey } from '../lib/apiKey';
 import { DurationPicker, EmptyState, Field, Section } from './ui';
 import { AvatarPicker } from './Avatar';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
@@ -35,6 +36,8 @@ export function SetupScreen({
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
   const [mediaUsage, setMediaUsage] = useState<{ count: number; bytes: number } | null>(null);
+  const [apiKey, setKeyState] = useState(() => getApiKey());
+  const [keyVisible, setKeyVisible] = useState(false);
 
   useEffect(() => {
     listAllMedia()
@@ -372,6 +375,52 @@ export function SetupScreen({
             Clear all data
           </button>
         </div>
+      </Section>
+
+      <Section title="AI coach">
+        <p className="muted small">
+          The Coach tab writes training sessions and reviews your match clips. That runs on Anthropic's servers, so it
+          needs your own API key from console.anthropic.com. The key is stored on this device only, is never included in
+          a backup file, and is used for nothing else.
+        </p>
+        <Field
+          label="Anthropic API key"
+          hint={apiKey ? 'Saved on this device. Clear the box to remove it.' : 'Starts with sk-ant-'}
+        >
+          <input
+            className="input"
+            type={keyVisible ? 'text' : 'password'}
+            value={apiKey}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="sk-ant-..."
+            onChange={(e) => {
+              setKeyState(e.target.value);
+              setApiKey(e.target.value.trim());
+            }}
+          />
+        </Field>
+        <div className="button-row">
+          <button className="ghost-btn" onClick={() => setKeyVisible((v) => !v)}>
+            {keyVisible ? 'Hide key' : 'Show key'}
+          </button>
+          {apiKey && (
+            <button
+              className="danger-link"
+              onClick={() => {
+                setKeyState('');
+                setApiKey('');
+                setMessage('API key removed.');
+              }}
+            >
+              Remove key
+            </button>
+          )}
+        </div>
+        <p className="muted small">
+          Costs land on your Anthropic account: a drills session is a fraction of a penny, reading a clip is roughly
+          20–30p. Set a spend limit in the Anthropic console if you're handing the phone over.
+        </p>
       </Section>
 
       <Section title="The app on your phone">

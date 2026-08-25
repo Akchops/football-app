@@ -62,3 +62,13 @@ export function MediaIcon() {
     </svg>
   );
 }
+
+export function CoachIcon() {
+  return (
+    <svg {...base}>
+      <path d="M12 4.6a3.1 3.1 0 00-5.5 2 2.7 2.7 0 00-1.2 4.6A2.9 2.9 0 006.6 16a2.8 2.8 0 005.4 1z" />
+      <path d="M12 4.6a3.1 3.1 0 015.5 2 2.7 2.7 0 011.2 4.6A2.9 2.9 0 0117.4 16 2.8 2.8 0 0112 17z" />
+      <path d="M12 4.6V17" />
+    </svg>
+  );
+}
