@@ -25,7 +25,15 @@ secret, twice:
 | `GEMINI_API_KEY` | the key from step 1 |
 | `CLOUDFLARE_API_TOKEN` | the token from step 2 |
 
-**4. Run it** — Actions tab → **Deploy AI proxy** → Run workflow.
+**4. Run it** — the **Actions** tab is in the row along the top of the repo
+(Code · Issues · Pull requests · **Actions**), not inside Settings. Click
+**Deploy AI proxy** in the left-hand list → **Run workflow**.
+
+If your Cloudflare account is new it has no `*.workers.dev` address yet, so
+type a name into the **workers_subdomain** box — your GitHub username is a
+good choice. The name is shared by everyone on Cloudflare, so a very common
+one may be taken; the run tells you if so. Leave the box blank if you have
+used Workers before.
 
 It prints a `https://…workers.dev` URL at the end.
 

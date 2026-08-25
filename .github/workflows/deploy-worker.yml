@@ -5,6 +5,11 @@ name: Deploy AI proxy
 #   GEMINI_API_KEY       - free from aistudio.google.com/apikey
 on:
   workflow_dispatch:
+    inputs:
+      workers_subdomain:
+        description: 'First run only: a name for your free *.workers.dev address (lowercase letters, numbers, hyphens). Leave blank if your Cloudflare account already has one.'
+        required: false
+        default: ''
 
 jobs:
   deploy:
@@ -24,3 +29,4 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          WORKERS_SUBDOMAIN: ${{ inputs.workers_subdomain }}
