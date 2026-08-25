@@ -390,6 +390,7 @@ export function SetupScreen({
 
       <p className="version-note">
         Matchday · {matches.length} matches tracked
+        <br />Build {__BUILD_ID__} UTC
         <br />© {new Date().getFullYear()} Akchops. All rights reserved.
       </p>
     </div>

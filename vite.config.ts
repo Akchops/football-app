@@ -8,8 +8,13 @@ export default defineConfig(({ mode }) => {
   // service worker scope, manifest and start_url pointing at the right place.
   const base = loadEnv(mode, '.', 'VITE_').VITE_BASE || '/football-app/';
 
+  // Lets the running app say which build it is, so "did my deploy arrive?" has
+  // an answer that does not depend on guessing.
+  const buildId = new Date().toISOString().slice(0, 16).replace('T', ' ');
+
   return {
     base,
+    define: { __BUILD_ID__: JSON.stringify(buildId) },
     plugins: [
       react(),
       VitePWA({
