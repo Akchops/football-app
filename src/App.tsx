@@ -33,7 +33,6 @@ const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
   { id: 'media', label: 'Media', Icon: MediaIcon },
   { id: 'coach', label: 'Coach', Icon: CoachIcon },
   { id: 'stats', label: 'Stats', Icon: ChartIcon },
-  { id: 'setup', label: 'Setup', Icon: GearIcon },
 ];
 
 function Shell() {
@@ -81,11 +80,21 @@ function Shell() {
           </span>
           <span>Matchday</span>
         </div>
-        {pending.length > 0 && (
-          <button className="pending-pill" onClick={() => setPromptHidden(false)}>
-            {pending.length} to log
+        <div className="topbar-actions">
+          {pending.length > 0 && (
+            <button className="pending-pill" onClick={() => setPromptHidden(false)}>
+              {pending.length} to log
+            </button>
+          )}
+          <button
+            className={tab === 'setup' ? 'topbar-btn on' : 'topbar-btn'}
+            onClick={() => setTab(tab === 'setup' ? 'calendar' : 'setup')}
+            aria-label="Setup"
+            aria-pressed={tab === 'setup'}
+          >
+            <GearIcon />
           </button>
-        )}
+        </div>
       </header>
 
       <main className="content" ref={contentRef}>

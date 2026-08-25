@@ -236,6 +236,23 @@ Because everything is stored in the browser, each phone that opens the link
 keeps its own separate data — there's no shared server and nothing syncs
 between devices. Use Export/Import in Setup to move data across.
 
+## Layout on a phone
+
+The app is sized with `100dvh`, not `100%`. With `viewport-fit=cover`, `100%`
+resolves to the *safe* area rather than the screen, which on a notched iPhone
+renders the app from y=0 (under the notch) while stopping short of the bottom —
+a dead band under the tab bar and a close button you can't reach.
+
+Safe-area insets are read once into `--safe-top` / `--safe-bottom` and used
+everywhere, which also means a test can override them to simulate a notched
+phone and assert the layout still fits. `scripts` aside, that check lives in the
+browser-driven tests: tab bar flush to the bottom edge, tap targets clear of the
+home indicator, and sheets capped at `100dvh - --safe-top` so their close button
+is always below the notch.
+
+Setup lives behind the gear in the top right rather than in the dock, keeping
+the tab bar to five items.
+
 ## How it's put together
 
 - React + TypeScript + Vite, no backend
