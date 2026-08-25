@@ -1466,3 +1466,18 @@ select.input { background-image: none; }
 
 .analysis { display: flex; flex-direction: column; gap: 14px; }
 .analysis-text { font-size: 14px; line-height: 1.55; }
+
+/* ---------- shared coach ---------- */
+.shared-coach {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shared-coach.on { background: rgba(41, 209, 124, 0.09); border-color: rgba(41, 209, 124, 0.35); }
+.shared-coach-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.shared-coach-head strong { font-size: 14px; }
+.shared-coach p { font-size: 12.5px; color: var(--muted); line-height: 1.5; }

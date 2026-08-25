@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PROVIDER_LABEL, type Provider } from '../lib/aiTypes';
 import { getApiKey, getModel, getProvider, setApiKey, setModel, setProvider } from '../lib/apiKey';
+import { proxyAvailable, sharedUsage } from '../lib/proxy';
 import { Field, Section } from './ui';
 
 interface Option {
@@ -33,6 +34,9 @@ export function AiSection() {
   const [error, setError] = useState('');
 
   const help = KEY_HELP[provider];
+  const shared = proxyAvailable();
+  const usage = sharedUsage();
+  const usingOwn = key.trim().length > 0;
 
   const switchProvider = (next: Provider) => {
     setProviderState(next);
@@ -86,11 +90,30 @@ export function AiSection() {
 
   return (
     <Section title="AI coach">
-      <p className="muted small">
-        The Coach tab writes training sessions and reviews your match clips. That runs on the provider's servers, so it
-        needs your own API key. The key is stored on this device only, is never included in a backup file, and is used
-        for nothing else.
-      </p>
+      {shared ? (
+        <div className={usingOwn ? 'shared-coach' : 'shared-coach on'}>
+          <div className="shared-coach-head">
+            <strong>{usingOwn ? 'Using your own key' : 'Shared coach — no setup needed'}</strong>
+            {!usingOwn && <span className="ai-badge">Free</span>}
+          </div>
+          <p>
+            {usingOwn
+              ? 'Your own key is being used, so you have no daily limit. Clear it below to go back to the shared coach.'
+              : `The Coach tab already works — it runs through Matchday's own coach, so there is nothing to set up. There is a daily limit${usage ? ` (${Math.max(0, usage.limit - usage.used)} of ${usage.limit} left today)` : ''} so one person can't use it all up.`}
+          </p>
+          {!usingOwn && (
+            <p className="muted small">
+              Adding your own free key below removes the limit entirely. Optional — most people won't need it.
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="muted small">
+          The Coach tab writes training sessions and reviews your match clips. That runs on the provider's servers, so
+          it needs your own API key. The key is stored on this device only, is never included in a backup file, and is
+          used for nothing else.
+        </p>
+      )}
 
       <Field label="Provider">
         <div className="chip-wrap">
@@ -108,7 +131,10 @@ export function AiSection() {
         </div>
       </Field>
 
-      <Field label={`${PROVIDER_LABEL[provider]} API key`} hint={key ? 'Saved on this device. Clear the box to remove it.' : help.hint}>
+      <Field
+        label={`${PROVIDER_LABEL[provider]} API key${shared ? ' (optional)' : ''}`}
+        hint={key ? 'Saved on this device. Clear the box to remove it.' : help.hint}
+      >
         <input
           className="input"
           type={visible ? 'text' : 'password'}

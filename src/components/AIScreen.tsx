@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import {
-  analyseClipBlob, costNote, describeError, requestDrills,
-  type ClipAnalysis, type ClipMode, type DrillPlan,
+  ProxyLimitError, analyseClipBlob, coachReady, costNote, describeError, requestDrills,
+  usingSharedCoach, type ClipAnalysis, type ClipMode, type DrillPlan,
 } from '../lib/ai';
-import { getProvider, hasApiKey } from '../lib/apiKey';
+import { getProvider } from '../lib/apiKey';
 import { ClipTooLongError, MAX_CLIP_SECONDS } from '../lib/frames';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import { getMediaBlob, listAllMedia, type MediaMeta } from '../store/media';
@@ -23,9 +23,9 @@ const SUGGESTIONS: Record<string, string[]> = {
 export default function AIScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
   const { profile, matches } = useStore();
   const [tab, setTab] = useState<Tab>('drills');
-  const keyed = hasApiKey();
+  const shared = usingSharedCoach();
 
-  if (!keyed) {
+  if (!coachReady()) {
     return (
       <div className="screen">
         <div className="screen-head">
@@ -34,7 +34,7 @@ export default function AIScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
         <EmptyState
           icon="🧠"
           title="Add an API key to switch the coach on"
-          message="The coach writes training sessions and reads your match clips. That runs on Google's or Anthropic's servers, so it needs your own API key — added once in Setup, kept on this device, and it is the only part of the app that uses the internet."
+          message="The coach writes training sessions and reads your match clips. This build has no shared coach set up, so it needs your own API key — added once in Setup, kept on this device, and it is the only part of the app that uses the internet."
           action={
             <button className="primary-btn" onClick={onOpenSetup}>
               Go to Setup
@@ -67,6 +67,24 @@ export default function AIScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
 
       <p className="muted small">
         Advice comes from an AI reading what you give it. Treat it as a second opinion, not a replacement for {profile.ageGroup ? 'your coach' : 'a coach'}.
+        {shared && ' The coach is shared, so there is a daily limit — Setup has the option to add your own free key for unlimited use.'}
+      </p>
+    </div>
+  );
+}
+
+/** Shown when the shared coach's daily allowance runs out. */
+function OwnKeyHint() {
+  if (!usingSharedCoach()) return null;
+  return (
+    <div className="ai-slot">
+      <div className="ai-slot-head">
+        <span className="ai-badge">Want more?</span>
+        <strong>Add your own free key</strong>
+      </div>
+      <p>
+        The shared coach has a daily limit so one person can't use it all up. A free Gemini key of your own removes
+        it — get one at aistudio.google.com/apikey and paste it into Setup. It takes a minute and costs nothing.
       </p>
     </div>
   );
@@ -79,6 +97,7 @@ function DrillsPanel() {
   const [ask, setAsk] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [outOfAllowance, setOutOfAllowance] = useState(false);
   const [plan, setPlan] = useState<DrillPlan | null>(null);
 
   const suggestions = SUGGESTIONS[profile.positionGroup] ?? SUGGESTIONS.midfielder;
@@ -87,11 +106,13 @@ function DrillsPanel() {
     if (!question.trim()) return;
     setBusy(true);
     setError('');
+    setOutOfAllowance(false);
     setPlan(null);
     try {
       setPlan(await requestDrills(profile, question.trim()));
     } catch (e) {
       setError(await describeError(e));
+      setOutOfAllowance(e instanceof ProxyLimitError);
     } finally {
       setBusy(false);
     }
@@ -129,6 +150,7 @@ function DrillsPanel() {
       </button>
 
       {error && <p className="form-error">{error}</p>}
+      {outOfAllowance && <OwnKeyHint />}
 
       {plan && (
         <div className="plan">
@@ -196,6 +218,7 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
   const [stage, setStage] = useState<'idle' | 'working'>('idle');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const [outOfAllowance, setOutOfAllowance] = useState(false);
   const [result, setResult] = useState<ClipAnalysis | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploaded, setUploaded] = useState<File | null>(null);
@@ -217,6 +240,7 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
     setRun(null);
     setResult(null);
     setError('');
+    setOutOfAllowance(false);
   };
 
   const start = async () => {
@@ -247,6 +271,7 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
         );
       } else {
         setError(await describeError(e));
+        setOutOfAllowance(e instanceof ProxyLimitError);
       }
     } finally {
       setStage('idle');
@@ -327,17 +352,16 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
         {busy ? progress : 'Analyse this clip'}
       </button>
 
-      {getProvider() === 'gemini' && (
-        <p className="muted small">Gemini watches the clip itself, so movement and timing are visible — not just stills.</p>
+      {(usingSharedCoach() || getProvider() === 'gemini') && (
+        <p className="muted small">The coach watches the clip itself, so movement and timing are visible — not just stills.</p>
       )}
 
       {run && !busy && (
-        <p className="muted small">
-          {run.mode === 'video' ? 'Whole clip watched' : 'Read as stills'} · {costNote(run.mode, run.frameCount)}
-        </p>
+        <p className="muted small">{costNote(run.mode, run.frameCount)}</p>
       )}
 
       {error && <p className="form-error">{error}</p>}
+      {outOfAllowance && <OwnKeyHint />}
 
       {result && (
         <div className="analysis">

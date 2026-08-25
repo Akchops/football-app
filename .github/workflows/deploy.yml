@@ -32,6 +32,10 @@ jobs:
       - run: npm test
 
       - run: npm run build
+        env:
+          # Set this repository variable to the AI proxy's URL (see worker/README.md).
+          # Left empty, the app falls back to asking each player for their own key.
+          VITE_AI_PROXY_URL: ${{ vars.AI_PROXY_URL }}
 
       # Static host with no server-side routing, so the 404 page serves the app.
       - run: cp dist/index.html dist/404.html

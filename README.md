@@ -93,11 +93,14 @@ server, nothing uploaded.
   with a drill for each. Frames are sampled from the clip in the browser and
   read by Claude — it reports its own confidence and says plainly what it
   couldn't judge from stills.
-- Two providers, chosen in Setup. **Google Gemini** is the default and has a
-  free tier, so normal use costs nothing; **Anthropic Claude** is pay-as-you-go.
-  Either way it is your own API key, stored on the device in its own entry,
-  never included in a backup export, and used for nothing else. The Coach tab
-  is the only part of the app that needs signal.
+- **No key needed.** When the app is published with an AI proxy configured
+  (`worker/`), the Coach tab works the moment someone opens it — the proxy holds
+  one shared key. There is a per-person daily limit so one player can't drain
+  it; past that the app offers the option of a personal key.
+- Anyone can still add **their own free key** in Setup to remove the limit.
+  Google Gemini (free tier) or Anthropic Claude (pay-as-you-go), stored on the
+  device in its own entry, never included in a backup export. The Coach tab is
+  the only part of the app that needs signal.
 - On Gemini a short clip is sent as **video**, so movement, timing and footwork
   are all visible. On Claude — which reads images, not video — the clip is
   sampled into stills first, and the coach is told to judge accordingly. Clips
@@ -194,6 +197,26 @@ underneath you mid-result.
 It is not an App Store or Play Store download. A store listing would need a
 native wrapper plus developer accounts (Apple $99/year and a Mac; Google $25
 one-off) — everything else about the app would stay the same.
+
+## The AI proxy
+
+A key cannot be shipped inside the app — anyone can read it out of the
+JavaScript. So sharing one key across all players needs a small server.
+
+`worker/` is a Cloudflare Worker that does exactly that, and nothing more: it
+owns the system prompts and response schemas, so it can't be repurposed as a
+free AI endpoint, only the app's origin may call it, and each IP gets a capped
+number of requests a day.
+
+```bash
+cd worker && npm install && npm run setup
+```
+
+That deploys it and prints a URL. Set that URL as the `AI_PROXY_URL` repository
+variable (Settings → Secrets and variables → Actions → Variables) and re-run the
+deploy. Full detail, including what it costs, is in `worker/README.md`.
+
+Without it the app still works — it just asks each player for their own key.
 
 ## Hosting it
 

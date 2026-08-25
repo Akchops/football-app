@@ -1,0 +1,278 @@
+/**
+ * Matchday AI proxy.
+ *
+ * Holds the one Gemini key so players don't each need their own. It is
+ * deliberately NOT a general Gemini proxy: it owns the system prompts and
+ * response schemas and only accepts the two shapes the app needs, so a leaked
+ * URL can waste quota but cannot be repurposed as a free LLM endpoint.
+ */
+
+export interface Env {
+  GEMINI_API_KEY: string;
+  /** Comma-separated origins allowed to call this worker. */
+  ALLOWED_ORIGINS: string;
+  /** Requests allowed per IP per day. */
+  DAILY_LIMIT?: string;
+  RATE_LIMIT: KVNamespace;
+}
+
+const API = 'https://generativelanguage.googleapis.com/v1beta';
+const DEFAULT_DAILY_LIMIT = 40;
+/** Clip requests carry base64 video; anything larger is refused outright. */
+const MAX_BODY_BYTES = 22 * 1024 * 1024;
+
+const DRILLS_SYSTEM =
+  'You are an experienced football coach writing a training session for one player. ' +
+  'Design drills that can be done realistically: a garden, a park, or a quiet corner of a training pitch, with everyday kit (cones, a ball, a wall, a friend to serve). ' +
+  'Be specific and physical - what to set up, how many, what the player should feel. One coaching cue per drill, not a list. ' +
+  'Match the intensity to the age group. Never suggest anything that risks injury for a young player. ' +
+  'Write in plain British English a teenager would actually follow.';
+
+function clipSystem(sawVideo: boolean): string {
+  return (
+    'You are a football coach reviewing a short clip with a young player. ' +
+    (sawVideo
+      ? 'You are watching the clip itself, so movement, timing and footwork are all visible. '
+      : 'You are shown still frames sampled in order from the clip - not the full video. Movement between frames has to be inferred, so say plainly when something cannot be judged. ') +
+    'Judge only what is visible: body shape, starting position, footwork, decision, angle to the ball, set position, handling. ' +
+    'If you cannot confidently pick out the described player, say so in the caveat and set confidence to low rather than guessing. ' +
+    'Rate this passage of play out of 100 - be fair and encouraging but honest; a routine, competent action is around 60-70. ' +
+    'Give concrete, physical coaching, never vague advice like "concentrate more". Plain British English for a teenager.'
+  );
+}
+
+const DRILL_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    focus: { type: 'string' },
+    warmup: { type: 'array', items: { type: 'string' } },
+    drills: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          setup: { type: 'string' },
+          reps: { type: 'string' },
+          coaching: { type: 'string' },
+        },
+        required: ['name', 'setup', 'reps', 'coaching'],
+        additionalProperties: false,
+      },
+    },
+    progression: { type: 'string' },
+    kit: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['title', 'focus', 'warmup', 'drills', 'progression', 'kit'],
+  additionalProperties: false,
+};
+
+const CLIP_SCHEMA = {
+  type: 'object',
+  properties: {
+    rating: { type: 'integer' },
+    headline: { type: 'string' },
+    whatHappened: { type: 'string' },
+    didWell: { type: 'array', items: { type: 'string' } },
+    improve: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { point: { type: 'string' }, why: { type: 'string' }, drill: { type: 'string' } },
+        required: ['point', 'why', 'drill'],
+        additionalProperties: false,
+      },
+    },
+    confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+    caveat: { type: 'string' },
+  },
+  required: ['rating', 'headline', 'whatHappened', 'didWell', 'improve', 'confidence', 'caveat'],
+  additionalProperties: false,
+};
+
+/** Never trust length or content of anything the client sends. */
+function clean(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.slice(0, max) : '';
+}
+
+function corsHeaders(origin: string | null, env: Env): Record<string, string> {
+  const allowed = env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
+  const ok = origin && (allowed.includes('*') || allowed.includes(origin));
+  return {
+    'Access-Control-Allow-Origin': ok ? (origin as string) : allowed[0] ?? '',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+}
+
+function json(body: unknown, status: number, headers: Record<string, string>): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...headers, 'content-type': 'application/json' },
+  });
+}
+
+/** One counter per IP per UTC day; the key expires on its own. */
+async function checkRateLimit(request: Request, env: Env): Promise<{ ok: boolean; used: number; limit: number }> {
+  const limit = Number(env.DAILY_LIMIT ?? DEFAULT_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `rl:${day}:${ip}`;
+
+  const current = Number((await env.RATE_LIMIT.get(key)) ?? '0');
+  if (current >= limit) return { ok: false, used: current, limit };
+
+  // 48h TTL comfortably covers the day boundary in any timezone.
+  await env.RATE_LIMIT.put(key, String(current + 1), { expirationTtl: 60 * 60 * 48 });
+  return { ok: true, used: current + 1, limit };
+}
+
+async function callGemini(env: Env, model: string, parts: unknown[], system: string, schema: unknown) {
+  const response = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts }],
+      systemInstruction: { parts: [{ text: system }] },
+      generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema },
+    }),
+  });
+
+  const body = (await response.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    error?: { message?: string };
+  };
+  if (!response.ok) {
+    throw Object.assign(new Error(body.error?.message ?? `Gemini returned ${response.status}`), {
+      status: response.status,
+    });
+  }
+  const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+  if (!text) throw new Error('The coach returned an empty response.');
+  const cleaned = text.trim().startsWith('```')
+    ? text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim()
+    : text.trim();
+  return JSON.parse(cleaned);
+}
+
+/** The model to use, discovered once and cached so a rename doesn't break the app. */
+async function pickModel(env: Env): Promise<string> {
+  const cached = await env.RATE_LIMIT.get('model:gemini');
+  if (cached) return cached;
+
+  const response = await fetch(`${API}/models`, { headers: { 'x-goog-api-key': env.GEMINI_API_KEY } });
+  const body = (await response.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
+  const usable = (body.models ?? [])
+    .map((m) => (m.name ?? '').replace(/^models\//, ''))
+    .filter((id) => id && !/embedding|aqa|imagen|veo|tts|audio|image-generation|learnlm|gemma/i.test(id))
+    .filter((id) => /flash|lite/i.test(id))
+    .sort((a, b) => {
+      const version = (id: string) => {
+        const m = id.match(/(\d+)\.?(\d+)?/);
+        return m ? Number(m[1]) * 100 + Number(m[2] ?? 0) : 0;
+      };
+      return version(b) - version(a);
+    });
+
+  const pick = usable[0];
+  if (!pick) throw new Error('No usable Gemini model is available to this key.');
+  await env.RATE_LIMIT.put('model:gemini', pick, { expirationTtl: 60 * 60 * 24 });
+  return pick;
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const origin = request.headers.get('origin');
+    const headers = corsHeaders(origin, env);
+
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+    if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405, headers);
+
+    const allowed = env.ALLOWED_ORIGINS.split(',').map((o) => o.trim());
+    if (!allowed.includes('*') && (!origin || !allowed.includes(origin))) {
+      return json({ error: 'This coach only serves the Matchday app.' }, 403, headers);
+    }
+
+    const length = Number(request.headers.get('content-length') ?? '0');
+    if (length > MAX_BODY_BYTES) {
+      return json({ error: 'That clip is too big. Trim it to the passage of play you want looked at.' }, 413, headers);
+    }
+
+    const limit = await checkRateLimit(request, env);
+    if (!limit.ok) {
+      return json(
+        {
+          error: `That's the ${limit.limit} free coach requests for today. It resets tomorrow, or add your own free Gemini key in Setup for unlimited use.`,
+          rateLimited: true,
+        },
+        429,
+        headers,
+      );
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = (await request.json()) as Record<string, unknown>;
+    } catch {
+      return json({ error: 'Bad request.' }, 400, headers);
+    }
+
+    try {
+      const model = await pickModel(env);
+      const url = new URL(request.url);
+
+      if (url.pathname.endsWith('/drills')) {
+        const player = clean(payload.player, 500);
+        const ask = clean(payload.ask, 500);
+        if (!ask) return json({ error: 'Say what you want to work on.' }, 400, headers);
+        const result = await callGemini(
+          env,
+          model,
+          [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
+          DRILLS_SYSTEM,
+          DRILL_SCHEMA,
+        );
+        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+      }
+
+      if (url.pathname.endsWith('/clip')) {
+        const prompt = clean(payload.prompt, 2000);
+        const media = Array.isArray(payload.media) ? payload.media : [];
+        if (media.length === 0) return json({ error: 'No clip was sent.' }, 400, headers);
+        if (media.length > 20) return json({ error: 'Too many frames.' }, 400, headers);
+
+        const parts: unknown[] = [];
+        for (const item of media as { mimeType?: unknown; data?: unknown; label?: unknown }[]) {
+          const mimeType = clean(item.mimeType, 60);
+          const data = typeof item.data === 'string' ? item.data : '';
+          if (!data || !/^(image|video)\//.test(mimeType)) {
+            return json({ error: 'That file type is not supported.' }, 400, headers);
+          }
+          const label = clean(item.label, 40);
+          if (label) parts.push({ text: label });
+          parts.push({ inlineData: { mimeType, data } });
+        }
+        parts.push({ text: prompt });
+
+        const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
+        const result = await callGemini(env, model, parts, clipSystem(sawVideo), CLIP_SCHEMA);
+        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+      }
+
+      return json({ error: 'Unknown endpoint.' }, 404, headers);
+    } catch (error) {
+      const status = (error as { status?: number }).status ?? 500;
+      const message = error instanceof Error ? error.message : 'The coach failed.';
+      // Never let an upstream error leak the key or internal detail.
+      const safe = status === 429
+        ? 'The coach is busy right now. Try again in a minute.'
+        : status >= 500
+          ? 'The coach had a problem. Try again.'
+          : message.slice(0, 200);
+      return json({ error: safe }, status >= 400 && status < 600 ? status : 500, headers);
+    }
+  },
+};

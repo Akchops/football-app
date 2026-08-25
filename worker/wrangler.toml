@@ -1,0 +1,14 @@
+name = "matchday-ai"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+
+[vars]
+# Origins allowed to call this worker. Add your own if you move the app.
+ALLOWED_ORIGINS = "https://akchops.github.io"
+# Coach requests allowed per person per day, before they're asked for their own key.
+DAILY_LIMIT = "40"
+
+# Created by setup.sh - holds the per-IP daily counters and the cached model id.
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "REPLACE_WITH_KV_ID"
