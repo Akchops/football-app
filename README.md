@@ -93,11 +93,22 @@ server, nothing uploaded.
   with a drill for each. Frames are sampled from the clip in the browser and
   read by Claude — it reports its own confidence and says plainly what it
   couldn't judge from stills.
-- Needs your own Anthropic API key, added in Setup. It is stored on the device
-  in its own entry, is never included in a backup export, and is used for
-  nothing else. The Coach tab is the only part of the app that needs signal.
+- Two providers, chosen in Setup. **Google Gemini** is the default and has a
+  free tier, so normal use costs nothing; **Anthropic Claude** is pay-as-you-go.
+  Either way it is your own API key, stored on the device in its own entry,
+  never included in a backup export, and used for nothing else. The Coach tab
+  is the only part of the app that needs signal.
+- On Gemini a short clip is sent as **video**, so movement, timing and footwork
+  are all visible. On Claude — which reads images, not video — the clip is
+  sampled into stills first, and the coach is told to judge accordingly. Clips
+  over 15MB fall back to stills on both.
+- Setup's "Check key" asks the provider which models the key can actually
+  reach and lets you pick one, rather than hardcoding a model id that may be
+  renamed or retired.
 - Clips are capped at two minutes. Full-match automatic stat extraction is not
   offered — see below.
+- Note on privacy: Google may use free-tier Gemini data to improve their
+  models. Worth knowing before uploading match video of a child.
 
 **Training**
 - Log sessions as well as matches: team training, keeper sessions, gym,

@@ -1,29 +1,61 @@
-/**
- * The Anthropic key, kept apart from the SDK so that importing it from Setup
- * doesn't pull the whole SDK into the main bundle.
- *
- * It lives in its own localStorage entry, never inside the app data, so it is
- * not carried into an exported backup.
- */
-const KEY_STORAGE = 'matchday.anthropicKey';
+import type { Provider } from './aiTypes';
 
-export function getApiKey(): string {
+/**
+ * Provider settings, kept apart from the SDKs so importing them from Setup
+ * doesn't pull either SDK into the main bundle.
+ *
+ * Keys live in their own localStorage entries, never inside the app data, so
+ * they are not carried into an exported backup.
+ */
+const KEYS: Record<Provider, string> = {
+  gemini: 'matchday.geminiKey',
+  claude: 'matchday.anthropicKey',
+};
+const PROVIDER_STORAGE = 'matchday.aiProvider';
+const MODEL_STORAGE = 'matchday.aiModel';
+
+function read(key: string): string {
   try {
-    return localStorage.getItem(KEY_STORAGE) ?? '';
+    return localStorage.getItem(key) ?? '';
   } catch {
     return '';
   }
 }
 
-export function setApiKey(key: string): void {
+function write(key: string, value: string): void {
   try {
-    if (key) localStorage.setItem(KEY_STORAGE, key);
-    else localStorage.removeItem(KEY_STORAGE);
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
   } catch {
-    // Private mode - the key just won't persist between sessions.
+    // Private mode - it just won't persist between sessions.
   }
 }
 
-export function hasApiKey(): boolean {
-  return getApiKey().trim().length > 0;
+export function getProvider(): Provider {
+  return read(PROVIDER_STORAGE) === 'claude' ? 'claude' : 'gemini';
+}
+
+export function setProvider(provider: Provider): void {
+  write(PROVIDER_STORAGE, provider);
+}
+
+export function getApiKey(provider: Provider = getProvider()): string {
+  return read(KEYS[provider]);
+}
+
+export function setApiKey(provider: Provider, key: string): void {
+  write(KEYS[provider], key);
+}
+
+export function hasApiKey(provider: Provider = getProvider()): boolean {
+  return getApiKey(provider).trim().length > 0;
+}
+
+/** The chosen model for the current provider, discovered from its API. */
+export function getModel(provider: Provider = getProvider()): string {
+  return read(`${MODEL_STORAGE}.${provider}`);
+}
+
+export function setModel(provider: Provider, model: string): void {
+  write(`${MODEL_STORAGE}.${provider}`, model);
 }

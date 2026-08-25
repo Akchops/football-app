@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import {
-  analyseClip, describeError, estimateClipCost, requestDrills,
-  type ClipAnalysis, type DrillPlan,
+  analyseClipBlob, costNote, describeError, requestDrills,
+  type ClipAnalysis, type ClipMode, type DrillPlan,
 } from '../lib/ai';
-import { hasApiKey } from '../lib/apiKey';
-import { ClipTooLongError, MAX_CLIP_SECONDS, extractFrames, formatClock, type Frame } from '../lib/frames';
+import { getProvider, hasApiKey } from '../lib/apiKey';
+import { ClipTooLongError, MAX_CLIP_SECONDS } from '../lib/frames';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import { getMediaBlob, listAllMedia, type MediaMeta } from '../store/media';
 import { formatDateShort } from '../lib/date';
@@ -34,7 +34,7 @@ export default function AIScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
         <EmptyState
           icon="🧠"
           title="Add an API key to switch the coach on"
-          message="The coach asks Claude for training sessions and reads your match clips. That runs on Anthropic's servers, so it needs your own API key — added once in Setup, kept on this device, and it is the only part of the app that uses the internet."
+          message="The coach writes training sessions and reads your match clips. That runs on Google's or Anthropic's servers, so it needs your own API key — added once in Setup, kept on this device, and it is the only part of the app that uses the internet."
           action={
             <button className="primary-btn" onClick={onOpenSetup}>
               Go to Setup
@@ -42,7 +42,7 @@ export default function AIScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
           }
         />
         <p className="muted small">
-          A key comes from console.anthropic.com. Sessions cost a fraction of a penny; reading a clip is roughly 20–30p.
+          Gemini has a free tier — get a key at aistudio.google.com/apikey and it costs nothing to run.
         </p>
       </div>
     );
@@ -91,7 +91,7 @@ function DrillsPanel() {
     try {
       setPlan(await requestDrills(profile, question.trim()));
     } catch (e) {
-      setError(describeError(e));
+      setError(await describeError(e));
     } finally {
       setBusy(false);
     }
@@ -192,8 +192,8 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
   const [selected, setSelected] = useState<MediaMeta | null>(null);
   const [whichPlayer, setWhichPlayer] = useState('');
   const [context, setContext] = useState('');
-  const [frames, setFrames] = useState<Frame[] | null>(null);
-  const [stage, setStage] = useState<'idle' | 'frames' | 'thinking'>('idle');
+  const [run, setRun] = useState<{ mode: ClipMode; frameCount: number } | null>(null);
+  const [stage, setStage] = useState<'idle' | 'working'>('idle');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState<ClipAnalysis | null>(null);
@@ -214,12 +214,12 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
   }, [selected, matches]);
 
   const reset = () => {
-    setFrames(null);
+    setRun(null);
     setResult(null);
     setError('');
   };
 
-  const run = async () => {
+  const start = async () => {
     setError('');
     setResult(null);
     if (!whichPlayer.trim()) {
@@ -235,21 +235,18 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
     }
 
     try {
-      setStage('frames');
+      setStage('working');
       setProgress('Reading the clip…');
-      const extracted = await extractFrames(blob, (done, total) => setProgress(`Reading frame ${done} of ${total}…`));
-      setFrames(extracted);
-
-      setStage('thinking');
-      setProgress(`Watching ${extracted.length} frames…`);
-      setResult(await analyseClip(profile, extracted, whichPlayer.trim(), context.trim()));
+      const outcome = await analyseClipBlob(profile, blob, whichPlayer.trim(), context.trim(), setProgress);
+      setRun({ mode: outcome.mode, frameCount: outcome.frameCount });
+      setResult(outcome.analysis);
     } catch (e) {
       if (e instanceof ClipTooLongError) {
         setError(
           `That clip is ${Math.round(e.seconds)} seconds. The coach reads clips up to ${MAX_CLIP_SECONDS} seconds — trim it to the passage of play you want looked at.`,
         );
       } else {
-        setError(describeError(e));
+        setError(await describeError(e));
       }
     } finally {
       setStage('idle');
@@ -326,13 +323,17 @@ function ClipPanel({ matchCount }: { matchCount: number }) {
         />
       </Field>
 
-      <button className="primary-btn" onClick={() => void run()} disabled={busy || (!selected && !uploaded)}>
+      <button className="primary-btn" onClick={() => void start()} disabled={busy || (!selected && !uploaded)}>
         {busy ? progress : 'Analyse this clip'}
       </button>
 
-      {frames && !busy && (
+      {getProvider() === 'gemini' && (
+        <p className="muted small">Gemini watches the clip itself, so movement and timing are visible — not just stills.</p>
+      )}
+
+      {run && !busy && (
         <p className="muted small">
-          {frames.length} frames read, {formatClock(frames[frames.length - 1].at)} of play · costs {estimateClipCost(frames.length)}
+          {run.mode === 'video' ? 'Whole clip watched' : 'Read as stills'} · {costNote(run.mode, run.frameCount)}
         </p>
       )}
 

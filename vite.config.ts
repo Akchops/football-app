@@ -36,6 +36,9 @@ export default defineConfig(({ mode }) => {
           // Everything is precached, so the app opens with no signal at all - which is
           // the normal state at a pitch.
           globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // The AI SDKs need the network to be any use, so precaching them for
+        // offline would be ~600KB of dead weight. They load on demand instead.
+        globIgnores: ['**/gemini-*.js', '**/claude-*.js'],
           navigateFallback: 'index.html',
           cleanupOutdatedCaches: true,
         },
