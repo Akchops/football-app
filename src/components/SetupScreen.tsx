@@ -391,7 +391,7 @@ export function SetupScreen({
       <p className="version-note">
         Matchday · {matches.length} matches tracked
         <br />Build {__BUILD_ID__} UTC
-        <br />© {new Date().getFullYear()} Akchops. All rights reserved.
+        <br />© {new Date().getFullYear()} Aarav Chopra. All rights reserved.
       </p>
     </div>
   );

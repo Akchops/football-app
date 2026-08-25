@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Football match tracker - calendar, results and stats",
-  "author": "Akchops",
+  "author": "Aarav Chopra",
   "license": "UNLICENSED",
   "scripts": {
     "dev": "vite",

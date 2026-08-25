@@ -275,7 +275,7 @@ and the migration from the old data format.
 
 ## Licence
 
-Matchday is proprietary. Copyright (c) 2026 Akchops, all rights reserved — see
+Matchday is proprietary. Copyright (c) 2026 Aarav Chopra, all rights reserved — see
 [LICENSE](LICENSE). The repository is public so the app can be hosted and run,
 but that is not permission to copy it: no licence to reuse, modify or
 redistribute the code is granted.
