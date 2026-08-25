@@ -10,5 +10,7 @@ Third-party components used under their own licences:
   Workbox                 MIT     https://github.com/GoogleChrome/workbox
   Vitest                  MIT     https://github.com/vitest-dev/vitest
   TypeScript              Apache-2.0  https://github.com/microsoft/TypeScript
+  Anthropic SDK           MIT     https://github.com/anthropics/anthropic-sdk-typescript
+  Google Gen AI SDK       Apache-2.0  https://github.com/googleapis/js-genai
 
 Their licences apply to those components only, not to Matchday itself.
