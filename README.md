@@ -208,13 +208,13 @@ owns the system prompts and response schemas, so it can't be repurposed as a
 free AI endpoint, only the app's origin may call it, and each IP gets a capped
 number of requests a day.
 
-```bash
-cd worker && npm install && npm run setup
-```
+It can be deployed **without opening a terminal**: add two repository secrets
+(`GEMINI_API_KEY`, `CLOUDFLARE_API_TOKEN`), then run the **Deploy AI proxy**
+workflow from the Actions tab. It prints a URL; set that as the `AI_PROXY_URL`
+repository *variable* and re-run the Pages deploy.
 
-That deploys it and prints a URL. Set that URL as the `AI_PROXY_URL` repository
-variable (Settings → Secrets and variables → Actions → Variables) and re-run the
-deploy. Full detail, including what it costs, is in `worker/README.md`.
+Step-by-step, including where to get each key, is in
+[worker/README.md](worker/README.md).
 
 Without it the app still works — it just asks each player for their own key.
 

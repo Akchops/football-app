@@ -2,26 +2,47 @@
 
 Holds one Gemini API key so players using Matchday don't each need their own.
 
-Without this, every user has to paste their own key into Setup. With it, the
+Without this, everyone has to paste their own key into Setup. With it, the
 Coach tab works the moment they open the app.
 
-## What it is
+## Easiest: deploy from GitHub, no terminal
 
-A single Cloudflare Worker. Cloudflare's free tier covers 100,000 requests a
-day, which is far more than this will ever use, and needs no card.
+You never have to open a command line. Do this once:
 
-It is deliberately **not** a general Gemini proxy:
+**1. Get a Gemini key** — free, no card:
+<https://aistudio.google.com/apikey> → Create API key → copy it.
 
-- It owns the system prompts and response schemas. Callers send a position and
-  a question, or a clip and a description — not arbitrary prompts. A leaked URL
-  can waste quota but can't be used as a free AI endpoint.
-- Only the app's origin is allowed (`ALLOWED_ORIGINS`).
-- Each IP gets `DAILY_LIMIT` requests a day (40 by default). Past that, the app
-  tells the player to add their own free key in Setup.
-- Requests over ~22MB are refused before reaching Gemini.
-- Upstream errors are rewritten before being returned, so nothing internal leaks.
+**2. Get a Cloudflare API token** — free, no card:
+<https://dash.cloudflare.com/profile/api-tokens> → Create Token → use the
+**"Edit Cloudflare Workers"** template → Continue → Create → copy it.
 
-## Setting it up
+**3. Put both into the repo** — on github.com/Akchops/football-app:
+Settings → Secrets and variables → Actions → **Secrets** tab → New repository
+secret, twice:
+
+| Name | Value |
+|---|---|
+| `GEMINI_API_KEY` | the key from step 1 |
+| `CLOUDFLARE_API_TOKEN` | the token from step 2 |
+
+**4. Run it** — Actions tab → **Deploy AI proxy** → Run workflow.
+
+It prints a `https://…workers.dev` URL at the end.
+
+**5. Tell the app** — Settings → Secrets and variables → Actions → **Variables**
+tab (not Secrets) → New repository variable:
+
+| Name | Value |
+|---|---|
+| `AI_PROXY_URL` | the URL from step 4 |
+
+**6.** Actions → **Deploy to GitHub Pages** → Run workflow.
+
+Done. The Coach tab now works for everyone with no key.
+
+## Alternative: from your own computer
+
+Needs Node 20+ and the repo cloned.
 
 ```bash
 cd worker
@@ -29,30 +50,38 @@ npm install
 npm run setup
 ```
 
-That signs you in to Cloudflare, creates the rate-limit store, asks for your
-Gemini key, and deploys. It prints a `*.workers.dev` URL at the end.
+That signs you into Cloudflare in a browser, creates the rate-limit store, asks
+for your Gemini key, and deploys. Then do steps 5 and 6 above.
 
-Then tell the app about it — on GitHub:
+## What it is
 
-**Settings → Secrets and variables → Actions → Variables → New repository
-variable**, named `AI_PROXY_URL`, set to that URL.
+A single Cloudflare Worker. The free tier covers 100,000 requests a day, far
+more than this will use, and needs no card.
 
-Re-run the deploy workflow and the Coach tab works for everyone with no key.
+It is deliberately **not** a general Gemini proxy:
+
+- It owns the system prompts and response schemas. Callers send a position and
+  a question, or a clip and a description — not arbitrary prompts. A leaked URL
+  can waste quota but can't be used as a free AI endpoint.
+- Only the app's origin is allowed (`ALLOWED_ORIGINS` in `wrangler.toml`).
+- Each IP gets `DAILY_LIMIT` requests a day (40 by default). Past that, the app
+  tells the player to add their own free key in Setup.
+- Requests over ~22MB are refused before reaching Gemini.
+- Upstream errors are rewritten before being returned, so nothing internal leaks.
 
 ## Costs and limits
 
-The Gemini free tier is generous but shared across everyone using your proxy,
-and it is rate limited per key rather than per user. If Matchday gets busy the
-free tier will run out and requests will fail until it resets — the app handles
-this by telling players to add their own key.
+The Gemini free tier is shared across everyone using your proxy, and it is rate
+limited per key rather than per user. If Matchday gets busy the free tier will
+run out and requests fail until it resets — the app handles this by telling
+players to add their own key.
 
 If you later put a card on the Google account, every clip analysed bills to
 you. `DAILY_LIMIT` in `wrangler.toml` is the lever: lower it to cap exposure.
 
-## Changing settings later
+## Changing things later
 
-```bash
-npx wrangler secret put GEMINI_API_KEY   # rotate the key
-npx wrangler deploy                       # after editing wrangler.toml
-npx wrangler tail                         # watch live logs
-```
+Re-run the **Deploy AI proxy** workflow after editing `wrangler.toml`, or
+rotate the key by updating the `GEMINI_API_KEY` secret and re-running it.
+
+From a terminal: `npx wrangler tail` watches live logs.

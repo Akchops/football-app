@@ -1,0 +1,26 @@
+name: Deploy AI proxy
+
+# Run this by hand from the Actions tab. It needs two repository secrets:
+#   CLOUDFLARE_API_TOKEN - from dash.cloudflare.com, "Edit Cloudflare Workers" template
+#   GEMINI_API_KEY       - free from aistudio.google.com/apikey
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm install
+        working-directory: worker
+
+      - run: ./ci-deploy.sh
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
