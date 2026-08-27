@@ -168,24 +168,50 @@ async function checkRateLimit(request: Request, env: Env): Promise<{ ok: boolean
   return { ok: true, used: current + 1, limit };
 }
 
-async function callGemini(env: Env, model: string, parts: unknown[], system: string, schema: unknown) {
-  const response = await postToGemini(env, model, parts, system, schema);
+async function callGemini(
+  env: Env,
+  model: string,
+  parts: unknown[],
+  system: string,
+  schema: unknown,
+  maxOutputTokens?: number,
+) {
+  const response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
 
   const body = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
     error?: { message?: string };
   };
   if (!response.ok) {
     throw Object.assign(new Error(body.error?.message ?? `Gemini returned ${response.status}`), {
       status: response.status,
+      code: 'upstream',
     });
   }
-  const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
-  if (!text) throw new Error('The coach returned an empty response.');
+
+  const candidate = body.candidates?.[0];
+  const text = candidate?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
+  const finish = candidate?.finishReason ?? '';
+
+  // A long answer that runs out of room comes back as valid-looking but truncated
+  // JSON, which then fails to parse for reasons the parse error cannot explain.
+  if (finish === 'MAX_TOKENS') {
+    throw Object.assign(new Error('Ran out of room before finishing.'), { code: 'truncated' });
+  }
+  if (!text) {
+    throw Object.assign(new Error(`Empty response (finishReason ${finish || 'none'}).`), {
+      code: finish === 'SAFETY' || finish === 'PROHIBITED_CONTENT' ? 'blocked' : 'empty',
+    });
+  }
+
   const cleaned = text.trim().startsWith('```')
     ? text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim()
     : text.trim();
-  return JSON.parse(cleaned);
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    throw Object.assign(new Error('The reply was not usable JSON.'), { code: 'badjson' });
+  }
 }
 
 function postToGemini(
@@ -194,14 +220,21 @@ function postToGemini(
   parts: unknown[],
   system: string,
   schema: unknown,
+  maxOutputTokens?: number,
 ): Promise<Response> {
+  const generationConfig: Record<string, unknown> = {
+    responseMimeType: 'application/json',
+    responseJsonSchema: schema,
+  };
+  if (maxOutputTokens) generationConfig.maxOutputTokens = maxOutputTokens;
+
   return fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       systemInstruction: { parts: [{ text: system }] },
-      generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema },
+      generationConfig,
     }),
     // A backstop only. The app gives up at 90s and its message is the one worth
     // showing, so this must never fire first - a 75s limit here cut off reads
@@ -331,7 +364,7 @@ export default {
         }
         parts.push({ text: prompt });
 
-        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA);
+        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384);
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 
@@ -339,22 +372,32 @@ export default {
     } catch (error) {
       const status = (error as { status?: number }).status ?? 500;
       const name = (error as { name?: string }).name ?? '';
+      const code = (error as { code?: string }).code ?? '';
       const message = error instanceof Error ? error.message : 'The coach failed.';
 
-      // Everything that was not an HTTP error used to collapse into one message,
-      // so a request cut off by a timeout looked identical to a genuine upstream
-      // fault - and neither said which. Name the distinct cases.
-      const safe = status === 429
-        ? 'The coach is busy right now. Try again in a minute.'
-        : name === 'TimeoutError' || name === 'AbortError'
-          ? 'That took too long to read. Try a smaller picture, or one page at a time.'
-          : /empty response/i.test(message)
-            ? 'The coach read that but sent nothing back. Try again, or use a clearer picture.'
-            : status >= 500
-              // Never let an upstream error leak the key or internal detail.
-              ? 'The coach had a problem. Try again.'
-              : message.slice(0, 200);
-      return json({ error: safe }, status >= 400 && status < 600 ? status : 500, headers);
+      // Every non-HTTP failure used to collapse into one sentence, so a timeout,
+      // a truncated reply and a genuine upstream fault were indistinguishable -
+      // to the reader and to anyone trying to fix it. Each says which it is, and
+      // carries a short code that names the cause without leaking any detail.
+      const [safe, tag] =
+        status === 429
+          ? ['The coach is busy right now. Try again in a minute.', 'busy']
+          : name === 'TimeoutError' || name === 'AbortError'
+            ? ['That took too long to read. Try a smaller picture, or one page at a time.', 'timeout']
+            : code === 'truncated'
+              ? ['That schedule was too long to read in one go. Try one page, or half of it.', 'truncated']
+              : code === 'blocked'
+                ? ['The coach would not read that image. Try a different photo.', 'blocked']
+                : code === 'empty'
+                  ? ['The coach read that but sent nothing back. Try again, or a clearer picture.', 'empty']
+                  : code === 'badjson'
+                    ? ['The coach garbled its answer. Try again.', 'badjson']
+                    : status >= 500
+                      // Never let an upstream error leak the key or internal detail.
+                      ? ['The coach had a problem. Try again.', code === 'upstream' ? 'upstream' : 'unknown']
+                      : [message.slice(0, 200), 'request'];
+
+      return json({ error: `${safe} (${tag})`, code: tag }, status >= 400 && status < 600 ? status : 500, headers);
     }
   },
 };
