@@ -175,8 +175,18 @@ async function callGemini(
   system: string,
   schema: unknown,
   maxOutputTokens?: number,
+  noThinking = false,
 ) {
-  const response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
+  let response = await postToGemini(env, model, parts, system, schema, maxOutputTokens, noThinking);
+
+  // Every model this picks accepts a zero thinking budget, but a future one may
+  // not. Rejection is cheap and recoverable, so retry plainly rather than fail.
+  if (!response.ok && response.status === 400 && noThinking) {
+    const detail = await response.clone().text();
+    if (/thinking/i.test(detail)) {
+      response = await postToGemini(env, model, parts, system, schema, maxOutputTokens, false);
+    }
+  }
 
   const body = (await response.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
@@ -221,12 +231,16 @@ function postToGemini(
   system: string,
   schema: unknown,
   maxOutputTokens?: number,
+  noThinking = false,
 ): Promise<Response> {
   const generationConfig: Record<string, unknown> = {
     responseMimeType: 'application/json',
     responseJsonSchema: schema,
   };
   if (maxOutputTokens) generationConfig.maxOutputTokens = maxOutputTokens;
+  // Reading a table off a photo is extraction. Deliberating first is the whole
+  // remaining wait on an import, and buys nothing on a job like this.
+  if (noThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
 
   return fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
@@ -374,15 +388,11 @@ export default {
         parts.push({ text: prompt });
 
         // Extraction, and the one call whose wait people actually feel.
-        const result = await callGemini(
-          env,
-          await pickModel(env, true),
-          parts,
-          FIXTURES_SYSTEM,
-          FIXTURES_SCHEMA,
-          16_384,
-        );
-        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+        const model = await pickModel(env, true);
+        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384, true);
+        // Naming the model is not sensitive and makes a slow read attributable
+        // to a specific one, rather than to the feature in general.
+        return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
 
       return json({ error: 'Unknown endpoint.' }, 404, headers);

@@ -8,7 +8,7 @@ import { proxyAvailable, sharedUsage as sharedUsageSnapshot } from './proxy';
 export type { ClipAnalysis, DrillPlan, Provider } from './aiTypes';
 export type { FixtureRead, ParsedFixture, ReviewRow } from './fixtures';
 export { PROVIDER_LABEL } from './aiTypes';
-export { ProxyLimitError, proxyAvailable, sharedUsage } from './proxy';
+export { ProxyLimitError, proxyAvailable, sharedUsage, lastModelUsed } from './proxy';
 
 /**
  * Personal key wins when there is one - it has its own quota. Otherwise the

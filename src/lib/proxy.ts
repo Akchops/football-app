@@ -28,10 +28,16 @@ export interface ProxyUsage {
 }
 
 let lastUsage: ProxyUsage | null = null;
+let lastModel = '';
 
 /** How much of today's shared allowance is gone, once something has been asked. */
 export function sharedUsage(): ProxyUsage | null {
   return lastUsage;
+}
+
+/** Which model answered last, so a slow reply can be pinned on a specific one. */
+export function lastModelUsed(): string {
+  return lastModel;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -52,11 +58,13 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     rateLimited?: boolean;
     used?: number;
     limit?: number;
+    model?: string;
   };
 
   if (typeof payload.used === 'number' && typeof payload.limit === 'number') {
     lastUsage = { used: payload.used, limit: payload.limit };
   }
+  if (typeof payload.model === 'string') lastModel = payload.model;
 
   if (!response.ok || !payload.result) {
     const message = payload.error ?? 'The coach could not answer that.';

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { todayISO } from '../lib/date';
-import { describeError, readFixtures, scheduleProblem } from '../lib/ai';
+import { describeError, lastModelUsed, readFixtures, scheduleProblem } from '../lib/ai';
 import { buildRows, importable, matchCompetition, toMatchInput, type ReviewRow } from '../lib/fixtures';
 import { Field, Sheet } from './ui';
 import type { Venue } from '../types';
@@ -73,7 +73,11 @@ export function ImportFixturesSheet({
         setProgress(message);
       });
       const total = performance.now() - started;
-      setTiming(`Read in ${(total / 1000).toFixed(1)}s · picture ready in ${(prepared / 1000).toFixed(1)}s`);
+      const model = lastModelUsed();
+      setTiming(
+        `Read in ${(total / 1000).toFixed(1)}s · picture ready in ${(prepared / 1000).toFixed(1)}s` +
+          (model ? ` · ${model}` : ''),
+      );
       const built = buildRows(read.fixtures, matches, today);
       setSummary(read.summary);
       setRows(built);
