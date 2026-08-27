@@ -15,6 +15,7 @@ import { ResultPrompt } from './components/ResultPrompt';
 import { CompetitionFormSheet, type CompetitionFormTarget } from './components/CompetitionFormSheet';
 import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
 import { TournamentSheet } from './components/TournamentSheet';
+import { ImportFixturesSheet } from './components/ImportFixturesSheet';
 import { TrainingFormSheet, type TrainingFormTarget } from './components/TrainingFormSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { MediaScreen } from './components/MediaScreen';
@@ -46,6 +47,8 @@ function Shell() {
   const [competitionForm, setCompetitionForm] = useState<CompetitionFormTarget | null>(null);
   const [teamForm, setTeamForm] = useState<TeamFormTarget | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [imported, setImported] = useState(0);
   const [trainingForm, setTrainingForm] = useState<TrainingFormTarget | null>(null);
   const [promptHidden, setPromptHidden] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
@@ -55,6 +58,13 @@ function Shell() {
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0 });
   }, [tab]);
+
+  // The import toast is a confirmation, not a message to dismiss by hand.
+  useEffect(() => {
+    if (imported === 0) return;
+    const timer = window.setTimeout(() => setImported(0), 4000);
+    return () => window.clearTimeout(timer);
+  }, [imported]);
 
   const pending = useMemo(() => pendingResultMatches(matches, settings, now), [matches, settings, now]);
 
@@ -105,6 +115,7 @@ function Shell() {
             onOpenMatch={setDetailMatch}
             onAddMatch={(dateISO) => setMatchForm({ mode: 'create', dateISO })}
             onAddTournament={() => setTournamentOpen(true)}
+            onImportFixtures={() => setImportOpen(true)}
             onAddTraining={(dateISO) => setTrainingForm({ mode: 'create', dateISO })}
             onOpenTraining={(id) => {
               const session = training.find((t) => t.id === id);
@@ -187,6 +198,19 @@ function Shell() {
       <TeamFormSheet target={teamForm} onClose={() => setTeamForm(null)} />
 
       <TournamentSheet open={tournamentOpen} onClose={() => setTournamentOpen(false)} />
+      <ImportFixturesSheet
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(count) => {
+          setImportOpen(false);
+          setImported(count);
+        }}
+      />
+      {imported > 0 && (
+        <div className="toast" role="status" onClick={() => setImported(0)}>
+          {imported} fixture{imported === 1 ? '' : 's'} added to your calendar
+        </div>
+      )}
 
       <TrainingFormSheet target={trainingForm} onClose={() => setTrainingForm(null)} />
     </div>

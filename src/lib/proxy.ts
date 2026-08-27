@@ -2,6 +2,7 @@ import type { Profile } from '../types';
 import { clipPrompt, playerLine, clampRating, type ClipAnalysis, type DrillPlan } from './aiTypes';
 import type { Frame } from './frames';
 import { formatClock } from './frames';
+import { fixturesPrompt, type FixtureRead } from './fixtures';
 
 /**
  * The shared coach: a small server that holds one Gemini key so players don't
@@ -103,6 +104,13 @@ export async function proxyClipFromFrames(
     })),
   });
   return clampRating(analysis);
+}
+
+export async function proxyFixtures(file: Blob, today: string, teamNames: string[]): Promise<FixtureRead> {
+  return post<FixtureRead>('/fixtures', {
+    prompt: fixturesPrompt(today, teamNames),
+    media: [{ mimeType: file.type || 'image/jpeg', data: await blobToBase64(file) }],
+  });
 }
 
 function blobToBase64(blob: Blob): Promise<string> {

@@ -8,6 +8,7 @@ import {
 import type { Frame } from './frames';
 import { formatClock } from './frames';
 import { getApiKey, getModel } from './apiKey';
+import { FIXTURES_SCHEMA, FIXTURES_SYSTEM, fixturesPrompt, type FixtureRead } from './fixtures';
 
 export const CLAUDE_DEFAULT_MODEL = 'claude-opus-5';
 
@@ -87,4 +88,40 @@ export async function claudeClipFromFrames(
   });
   if (!message.parsed_output) throw new Error('The coach could not read that clip. Try a shorter or clearer one.');
   return clampRating(message.parsed_output as ClipAnalysis);
+}
+
+export async function claudeFixtures(file: Blob, today: string, teamNames: string[]): Promise<FixtureRead> {
+  const data = await blobToBase64(file);
+  const type = file.type || 'image/jpeg';
+  // Claude takes a PDF as a document block and a photo as an image block; the
+  // schedule arrives as either depending on how the club sent it.
+  const source: Anthropic.ContentBlockParam =
+    type === 'application/pdf'
+      ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } }
+      : {
+          type: 'image',
+          source: { type: 'base64', media_type: type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data },
+        };
+
+  const message = await client().messages.parse({
+    model: model(),
+    max_tokens: 8000,
+    system: FIXTURES_SYSTEM,
+    messages: [{ role: 'user', content: [source, { type: 'text', text: fixturesPrompt(today, teamNames) }] }],
+    output_config: { format: jsonSchemaOutputFormat(FIXTURES_SCHEMA) },
+  });
+  if (!message.parsed_output) throw new Error('The coach could not read that schedule. Try a clearer photo.');
+  return message.parsed_output as FixtureRead;
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result);
+      resolve(result.slice(result.indexOf(',') + 1));
+    };
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.readAsDataURL(blob);
+  });
 }

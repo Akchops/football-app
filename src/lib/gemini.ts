@@ -7,6 +7,7 @@ import {
 import type { Frame } from './frames';
 import { formatClock } from './frames';
 import { getApiKey, getModel, setModel } from './apiKey';
+import { FIXTURES_SCHEMA, FIXTURES_SYSTEM, fixturesPrompt, type FixtureRead } from './fixtures';
 
 /**
  * Gemini can read video directly, so a short clip is sent as-is rather than as
@@ -186,6 +187,27 @@ export async function geminiClipFromFrames(
     },
   });
   return clampRating(parseJson<ClipAnalysis>(response.text));
+}
+
+export async function geminiFixtures(file: Blob, today: string, teamNames: string[]): Promise<FixtureRead> {
+  const response = await client().models.generateContent({
+    model: await resolveModel(),
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { inlineData: { mimeType: file.type || 'image/jpeg', data: await blobToBase64(file) } },
+          { text: fixturesPrompt(today, teamNames) },
+        ],
+      },
+    ],
+    config: {
+      systemInstruction: FIXTURES_SYSTEM,
+      responseMimeType: 'application/json',
+      responseJsonSchema: FIXTURES_SCHEMA,
+    },
+  });
+  return parseJson<FixtureRead>(response.text);
 }
 
 function blobToBase64(blob: Blob): Promise<string> {

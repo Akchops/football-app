@@ -1,10 +1,12 @@
 import type { Profile } from '../types';
 import type { ClipAnalysis, DrillPlan } from './aiTypes';
+import type { FixtureRead } from './fixtures';
 import { getProvider, hasApiKey } from './apiKey';
 import { extractFrames, type Frame } from './frames';
 import { proxyAvailable, sharedUsage as sharedUsageSnapshot } from './proxy';
 
 export type { ClipAnalysis, DrillPlan, Provider } from './aiTypes';
+export type { FixtureRead, ParsedFixture, ReviewRow } from './fixtures';
 export { PROVIDER_LABEL } from './aiTypes';
 export { ProxyLimitError, proxyAvailable, sharedUsage } from './proxy';
 
@@ -98,6 +100,38 @@ export async function analyseClipBlob(
 async function framesFor(video: Blob, onProgress?: (message: string) => void): Promise<Frame[]> {
   onProgress?.('Reading the clip…');
   return extractFrames(video, (done, total) => onProgress?.(`Reading frame ${done} of ${total}…`));
+}
+
+/** Inline media has to stay small enough to send in one request. */
+export const MAX_SCHEDULE_BYTES = 12 * 1024 * 1024;
+
+/** Why this file cannot be read as a schedule, or empty if it can. */
+export function scheduleProblem(file: File): string {
+  const type = file.type || '';
+  if (!type.startsWith('image/') && type !== 'application/pdf') {
+    return 'Send a photo, a screenshot or a PDF of the schedule.';
+  }
+  if (file.size > MAX_SCHEDULE_BYTES) {
+    return 'That file is too big. A screenshot or a photo of the sheet works better than a scan.';
+  }
+  return '';
+}
+
+/**
+ * Read fixtures off a schedule someone was sent. Gemini takes a PDF directly;
+ * so does Claude, as a document block - so every provider handles both.
+ */
+export async function readFixtures(file: File, today: string, teamNames: string[]): Promise<FixtureRead> {
+  if (usingSharedCoach()) {
+    const { proxyFixtures } = await import('./proxy');
+    return proxyFixtures(file, today, teamNames);
+  }
+  if (getProvider() === 'claude') {
+    const { claudeFixtures } = await import('./claude');
+    return claudeFixtures(file, today, teamNames);
+  }
+  const { geminiFixtures } = await import('./gemini');
+  return geminiFixtures(file, today, teamNames);
 }
 
 export async function describeError(error: unknown): Promise<string> {

@@ -3,7 +3,7 @@
  *
  * Holds the one Gemini key so players don't each need their own. It is
  * deliberately NOT a general Gemini proxy: it owns the system prompts and
- * response schemas and only accepts the two shapes the app needs, so a leaked
+ * response schemas and only accepts the three shapes the app needs, so a leaked
  * URL can waste quota but cannot be repurposed as a free LLM endpoint.
  */
 
@@ -67,6 +67,44 @@ const DRILL_SCHEMA = {
   required: ['title', 'focus', 'warmup', 'drills', 'progression', 'kit'],
   additionalProperties: false,
 };
+
+const FIXTURES_SYSTEM =
+  'You read football fixture lists off photos, screenshots and PDFs and turn them into structured data. ' +
+  'These are usually shared in team chats: a club schedule, a league table of fixtures, a tournament order of play, or a photo of a printed sheet. ' +
+  'Read every fixture row you can see. Do not invent rows, and do not skip rows because they are hard to read - mark those low confidence instead. ' +
+  'Dates are often written without a year ("Sat 12 Sep"). Use the current date given to you and choose the nearest sensible upcoming date; a fixture list nearly always runs forwards from now. ' +
+  'Times may be 12-hour ("4.30", "4:30pm", "kick off 2pm"). Always return 24-hour HH:mm. If a row genuinely has no time, return an empty string rather than guessing. ' +
+  'H and A, or (H) and (A), mean home and away. So do "vs" for home and "@" or "at" for away. Neutral only when the sheet says so. ' +
+  'The opponent is the other team, never the player\'s own. If the row reads "Riverside FC v Oakwood United" and the sheet belongs to Riverside, the opponent is Oakwood United. ' +
+  'Only set durationMinutes when the sheet states a length. Otherwise return 0. ' +
+  'If the image is not a fixture list at all, say so in the summary and return no fixtures.';
+
+const FIXTURES_SCHEMA = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string', description: 'One line on what this document is. Say so plainly if it is not a fixture list.' },
+    fixtures: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'Match date as YYYY-MM-DD' },
+          time: { type: 'string', description: 'Kickoff as 24-hour HH:mm, or empty string if the sheet does not give one' },
+          opponent: { type: 'string', description: 'The other team, exactly as written' },
+          venue: { type: 'string', enum: ['home', 'away', 'neutral'] },
+          competition: { type: 'string', description: 'Competition or division as printed, or empty string' },
+          location: { type: 'string', description: 'Ground or pitch if given, or empty string' },
+          durationMinutes: { type: 'integer', description: 'Total minutes only if the sheet states it, otherwise 0' },
+          confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+        },
+        required: ['date', 'time', 'opponent', 'venue', 'competition', 'location', 'durationMinutes', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['summary', 'fixtures'],
+  additionalProperties: false,
+} as const;
 
 const CLIP_SCHEMA = {
   type: 'object',
@@ -259,6 +297,27 @@ export default {
 
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
         const result = await callGemini(env, model, parts, clipSystem(sawVideo), CLIP_SCHEMA);
+        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+      }
+
+      if (url.pathname.endsWith('/fixtures')) {
+        const prompt = clean(payload.prompt, 2000);
+        const media = Array.isArray(payload.media) ? payload.media : [];
+        if (media.length === 0) return json({ error: 'No schedule was sent.' }, 400, headers);
+        if (media.length > 8) return json({ error: 'Too many pages at once.' }, 400, headers);
+
+        const parts: unknown[] = [];
+        for (const item of media as { mimeType?: unknown; data?: unknown }[]) {
+          const mimeType = clean(item.mimeType, 60);
+          const data = typeof item.data === 'string' ? item.data : '';
+          if (!data || !(/^image\//.test(mimeType) || mimeType === 'application/pdf')) {
+            return json({ error: 'Send a photo, a screenshot or a PDF of the schedule.' }, 400, headers);
+          }
+          parts.push({ inlineData: { mimeType, data } });
+        }
+        parts.push({ text: prompt });
+
+        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA);
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 

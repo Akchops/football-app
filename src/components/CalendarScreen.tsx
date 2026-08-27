@@ -19,6 +19,7 @@ export function CalendarScreen({
   onOpenMatch,
   onAddMatch,
   onAddTournament,
+  onImportFixtures,
   onAddTraining,
   onOpenTraining,
   onEnterResult,
@@ -27,6 +28,7 @@ export function CalendarScreen({
   onOpenMatch: (match: Match) => void;
   onAddMatch: (dateISO: string) => void;
   onAddTournament: () => void;
+  onImportFixtures: () => void;
   onAddTraining: (dateISO: string) => void;
   onOpenTraining: (id: string) => void;
   onEnterResult: (match: Match) => void;
@@ -123,6 +125,9 @@ export function CalendarScreen({
         </button>
         <button className="quick-btn" onClick={() => onAddTraining(selected)}>
           + Training
+        </button>
+        <button className="quick-btn" onClick={onImportFixtures}>
+          Import
         </button>
         {(teams.length > 1 || competitions.length > 1) && (
           <button
