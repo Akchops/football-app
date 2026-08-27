@@ -29,6 +29,7 @@ export function ImportFixturesSheet({
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [progress, setProgress] = useState('');
+  const [timing, setTiming] = useState('');
   const [teamId, setTeamId] = useState('');
   const [competitionId, setCompetitionId] = useState('');
 
@@ -38,6 +39,7 @@ export function ImportFixturesSheet({
   function reset() {
     setStage('idle');
     setProgress('');
+    setTiming('');
     setError('');
     setSummary('');
     setRows([]);
@@ -61,7 +63,16 @@ export function ImportFixturesSheet({
     setError('');
     try {
       const today = todayISO();
-      const read = await readFixtures(file, today, teams.map((t) => t.name), setProgress);
+      // Split the wait into shrinking the picture versus sending and reading it,
+      // because the two are slow for completely different reasons.
+      const started = performance.now();
+      let prepared = 0;
+      const read = await readFixtures(file, today, teams.map((t) => t.name), (message) => {
+        if (message.startsWith('Reading')) prepared = performance.now() - started;
+        setProgress(message);
+      });
+      const total = performance.now() - started;
+      setTiming(`Read in ${(total / 1000).toFixed(1)}s · picture ready in ${(prepared / 1000).toFixed(1)}s`);
       const built = buildRows(read.fixtures, matches, today);
       setSummary(read.summary);
       setRows(built);
@@ -171,6 +182,7 @@ export function ImportFixturesSheet({
       {stage === 'review' && (
         <>
           {summary && <p className="notice">{summary}</p>}
+          {timing && <p className="muted small">{timing}</p>}
 
           {rows.length === 0 ? (
             <p className="muted small">
