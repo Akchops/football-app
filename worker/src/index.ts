@@ -168,16 +168,31 @@ async function checkRateLimit(request: Request, env: Env): Promise<{ ok: boolean
   return { ok: true, used: current + 1, limit };
 }
 
-async function callGemini(env: Env, model: string, parts: unknown[], system: string, schema: unknown) {
-  const response = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts }],
-      systemInstruction: { parts: [{ text: system }] },
-      generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema },
-    }),
-  });
+/**
+ * Reading a table off a picture is extraction, not reasoning. Letting the model
+ * think first adds latency for nothing, so it is turned off where it does not
+ * help - but not every model accepts the setting, so a rejection is remembered
+ * and the call retried without it rather than failing.
+ */
+async function callGemini(
+  env: Env,
+  model: string,
+  parts: unknown[],
+  system: string,
+  schema: unknown,
+  skipThinking = false,
+) {
+  const flag = `nothink:unsupported:${model}`;
+  const useThinkingConfig = skipThinking && !(await env.RATE_LIMIT.get(flag));
+
+  let response = await postToGemini(env, model, parts, system, schema, useThinkingConfig);
+  if (!response.ok && response.status === 400 && useThinkingConfig) {
+    const text = await response.clone().text();
+    if (/thinking/i.test(text)) {
+      await env.RATE_LIMIT.put(flag, '1', { expirationTtl: 60 * 60 * 24 * 30 });
+      response = await postToGemini(env, model, parts, system, schema, false);
+    }
+  }
 
   const body = (await response.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
@@ -194,6 +209,33 @@ async function callGemini(env: Env, model: string, parts: unknown[], system: str
     ? text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim()
     : text.trim();
   return JSON.parse(cleaned);
+}
+
+function postToGemini(
+  env: Env,
+  model: string,
+  parts: unknown[],
+  system: string,
+  schema: unknown,
+  noThinking: boolean,
+): Promise<Response> {
+  const generationConfig: Record<string, unknown> = {
+    responseMimeType: 'application/json',
+    responseJsonSchema: schema,
+  };
+  if (noThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+
+  return fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts }],
+      systemInstruction: { parts: [{ text: system }] },
+      generationConfig,
+    }),
+    // Never leave the phone waiting on a request that is not coming back.
+    signal: AbortSignal.timeout(75_000),
+  });
 }
 
 /** The model to use, discovered once and cached so a rename doesn't break the app. */
@@ -317,7 +359,7 @@ export default {
         }
         parts.push({ text: prompt });
 
-        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA);
+        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, true);
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 

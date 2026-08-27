@@ -117,11 +117,31 @@ export function scheduleProblem(file: File): string {
   return '';
 }
 
+/** Past this, something has gone wrong and waiting longer will not fix it. */
+const READ_TIMEOUT_MS = 90_000;
+
 /**
  * Read fixtures off a schedule someone was sent. Gemini takes a PDF directly;
  * so does Claude, as a document block - so every provider handles both.
+ *
+ * The photo is shrunk before it goes anywhere: sending a raw 12MP camera file
+ * means minutes of upload before the reading can even begin.
  */
-export async function readFixtures(file: File, today: string, teamNames: string[]): Promise<FixtureRead> {
+export async function readFixtures(
+  file: File,
+  today: string,
+  teamNames: string[],
+  onProgress?: (message: string) => void,
+): Promise<FixtureRead> {
+  onProgress?.('Getting the picture ready…');
+  const { prepareSchedule } = await import('./scheduleImage');
+  const { file: ready } = await prepareSchedule(file);
+
+  onProgress?.('Reading the schedule…');
+  return withTimeout(read(ready, today, teamNames));
+}
+
+async function read(file: Blob, today: string, teamNames: string[]): Promise<FixtureRead> {
   if (usingSharedCoach()) {
     const { proxyFixtures } = await import('./proxy');
     return proxyFixtures(file, today, teamNames);
@@ -132,6 +152,16 @@ export async function readFixtures(file: File, today: string, teamNames: string[
   }
   const { geminiFixtures } = await import('./gemini');
   return geminiFixtures(file, today, teamNames);
+}
+
+function withTimeout<T>(work: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error('That took too long. Try a smaller picture, or one page at a time.')),
+      READ_TIMEOUT_MS,
+    );
+    work.then(resolve, reject).finally(() => window.clearTimeout(timer));
+  });
 }
 
 export async function describeError(error: unknown): Promise<string> {

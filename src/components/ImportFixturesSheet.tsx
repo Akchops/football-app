@@ -28,6 +28,7 @@ export function ImportFixturesSheet({
   const [summary, setSummary] = useState('');
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [progress, setProgress] = useState('');
   const [teamId, setTeamId] = useState('');
   const [competitionId, setCompetitionId] = useState('');
 
@@ -36,6 +37,7 @@ export function ImportFixturesSheet({
 
   function reset() {
     setStage('idle');
+    setProgress('');
     setError('');
     setSummary('');
     setRows([]);
@@ -59,7 +61,7 @@ export function ImportFixturesSheet({
     setError('');
     try {
       const today = todayISO();
-      const read = await readFixtures(file, today, teams.map((t) => t.name));
+      const read = await readFixtures(file, today, teams.map((t) => t.name), setProgress);
       const built = buildRows(read.fixtures, matches, today);
       setSummary(read.summary);
       setRows(built);
@@ -161,7 +163,7 @@ export function ImportFixturesSheet({
       {stage === 'reading' && (
         <div className="reading-state">
           <div className="spinner" />
-          <p>Reading the schedule…</p>
+          <p>{progress || 'Reading the schedule…'}</p>
           <p className="muted small">This is the one part that needs signal.</p>
         </div>
       )}
