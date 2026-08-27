@@ -1588,3 +1588,19 @@ select.input { background-image: none; }
   font-weight: 700;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
+
+/* The two pickers that decide what a whole import lands as. They set every match
+   at once, so they get more room than a field that sets one thing. */
+.big-select {
+  padding: 14px 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+/* Unchosen reads as a prompt rather than as a value, so it does not look like a
+   setting that has already been made. */
+.big-select.unset { color: var(--muted); font-weight: 500; }
+
+/* Nothing in the app marked a disabled button as disabled, so "you cannot do
+   this yet" looked identical to "press me". */
+button:disabled { opacity: 0.45; }
+button:disabled:active { transform: none; }

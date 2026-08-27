@@ -35,6 +35,9 @@ export function ImportFixturesSheet({
 
   const liveCompetitions = useMemo(() => competitions.filter((c) => !c.archived), [competitions]);
   const ready = importable(rows);
+  // Only demandable when there is something to choose. With no teams set up at
+  // all there is nothing to pick, and blocking the import would be a dead end.
+  const needsTeam = teams.length > 0 && teamId === '';
 
   function reset() {
     setStage('idle');
@@ -142,8 +145,12 @@ export function ImportFixturesSheet({
             <button className="ghost-btn" onClick={reset}>
               Start again
             </button>
-            <button className="primary-btn" onClick={confirm} disabled={ready.length === 0}>
-              {ready.length === 0 ? 'Nothing selected' : `Add ${ready.length} match${ready.length === 1 ? '' : 'es'}`}
+            <button className="primary-btn" onClick={confirm} disabled={ready.length === 0 || needsTeam}>
+              {needsTeam
+                ? 'Choose a team first'
+                : ready.length === 0
+                  ? 'Nothing selected'
+                  : `Add ${ready.length} match${ready.length === 1 ? '' : 'es'}`}
             </button>
           </div>
         ) : undefined
@@ -201,8 +208,17 @@ export function ImportFixturesSheet({
               <div className="row two">
                 {teams.length > 0 && (
                   <Field label="Team" hint="Applied to every fixture added">
-                    <select value={teamId} onChange={(e) => setTeamId(e.target.value)}>
-                      <option value="">No team</option>
+                    {/* No "not set" option: a schedule lists opponents, so the
+                        player's own team can only come from here. Left optional,
+                        the whole import silently lands with no team. */}
+                    <select
+                      className={`input big-select${teamId === '' ? ' unset' : ''}`}
+                      value={teamId}
+                      onChange={(e) => setTeamId(e.target.value)}
+                    >
+                      <option value="" disabled>
+                        Choose a team…
+                      </option>
                       {teams.map((team) => (
                         <option key={team.id} value={team.id}>
                           {team.name}
@@ -213,7 +229,11 @@ export function ImportFixturesSheet({
                 )}
                 {liveCompetitions.length > 0 && (
                   <Field label="Competition">
-                    <select value={competitionId} onChange={(e) => setCompetitionId(e.target.value)}>
+                    <select
+                      className="input big-select"
+                      value={competitionId}
+                      onChange={(e) => setCompetitionId(e.target.value)}
+                    >
                       <option value="">None</option>
                       {liveCompetitions.map((competition) => (
                         <option key={competition.id} value={competition.id}>
