@@ -175,18 +175,8 @@ async function callGemini(
   system: string,
   schema: unknown,
   maxOutputTokens?: number,
-  noThinking = false,
 ) {
-  let response = await postToGemini(env, model, parts, system, schema, maxOutputTokens, noThinking);
-
-  // Every model this picks accepts a zero thinking budget, but a future one may
-  // not. Rejection is cheap and recoverable, so retry plainly rather than fail.
-  if (!response.ok && response.status === 400 && noThinking) {
-    const detail = await response.clone().text();
-    if (/thinking/i.test(detail)) {
-      response = await postToGemini(env, model, parts, system, schema, maxOutputTokens, false);
-    }
-  }
+  const response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
 
   const body = (await response.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
@@ -231,16 +221,15 @@ function postToGemini(
   system: string,
   schema: unknown,
   maxOutputTokens?: number,
-  noThinking = false,
 ): Promise<Response> {
+  // Nothing here touches thinkingConfig on purpose. Setting a thinking budget
+  // was tried twice and broke schedule reading both times - the model refuses
+  // the whole request - and it was never what made the import fast anyway.
   const generationConfig: Record<string, unknown> = {
     responseMimeType: 'application/json',
     responseJsonSchema: schema,
   };
   if (maxOutputTokens) generationConfig.maxOutputTokens = maxOutputTokens;
-  // Reading a table off a photo is extraction. Deliberating first is the whole
-  // remaining wait on an import, and buys nothing on a job like this.
-  if (noThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
 
   return fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
@@ -377,35 +366,21 @@ export default {
         if (media.length > 8) return json({ error: 'Too many pages at once.' }, 400, headers);
 
         const parts: unknown[] = [];
-        let hasPdf = false;
         for (const item of media as { mimeType?: unknown; data?: unknown }[]) {
           const mimeType = clean(item.mimeType, 60);
           const data = typeof item.data === 'string' ? item.data : '';
           if (!data || !(/^image\//.test(mimeType) || mimeType === 'application/pdf')) {
             return json({ error: 'Send a photo, a screenshot or a PDF of the schedule.' }, 400, headers);
           }
-          if (mimeType === 'application/pdf') hasPdf = true;
           parts.push({ inlineData: { mimeType, data } });
         }
         parts.push({ text: prompt });
 
-        // A photo is extraction, and the one call whose wait people actually
-        // feel, so it goes to the lightest model. A PDF is a document rather
-        // than a picture and the light model will not always take one, so those
-        // start on the fuller model instead.
-        let model = await pickModel(env, !hasPdf);
-        let result: unknown;
-        try {
-          result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384, true);
-        } catch (error) {
-          // A rejected request is the model refusing this shape of input, not a
-          // fault. One retry on the fuller model, with nothing else changed, so
-          // an unsupported file type still gets read rather than just failing.
-          const fallback = await pickModel(env);
-          if ((error as { status?: number }).status !== 400 || fallback === model) throw error;
-          model = fallback;
-          result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384, false);
-        }
+        // Extraction, and the one call whose wait people actually feel, so it
+        // goes to the lightest model. That and the smaller picture are what made
+        // this quick; nothing here treats a PDF differently from a photo.
+        const model = await pickModel(env, true);
+        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384);
         // Naming the model is not sensitive and makes a slow read attributable
         // to a specific one, rather than to the feature in general.
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
