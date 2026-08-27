@@ -137,8 +137,28 @@ export async function readFixtures(
   const { prepareSchedule } = await import('./scheduleImage');
   const { file: ready } = await prepareSchedule(file);
 
-  onProgress?.('Reading the schedule…');
-  return withTimeout(read(ready, today, teamNames));
+  onProgress?.(`Reading the schedule… (sending ${Math.round(ready.size / 1024)} KB)`);
+
+  // A phone suspends a web app the moment you switch away, which kills the
+  // request mid-flight. That surfaced as "check your internet", blaming a
+  // connection that was never the problem.
+  let leftApp = false;
+  const watch = () => {
+    if (document.visibilityState === 'hidden') leftApp = true;
+  };
+  document.addEventListener('visibilitychange', watch);
+  try {
+    return await withTimeout(read(ready, today, teamNames));
+  } catch (error) {
+    if (leftApp) {
+      throw new Error(
+        'Matchday has to stay open while it reads a schedule — your phone stops the app when you switch away. Try again and leave it on this screen.',
+      );
+    }
+    throw error;
+  } finally {
+    document.removeEventListener('visibilitychange', watch);
+  }
 }
 
 async function read(file: Blob, today: string, teamNames: string[]): Promise<FixtureRead> {

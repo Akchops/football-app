@@ -61,6 +61,7 @@ export function ImportFixturesSheet({
 
     setStage('reading');
     setError('');
+    const failedAfter = performance.now();
     try {
       const today = todayISO();
       // Split the wait into shrinking the picture versus sending and reading it,
@@ -84,7 +85,10 @@ export function ImportFixturesSheet({
       const printed = built.find((row) => row.competition.trim() !== '')?.competition ?? '';
       setCompetitionId(matchCompetition(printed, liveCompetitions) ?? '');
     } catch (e) {
-      setError(await describeError(e));
+      // A failure that says how long it ran for is the difference between
+      // "the model is slow" and "it never got off the phone".
+      const ran = (performance.now() - failedAfter) / 1000;
+      setError(`${await describeError(e)} — after ${ran.toFixed(0)}s`);
       setStage('idle');
     }
   }
