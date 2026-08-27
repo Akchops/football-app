@@ -168,31 +168,8 @@ async function checkRateLimit(request: Request, env: Env): Promise<{ ok: boolean
   return { ok: true, used: current + 1, limit };
 }
 
-/**
- * Reading a table off a picture is extraction, not reasoning. Letting the model
- * think first adds latency for nothing, so it is turned off where it does not
- * help - but not every model accepts the setting, so a rejection is remembered
- * and the call retried without it rather than failing.
- */
-async function callGemini(
-  env: Env,
-  model: string,
-  parts: unknown[],
-  system: string,
-  schema: unknown,
-  skipThinking = false,
-) {
-  const flag = `nothink:unsupported:${model}`;
-  const useThinkingConfig = skipThinking && !(await env.RATE_LIMIT.get(flag));
-
-  let response = await postToGemini(env, model, parts, system, schema, useThinkingConfig);
-  if (!response.ok && response.status === 400 && useThinkingConfig) {
-    const text = await response.clone().text();
-    if (/thinking/i.test(text)) {
-      await env.RATE_LIMIT.put(flag, '1', { expirationTtl: 60 * 60 * 24 * 30 });
-      response = await postToGemini(env, model, parts, system, schema, false);
-    }
-  }
+async function callGemini(env: Env, model: string, parts: unknown[], system: string, schema: unknown) {
+  const response = await postToGemini(env, model, parts, system, schema);
 
   const body = (await response.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] } }[];
@@ -217,24 +194,19 @@ function postToGemini(
   parts: unknown[],
   system: string,
   schema: unknown,
-  noThinking: boolean,
 ): Promise<Response> {
-  const generationConfig: Record<string, unknown> = {
-    responseMimeType: 'application/json',
-    responseJsonSchema: schema,
-  };
-  if (noThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-
   return fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ role: 'user', parts }],
       systemInstruction: { parts: [{ text: system }] },
-      generationConfig,
+      generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema },
     }),
-    // Never leave the phone waiting on a request that is not coming back.
-    signal: AbortSignal.timeout(75_000),
+    // A backstop only. The app gives up at 90s and its message is the one worth
+    // showing, so this must never fire first - a 75s limit here cut off reads
+    // that were merely slow and reported them as a failure.
+    signal: AbortSignal.timeout(120_000),
   });
 }
 
@@ -359,20 +331,29 @@ export default {
         }
         parts.push({ text: prompt });
 
-        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, true);
+        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA);
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 
       return json({ error: 'Unknown endpoint.' }, 404, headers);
     } catch (error) {
       const status = (error as { status?: number }).status ?? 500;
+      const name = (error as { name?: string }).name ?? '';
       const message = error instanceof Error ? error.message : 'The coach failed.';
-      // Never let an upstream error leak the key or internal detail.
+
+      // Everything that was not an HTTP error used to collapse into one message,
+      // so a request cut off by a timeout looked identical to a genuine upstream
+      // fault - and neither said which. Name the distinct cases.
       const safe = status === 429
         ? 'The coach is busy right now. Try again in a minute.'
-        : status >= 500
-          ? 'The coach had a problem. Try again.'
-          : message.slice(0, 200);
+        : name === 'TimeoutError' || name === 'AbortError'
+          ? 'That took too long to read. Try a smaller picture, or one page at a time.'
+          : /empty response/i.test(message)
+            ? 'The coach read that but sent nothing back. Try again, or use a clearer picture.'
+            : status >= 500
+              // Never let an upstream error leak the key or internal detail.
+              ? 'The coach had a problem. Try again.'
+              : message.slice(0, 200);
       return json({ error: safe }, status >= 400 && status < 600 ? status : 500, headers);
     }
   },
