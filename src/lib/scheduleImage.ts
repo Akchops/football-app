@@ -3,10 +3,13 @@
  * by a third again, and all of that has to leave a phone on mobile data before
  * anything can even start reading it - which is minutes, not seconds.
  *
- * Text stays legible far below that. The model tiles an image at 768px anyway,
- * so anything past a couple of thousand pixels is bytes spent for no accuracy.
+ * Text stays legible far below that, and the ceiling is set by what the model
+ * has to read rather than by what the connection has to carry: it tiles an image
+ * at 768px, so 1800px is about six tiles where 1200px is about three. Halving
+ * the tiles halves the reading, which is where the wait actually goes - the
+ * bytes saved are almost incidental.
  */
-const MAX_EDGE = 1800;
+const MAX_EDGE = 1200;
 const QUALITY = 0.82;
 
 export interface Prepared {

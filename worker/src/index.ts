@@ -243,9 +243,17 @@ function postToGemini(
   });
 }
 
-/** The model to use, discovered once and cached so a rename doesn't break the app. */
-async function pickModel(env: Env): Promise<string> {
-  const cached = await env.RATE_LIMIT.get('model:gemini');
+/**
+ * The model to use, discovered once and cached so a rename doesn't break the app.
+ *
+ * `preferLite` picks the lightest capable model instead of the newest. Reading a
+ * table off a photo is extraction, not reasoning, and the wait for it is what
+ * makes importing a schedule feel broken - where a drill plan is worth the
+ * better model. Cached separately so the two choices never overwrite each other.
+ */
+async function pickModel(env: Env, preferLite = false): Promise<string> {
+  const key = preferLite ? 'model:gemini:fast' : 'model:gemini';
+  const cached = await env.RATE_LIMIT.get(key);
   if (cached) return cached;
 
   const response = await fetch(`${API}/models`, { headers: { 'x-goog-api-key': env.GEMINI_API_KEY } });
@@ -262,9 +270,11 @@ async function pickModel(env: Env): Promise<string> {
       return version(b) - version(a);
     });
 
-  const pick = usable[0];
+  // Newest first either way; a lite variant only wins when one actually exists,
+  // so a key without one still gets a working model rather than nothing.
+  const pick = (preferLite ? usable.find((id) => /lite/i.test(id)) : undefined) ?? usable[0];
   if (!pick) throw new Error('No usable Gemini model is available to this key.');
-  await env.RATE_LIMIT.put('model:gemini', pick, { expirationTtl: 60 * 60 * 24 });
+  await env.RATE_LIMIT.put(key, pick, { expirationTtl: 60 * 60 * 24 });
   return pick;
 }
 
@@ -306,7 +316,6 @@ export default {
     }
 
     try {
-      const model = await pickModel(env);
       const url = new URL(request.url);
 
       if (url.pathname.endsWith('/drills')) {
@@ -315,7 +324,7 @@ export default {
         if (!ask) return json({ error: 'Say what you want to work on.' }, 400, headers);
         const result = await callGemini(
           env,
-          model,
+          await pickModel(env),
           [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
           DRILLS_SYSTEM,
           DRILL_SCHEMA,
@@ -343,7 +352,7 @@ export default {
         parts.push({ text: prompt });
 
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
-        const result = await callGemini(env, model, parts, clipSystem(sawVideo), CLIP_SCHEMA);
+        const result = await callGemini(env, await pickModel(env), parts, clipSystem(sawVideo), CLIP_SCHEMA);
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 
@@ -364,7 +373,15 @@ export default {
         }
         parts.push({ text: prompt });
 
-        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384);
+        // Extraction, and the one call whose wait people actually feel.
+        const result = await callGemini(
+          env,
+          await pickModel(env, true),
+          parts,
+          FIXTURES_SYSTEM,
+          FIXTURES_SCHEMA,
+          16_384,
+        );
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 
