@@ -175,8 +175,26 @@ async function callGemini(
   system: string,
   schema: unknown,
   maxOutputTokens?: number,
+  /** Cache key this model came from, so a model that keeps failing can be dropped. */
+  cacheKey?: string,
 ) {
-  const response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
+  let response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
+
+  // A server error is Google's end, not the request's, and is usually a blip.
+  // One retry, because sending once meant a single bad second reached the player
+  // as a failure. Only one: hammering a service that is genuinely down helps
+  // nobody, and two attempts stay well inside the 90s the app waits.
+  if (response.status >= 500) {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
+
+    // Still failing. A cached model that has gone bad would otherwise keep
+    // failing for the full 24h of its cache, with no way back - so forget it and
+    // let the next request discover a working one.
+    if (response.status >= 500 && cacheKey) {
+      await env.RATE_LIMIT.delete(cacheKey);
+    }
+  }
 
   const body = (await response.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
@@ -254,8 +272,12 @@ function postToGemini(
  * makes importing a schedule feel broken - where a drill plan is worth the
  * better model. Cached separately so the two choices never overwrite each other.
  */
+function modelCacheKey(preferLite: boolean): string {
+  return preferLite ? 'model:gemini:fast' : 'model:gemini';
+}
+
 async function pickModel(env: Env, preferLite = false): Promise<string> {
-  const key = preferLite ? 'model:gemini:fast' : 'model:gemini';
+  const key = modelCacheKey(preferLite);
   const cached = await env.RATE_LIMIT.get(key);
   if (cached) return cached;
 
@@ -331,6 +353,8 @@ export default {
           [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
           DRILLS_SYSTEM,
           DRILL_SCHEMA,
+          undefined,
+          modelCacheKey(false),
         );
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
@@ -355,7 +379,15 @@ export default {
         parts.push({ text: prompt });
 
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
-        const result = await callGemini(env, await pickModel(env), parts, clipSystem(sawVideo), CLIP_SCHEMA);
+        const result = await callGemini(
+          env,
+          await pickModel(env),
+          parts,
+          clipSystem(sawVideo),
+          CLIP_SCHEMA,
+          undefined,
+          modelCacheKey(false),
+        );
         return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 
@@ -380,7 +412,15 @@ export default {
         // goes to the lightest model. That and the smaller picture are what made
         // this quick; nothing here treats a PDF differently from a photo.
         const model = await pickModel(env, true);
-        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384);
+        const result = await callGemini(
+          env,
+          model,
+          parts,
+          FIXTURES_SYSTEM,
+          FIXTURES_SCHEMA,
+          16_384,
+          modelCacheKey(true),
+        );
         // Naming the model is not sensitive and makes a slow read attributable
         // to a specific one, rather than to the feature in general.
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
@@ -410,10 +450,14 @@ export default {
                   ? ['The coach read that but sent nothing back. Try again, or a clearer picture.', 'empty']
                   : code === 'badjson'
                     ? ['The coach garbled its answer. Try again.', 'badjson']
-                    : status >= 500
-                      // Never let an upstream error leak the key or internal detail.
-                      ? ['The coach had a problem. Try again.', code === 'upstream' ? 'upstream' : 'unknown']
-                      : [message.slice(0, 200), 'request'];
+                    : status === 503
+                      // Overloaded rather than broken, and it comes back on its
+                      // own - so say to wait rather than implying a fault.
+                      ? ['The coach is busy right now. Give it a minute and try again.', 'busy']
+                      : status >= 500
+                        // Never let an upstream error leak the key or internal detail.
+                        ? ['The coach had a problem. Try again.', code === 'upstream' ? 'upstream' : 'unknown']
+                        : [message.slice(0, 200), 'request'];
 
       return json({ error: `${safe} (${tag})`, code: tag }, status >= 400 && status < 600 ? status : 500, headers);
     }
