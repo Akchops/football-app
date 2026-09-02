@@ -37,6 +37,7 @@ export function ResultSheet({
   const [notes, setNotes] = useState('');
   const [showPens, setShowPens] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
+  const [showExtra, setShowExtra] = useState(false);
 
   useEffect(() => {
     if (!match) return;
@@ -52,6 +53,11 @@ export function ResultSheet({
   const primary = metricDefs.filter((m) => m.primary);
   const secondary = metricDefs.filter((m) => !m.primary);
   const preview = useMemo(() => matchScore(result, duration), [result, duration]);
+  const extraSummary = [
+    result.motm ? 'Man of the match' : null,
+    result.didPlay ? null : 'Did not play',
+    showPens ? 'Decided on penalties' : null,
+  ].filter((s): s is string => s !== null);
 
   if (!match) return null;
 
@@ -116,41 +122,6 @@ export function ResultSheet({
           <Stepper label={them} value={result.goalsAgainst} onChange={(v) => patch({ goalsAgainst: v })} max={50} accent />
         </div>
       </div>
-
-      {isDraw && (
-        <label className="toggle-row">
-          <input type="checkbox" checked={showPens} onChange={(e) => setShowPens(e.target.checked)} />
-          <span>Decided on penalties</span>
-        </label>
-      )}
-
-      {isDraw && showPens && (
-        <div className="row two">
-          <Field label={`${us} pens`}>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={result.penaltiesFor ?? 0}
-              onChange={(e) => patch({ penaltiesFor: Number(e.target.value) })}
-            />
-          </Field>
-          <Field label={`${them} pens`}>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={result.penaltiesAgainst ?? 0}
-              onChange={(e) => patch({ penaltiesAgainst: Number(e.target.value) })}
-            />
-          </Field>
-        </div>
-      )}
-
-      <label className="toggle-row">
-        <input type="checkbox" checked={result.didPlay} onChange={(e) => patch({ didPlay: e.target.checked })} />
-        <span>I played in this match</span>
-      </label>
 
       {result.didPlay && (
         <>
@@ -248,11 +219,6 @@ export function ResultSheet({
                   />
                 </Field>
               </div>
-
-              <label className="toggle-row">
-                <input type="checkbox" checked={result.motm} onChange={(e) => patch({ motm: e.target.checked })} />
-                <span>Man of the match 🏅</span>
-              </label>
             </div>
           )}
         </>
@@ -268,15 +234,72 @@ export function ResultSheet({
         />
       </Field>
 
-      <button
-        className="danger-link"
-        onClick={() => {
-          cancelMatch(match.id);
-          onClose();
-        }}
-      >
-        This match didn't happen (called off)
+      {/* The things that are true of few matches. Kept out of the main flow so
+          entering a normal result is a scoreline and your stats, and nothing
+          else - but one tap away when a match was odd. */}
+      <button className="link-btn" onClick={() => setShowExtra((s) => !s)}>
+        {showExtra ? 'Hide extra settings' : 'Extra settings'}
       </button>
+
+      {/* Anything set in here would otherwise be invisible once collapsed, which
+          is how a match ends up quietly marked as one you did not play. */}
+      {!showExtra && extraSummary.length > 0 && (
+        <p className="muted small">{extraSummary.join(' · ')}</p>
+      )}
+
+      {showExtra && (
+        <div className="detail-block">
+          <label className="toggle-row">
+            <input type="checkbox" checked={result.motm} onChange={(e) => patch({ motm: e.target.checked })} />
+            <span>I was man of the match 🏅</span>
+          </label>
+
+          <label className="toggle-row">
+            <input type="checkbox" checked={result.didPlay} onChange={(e) => patch({ didPlay: e.target.checked })} />
+            <span>I played in this match</span>
+          </label>
+
+          {isDraw && (
+            <label className="toggle-row">
+              <input type="checkbox" checked={showPens} onChange={(e) => setShowPens(e.target.checked)} />
+              <span>Decided on penalties</span>
+            </label>
+          )}
+
+          {isDraw && showPens && (
+            <div className="row two">
+              <Field label={`${us} pens`}>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={result.penaltiesFor ?? 0}
+                  onChange={(e) => patch({ penaltiesFor: Number(e.target.value) })}
+                />
+              </Field>
+              <Field label={`${them} pens`}>
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  value={result.penaltiesAgainst ?? 0}
+                  onChange={(e) => patch({ penaltiesAgainst: Number(e.target.value) })}
+                />
+              </Field>
+            </div>
+          )}
+
+          <button
+            className="danger-link"
+            onClick={() => {
+              cancelMatch(match.id);
+              onClose();
+            }}
+          >
+            This match didn't happen (called off)
+          </button>
+        </div>
+      )}
     </Sheet>
   );
 }
