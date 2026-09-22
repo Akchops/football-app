@@ -276,6 +276,39 @@ function modelCacheKey(preferLite: boolean): string {
   return preferLite ? 'model:gemini:fast' : 'model:gemini';
 }
 
+/**
+ * Run a call on the better model, and if that model will not answer, run it on
+ * the light one instead.
+ *
+ * Dropping the cache entry on failure was not enough on its own: rediscovery is
+ * deterministic, so it just chose the same unhealthy model again. Only a second,
+ * different model actually gets an answer back. Reserved for the failures that
+ * mean "not this model" - a server error or a model that is not there - since a
+ * refusal or an over-long answer would happen identically on any model and
+ * retrying would only spend quota.
+ */
+async function callWithFallback(
+  env: Env,
+  parts: unknown[],
+  system: string,
+  schema: unknown,
+  maxOutputTokens?: number,
+): Promise<{ result: unknown; model: string }> {
+  const primary = await pickModel(env);
+  try {
+    const result = await callGemini(env, primary, parts, system, schema, maxOutputTokens, modelCacheKey(false));
+    return { result, model: primary };
+  } catch (error) {
+    const status = (error as { status?: number }).status ?? 0;
+    if (status !== 404 && status < 500) throw error;
+
+    const lite = await pickModel(env, true);
+    if (lite === primary) throw error;
+    const result = await callGemini(env, lite, parts, system, schema, maxOutputTokens, modelCacheKey(true));
+    return { result, model: lite };
+  }
+}
+
 async function pickModel(env: Env, preferLite = false): Promise<string> {
   const key = modelCacheKey(preferLite);
   const cached = await env.RATE_LIMIT.get(key);
@@ -284,6 +317,10 @@ async function pickModel(env: Env, preferLite = false): Promise<string> {
   const response = await fetch(`${API}/models`, { headers: { 'x-goog-api-key': env.GEMINI_API_KEY } });
   const body = (await response.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
   const usable = (body.models ?? [])
+    // This was read from the API and then never used, so a model that cannot
+    // answer a generateContent call at all was a candidate like any other -
+    // and being the newest, it won. Absent means unstated, not unsupported.
+    .filter((m) => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
     .map((m) => (m.name ?? '').replace(/^models\//, ''))
     .filter((id) => id && !/embedding|aqa|imagen|veo|tts|audio|image-generation|learnlm|gemma/i.test(id))
     .filter((id) => /flash|lite/i.test(id))
@@ -347,16 +384,13 @@ export default {
         const player = clean(payload.player, 500);
         const ask = clean(payload.ask, 500);
         if (!ask) return json({ error: 'Say what you want to work on.' }, 400, headers);
-        const result = await callGemini(
+        const { result, model } = await callWithFallback(
           env,
-          await pickModel(env),
           [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
           DRILLS_SYSTEM,
           DRILL_SCHEMA,
-          undefined,
-          modelCacheKey(false),
         );
-        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+        return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
 
       if (url.pathname.endsWith('/clip')) {
@@ -379,16 +413,8 @@ export default {
         parts.push({ text: prompt });
 
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
-        const result = await callGemini(
-          env,
-          await pickModel(env),
-          parts,
-          clipSystem(sawVideo),
-          CLIP_SCHEMA,
-          undefined,
-          modelCacheKey(false),
-        );
-        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+        const { result, model } = await callWithFallback(env, parts, clipSystem(sawVideo), CLIP_SCHEMA);
+        return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
 
       if (url.pathname.endsWith('/fixtures')) {
