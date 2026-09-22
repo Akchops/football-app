@@ -21,6 +21,15 @@ const DEFAULT_DAILY_LIMIT = 40;
 /** Clip requests carry base64 video; anything larger is refused outright. */
 const MAX_BODY_BYTES = 22 * 1024 * 1024;
 
+/**
+ * One budget for everything a request does upstream, retries and a fallback
+ * model included. Without it each attempt had its own limit and they stacked:
+ * two attempts on each of two models reached eight minutes of silence.
+ */
+const REQUEST_BUDGET_MS = 75_000;
+/** Below this there is no point starting another attempt. */
+const MIN_ATTEMPT_MS = 8_000;
+
 const DRILLS_SYSTEM =
   'You are an experienced football coach writing a training session for one player. ' +
   'Design drills that can be done realistically: a garden, a park, or a quiet corner of a training pitch, with everyday kit (cones, a ball, a wall, a friend to serve). ' +
@@ -174,19 +183,22 @@ async function callGemini(
   parts: unknown[],
   system: string,
   schema: unknown,
+  /** When the whole request must be done by, shared across every attempt. */
+  deadline: number,
   maxOutputTokens?: number,
   /** Cache key this model came from, so a model that keeps failing can be dropped. */
   cacheKey?: string,
 ) {
-  let response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
+  let response = await postToGemini(env, model, parts, system, schema, deadline, maxOutputTokens);
 
   // A server error is Google's end, not the request's, and is usually a blip.
   // One retry, because sending once meant a single bad second reached the player
   // as a failure. Only one: hammering a service that is genuinely down helps
-  // nobody, and two attempts stay well inside the 90s the app waits.
-  if (response.status >= 500) {
+  // nobody. Skipped when the budget is spent - every attempt shares one deadline,
+  // so retries can never stack into a wait nobody is still waiting through.
+  if (response.status >= 500 && deadline - Date.now() > MIN_ATTEMPT_MS) {
     await new Promise((resolve) => setTimeout(resolve, 700));
-    response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
+    response = await postToGemini(env, model, parts, system, schema, deadline, maxOutputTokens);
 
     // Still failing. A cached model that has gone bad would otherwise keep
     // failing for the full 24h of its cache, with no way back - so forget it and
@@ -238,6 +250,7 @@ function postToGemini(
   parts: unknown[],
   system: string,
   schema: unknown,
+  deadline: number,
   maxOutputTokens?: number,
 ): Promise<Response> {
   // Nothing here touches thinkingConfig on purpose. Setting a thinking budget
@@ -257,10 +270,9 @@ function postToGemini(
       systemInstruction: { parts: [{ text: system }] },
       generationConfig,
     }),
-    // A backstop only. The app gives up at 90s and its message is the one worth
-    // showing, so this must never fire first - a 75s limit here cut off reads
-    // that were merely slow and reported them as a failure.
-    signal: AbortSignal.timeout(120_000),
+    // Never outlive the request's own budget. A fixed per-attempt limit is what
+    // let a retry and a fallback stack into minutes of nothing happening.
+    signal: AbortSignal.timeout(Math.max(MIN_ATTEMPT_MS, deadline - Date.now())),
   });
 }
 
@@ -292,19 +304,23 @@ async function callWithFallback(
   parts: unknown[],
   system: string,
   schema: unknown,
+  deadline: number,
   maxOutputTokens?: number,
 ): Promise<{ result: unknown; model: string }> {
   const primary = await pickModel(env);
   try {
-    const result = await callGemini(env, primary, parts, system, schema, maxOutputTokens, modelCacheKey(false));
+    const result = await callGemini(env, primary, parts, system, schema, deadline, maxOutputTokens, modelCacheKey(false));
     return { result, model: primary };
   } catch (error) {
     const status = (error as { status?: number }).status ?? 0;
     if (status !== 404 && status < 500) throw error;
+    // No budget left to try another model, so report the failure we have rather
+    // than leave someone watching a spinner for a second model's worth of time.
+    if (deadline - Date.now() < MIN_ATTEMPT_MS) throw error;
 
     const lite = await pickModel(env, true);
     if (lite === primary) throw error;
-    const result = await callGemini(env, lite, parts, system, schema, maxOutputTokens, modelCacheKey(true));
+    const result = await callGemini(env, lite, parts, system, schema, deadline, maxOutputTokens, modelCacheKey(true));
     return { result, model: lite };
   }
 }
@@ -379,6 +395,9 @@ export default {
 
     try {
       const url = new URL(request.url);
+      // Everything this request does upstream shares this. Set once, here, so no
+      // combination of retry and fallback can outlast what someone will wait.
+      const deadline = Date.now() + REQUEST_BUDGET_MS;
 
       if (url.pathname.endsWith('/drills')) {
         const player = clean(payload.player, 500);
@@ -389,6 +408,7 @@ export default {
           [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
           DRILLS_SYSTEM,
           DRILL_SCHEMA,
+          deadline,
         );
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
@@ -413,7 +433,7 @@ export default {
         parts.push({ text: prompt });
 
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
-        const { result, model } = await callWithFallback(env, parts, clipSystem(sawVideo), CLIP_SCHEMA);
+        const { result, model } = await callWithFallback(env, parts, clipSystem(sawVideo), CLIP_SCHEMA, deadline);
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
 
@@ -444,6 +464,7 @@ export default {
           parts,
           FIXTURES_SYSTEM,
           FIXTURES_SCHEMA,
+          deadline,
           16_384,
           modelCacheKey(true),
         );

@@ -33,6 +33,10 @@ export interface ClipRun {
 }
 
 export async function requestDrills(profile: Profile, ask: string): Promise<DrillPlan> {
+  return withTimeout(drills(profile, ask), COACH_TIMEOUT_MS, 'The coach did not answer. Try again.');
+}
+
+async function drills(profile: Profile, ask: string): Promise<DrillPlan> {
   if (usingSharedCoach()) {
     const { proxyDrills } = await import('./proxy');
     return proxyDrills(profile, ask);
@@ -50,6 +54,22 @@ export async function requestDrills(profile: Profile, ask: string): Promise<Dril
  * sees the movement. Claude reads images, so the clip becomes stills first.
  */
 export async function analyseClipBlob(
+  profile: Profile,
+  video: Blob,
+  whichPlayer: string,
+  context: string,
+  onProgress?: (message: string) => void,
+): Promise<ClipRun> {
+  // Reading frames out of the video happens on the phone and is not the network
+  // waiting, so the limit covers the whole run rather than only the send.
+  return withTimeout(
+    analyseClip(profile, video, whichPlayer, context, onProgress),
+    READ_TIMEOUT_MS,
+    'The coach did not answer. Try a shorter clip.',
+  );
+}
+
+async function analyseClip(
   profile: Profile,
   video: Blob,
   whichPlayer: string,
@@ -119,6 +139,8 @@ export function scheduleProblem(file: File): string {
 
 /** Past this, something has gone wrong and waiting longer will not fix it. */
 const READ_TIMEOUT_MS = 90_000;
+/** The coach answers in seconds when it answers at all. */
+const COACH_TIMEOUT_MS = 60_000;
 
 /**
  * Read fixtures off a schedule someone was sent. Gemini takes a PDF directly;
@@ -148,7 +170,11 @@ export async function readFixtures(
   };
   document.addEventListener('visibilitychange', watch);
   try {
-    return await withTimeout(read(ready, today, teamNames));
+    return await withTimeout(
+      read(ready, today, teamNames),
+      READ_TIMEOUT_MS,
+      'That took too long. Try a smaller picture, or one page at a time.',
+    );
   } catch (error) {
     if (leftApp) {
       throw new Error(
@@ -174,12 +200,14 @@ async function read(file: Blob, today: string, teamNames: string[]): Promise<Fix
   return geminiFixtures(file, today, teamNames);
 }
 
-function withTimeout<T>(work: Promise<T>): Promise<T> {
+/**
+ * Nothing that waits on the network is allowed to wait forever. Only the import
+ * had this; the coach had no limit at all, so when a request upstream stopped
+ * coming back the app simply spun, with nothing to show and nothing to read.
+ */
+function withTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(
-      () => reject(new Error('That took too long. Try a smaller picture, or one page at a time.')),
-      READ_TIMEOUT_MS,
-    );
+    const timer = window.setTimeout(() => reject(new Error(message)), ms);
     work.then(resolve, reject).finally(() => window.clearTimeout(timer));
   });
 }
