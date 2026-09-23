@@ -21,15 +21,6 @@ const DEFAULT_DAILY_LIMIT = 40;
 /** Clip requests carry base64 video; anything larger is refused outright. */
 const MAX_BODY_BYTES = 22 * 1024 * 1024;
 
-/**
- * One budget for everything a request does upstream, retries and a fallback
- * model included. Without it each attempt had its own limit and they stacked:
- * two attempts on each of two models reached eight minutes of silence.
- */
-const REQUEST_BUDGET_MS = 75_000;
-/** Below this there is no point starting another attempt. */
-const MIN_ATTEMPT_MS = 8_000;
-
 const DRILLS_SYSTEM =
   'You are an experienced football coach writing a training session for one player. ' +
   'Design drills that can be done realistically: a garden, a park, or a quiet corner of a training pitch, with everyday kit (cones, a ball, a wall, a friend to serve). ' +
@@ -183,30 +174,9 @@ async function callGemini(
   parts: unknown[],
   system: string,
   schema: unknown,
-  /** When the whole request must be done by, shared across every attempt. */
-  deadline: number,
   maxOutputTokens?: number,
-  /** Cache key this model came from, so a model that keeps failing can be dropped. */
-  cacheKey?: string,
 ) {
-  let response = await postToGemini(env, model, parts, system, schema, deadline, maxOutputTokens);
-
-  // A server error is Google's end, not the request's, and is usually a blip.
-  // One retry, because sending once meant a single bad second reached the player
-  // as a failure. Only one: hammering a service that is genuinely down helps
-  // nobody. Skipped when the budget is spent - every attempt shares one deadline,
-  // so retries can never stack into a wait nobody is still waiting through.
-  if (response.status >= 500 && deadline - Date.now() > MIN_ATTEMPT_MS) {
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    response = await postToGemini(env, model, parts, system, schema, deadline, maxOutputTokens);
-
-    // Still failing. A cached model that has gone bad would otherwise keep
-    // failing for the full 24h of its cache, with no way back - so forget it and
-    // let the next request discover a working one.
-    if (response.status >= 500 && cacheKey) {
-      await env.RATE_LIMIT.delete(cacheKey);
-    }
-  }
+  const response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
 
   const body = (await response.json()) as {
     candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
@@ -250,7 +220,6 @@ function postToGemini(
   parts: unknown[],
   system: string,
   schema: unknown,
-  deadline: number,
   maxOutputTokens?: number,
 ): Promise<Response> {
   // Nothing here touches thinkingConfig on purpose. Setting a thinking budget
@@ -270,9 +239,10 @@ function postToGemini(
       systemInstruction: { parts: [{ text: system }] },
       generationConfig,
     }),
-    // Never outlive the request's own budget. A fixed per-attempt limit is what
-    // let a retry and a fallback stack into minutes of nothing happening.
-    signal: AbortSignal.timeout(Math.max(MIN_ATTEMPT_MS, deadline - Date.now())),
+    // A backstop only. The app gives up at 90s and its message is the one worth
+    // showing, so this must never fire first - a 75s limit here cut off reads
+    // that were merely slow and reported them as a failure.
+    signal: AbortSignal.timeout(120_000),
   });
 }
 
@@ -284,59 +254,14 @@ function postToGemini(
  * makes importing a schedule feel broken - where a drill plan is worth the
  * better model. Cached separately so the two choices never overwrite each other.
  */
-function modelCacheKey(preferLite: boolean): string {
-  return preferLite ? 'model:gemini:fast' : 'model:gemini';
-}
-
-/**
- * Run a call on the better model, and if that model will not answer, run it on
- * the light one instead.
- *
- * Dropping the cache entry on failure was not enough on its own: rediscovery is
- * deterministic, so it just chose the same unhealthy model again. Only a second,
- * different model actually gets an answer back. Reserved for the failures that
- * mean "not this model" - a server error or a model that is not there - since a
- * refusal or an over-long answer would happen identically on any model and
- * retrying would only spend quota.
- */
-async function callWithFallback(
-  env: Env,
-  parts: unknown[],
-  system: string,
-  schema: unknown,
-  deadline: number,
-  maxOutputTokens?: number,
-): Promise<{ result: unknown; model: string }> {
-  const primary = await pickModel(env);
-  try {
-    const result = await callGemini(env, primary, parts, system, schema, deadline, maxOutputTokens, modelCacheKey(false));
-    return { result, model: primary };
-  } catch (error) {
-    const status = (error as { status?: number }).status ?? 0;
-    if (status !== 404 && status < 500) throw error;
-    // No budget left to try another model, so report the failure we have rather
-    // than leave someone watching a spinner for a second model's worth of time.
-    if (deadline - Date.now() < MIN_ATTEMPT_MS) throw error;
-
-    const lite = await pickModel(env, true);
-    if (lite === primary) throw error;
-    const result = await callGemini(env, lite, parts, system, schema, deadline, maxOutputTokens, modelCacheKey(true));
-    return { result, model: lite };
-  }
-}
-
 async function pickModel(env: Env, preferLite = false): Promise<string> {
-  const key = modelCacheKey(preferLite);
+  const key = preferLite ? 'model:gemini:fast' : 'model:gemini';
   const cached = await env.RATE_LIMIT.get(key);
   if (cached) return cached;
 
   const response = await fetch(`${API}/models`, { headers: { 'x-goog-api-key': env.GEMINI_API_KEY } });
   const body = (await response.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
   const usable = (body.models ?? [])
-    // This was read from the API and then never used, so a model that cannot
-    // answer a generateContent call at all was a candidate like any other -
-    // and being the newest, it won. Absent means unstated, not unsupported.
-    .filter((m) => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
     .map((m) => (m.name ?? '').replace(/^models\//, ''))
     .filter((id) => id && !/embedding|aqa|imagen|veo|tts|audio|image-generation|learnlm|gemma/i.test(id))
     .filter((id) => /flash|lite/i.test(id))
@@ -395,22 +320,19 @@ export default {
 
     try {
       const url = new URL(request.url);
-      // Everything this request does upstream shares this. Set once, here, so no
-      // combination of retry and fallback can outlast what someone will wait.
-      const deadline = Date.now() + REQUEST_BUDGET_MS;
 
       if (url.pathname.endsWith('/drills')) {
         const player = clean(payload.player, 500);
         const ask = clean(payload.ask, 500);
         if (!ask) return json({ error: 'Say what you want to work on.' }, 400, headers);
-        const { result, model } = await callWithFallback(
+        const result = await callGemini(
           env,
+          await pickModel(env),
           [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
           DRILLS_SYSTEM,
           DRILL_SCHEMA,
-          deadline,
         );
-        return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
+        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 
       if (url.pathname.endsWith('/clip')) {
@@ -433,8 +355,8 @@ export default {
         parts.push({ text: prompt });
 
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
-        const { result, model } = await callWithFallback(env, parts, clipSystem(sawVideo), CLIP_SCHEMA, deadline);
-        return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
+        const result = await callGemini(env, await pickModel(env), parts, clipSystem(sawVideo), CLIP_SCHEMA);
+        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
       }
 
       if (url.pathname.endsWith('/fixtures')) {
@@ -458,16 +380,7 @@ export default {
         // goes to the lightest model. That and the smaller picture are what made
         // this quick; nothing here treats a PDF differently from a photo.
         const model = await pickModel(env, true);
-        const result = await callGemini(
-          env,
-          model,
-          parts,
-          FIXTURES_SYSTEM,
-          FIXTURES_SCHEMA,
-          deadline,
-          16_384,
-          modelCacheKey(true),
-        );
+        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384);
         // Naming the model is not sensitive and makes a slow read attributable
         // to a specific one, rather than to the feature in general.
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
@@ -497,14 +410,10 @@ export default {
                   ? ['The coach read that but sent nothing back. Try again, or a clearer picture.', 'empty']
                   : code === 'badjson'
                     ? ['The coach garbled its answer. Try again.', 'badjson']
-                    : status === 503
-                      // Overloaded rather than broken, and it comes back on its
-                      // own - so say to wait rather than implying a fault.
-                      ? ['The coach is busy right now. Give it a minute and try again.', 'busy']
-                      : status >= 500
-                        // Never let an upstream error leak the key or internal detail.
-                        ? ['The coach had a problem. Try again.', code === 'upstream' ? 'upstream' : 'unknown']
-                        : [message.slice(0, 200), 'request'];
+                    : status >= 500
+                      // Never let an upstream error leak the key or internal detail.
+                      ? ['The coach had a problem. Try again.', code === 'upstream' ? 'upstream' : 'unknown']
+                      : [message.slice(0, 200), 'request'];
 
       return json({ error: `${safe} (${tag})`, code: tag }, status >= 400 && status < 600 ? status : 500, headers);
     }
