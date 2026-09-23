@@ -24,6 +24,7 @@ function match(over: Partial<Match> = {}): Match {
     remindAfter: null,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
+    deletedAt: null,
     ...over,
   };
 }
@@ -193,7 +194,7 @@ describe('breakdowns', () => {
   it('splits the record by competition, keeping uncategorised matches', () => {
     const rows = statsByCompetition(
       [played(1, 0, { competitionId: 'c1' }), played(0, 1, { competitionId: 'c1' }), played(2, 2)],
-      [{ id: 'c1', name: 'League', type: 'league', season: '25/26', color: '#fff', notes: '', archived: false, createdAt: '' }],
+      [{ id: 'c1', name: 'League', type: 'league', season: '25/26', color: '#fff', notes: '', archived: false, createdAt: '', updatedAt: '', deletedAt: null }],
     );
     const league = rows.find((r) => r.competition?.id === 'c1');
     const none = rows.find((r) => r.competition === null);

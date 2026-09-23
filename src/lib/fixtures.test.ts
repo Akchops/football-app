@@ -45,6 +45,7 @@ function match(over: Partial<Match> = {}): Match {
     remindAfter: null,
     createdAt: '',
     updatedAt: '',
+    deletedAt: null,
     ...over,
   };
 }

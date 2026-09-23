@@ -4,14 +4,14 @@ import { matchToICS } from './ics';
 
 const team: Team = {
   id: 't1', name: 'Wanderers FC', ageGroup: 'U16', position: 'GK',
-  color: '#38bdf8', notes: '', createdAt: '',
+  color: '#38bdf8', notes: '', createdAt: '', updatedAt: '', deletedAt: null,
 };
 
 const match: Match = {
   id: 'm1', competitionId: null, teamId: 't1', opponent: 'Riverside FC',
   date: '2026-04-12', time: '16:30', venue: 'away', location: 'Central Fields, Pitch 3',
   durationMinutes: 80, status: 'scheduled', result: null, notes: 'Meet at 3pm',
-  remindAfter: null, createdAt: '', updatedAt: '',
+  remindAfter: null, createdAt: '', updatedAt: '', deletedAt: null,
 };
 
 describe('matchToICS', () => {

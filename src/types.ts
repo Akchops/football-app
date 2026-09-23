@@ -10,6 +10,11 @@ export interface Competition {
   notes: string;
   archived: boolean;
   createdAt: string;
+  /** Bumped on every edit; when two devices disagree, the newest one wins. */
+  updatedAt: string;
+  /** Set instead of dropping the row, so a delete syncs rather than being undone
+      by the next device that pushes. */
+  deletedAt: string | null;
 }
 
 /** A club or squad the player turns out for. Several can be active at once. */
@@ -23,6 +28,11 @@ export interface Team {
   color: string;
   notes: string;
   createdAt: string;
+  /** Bumped on every edit; when two devices disagree, the newest one wins. */
+  updatedAt: string;
+  /** Set instead of dropping the row, so a delete syncs rather than being undone
+      by the next device that pushes. */
+  deletedAt: string | null;
 }
 
 /**
@@ -171,9 +181,12 @@ export interface Match {
   remindAfter: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set instead of dropping the row, so a delete syncs rather than being undone
+      by the next device that pushes. */
+  deletedAt: string | null;
 }
 
-/** The player this app is tracking. Local only - there is no account or server. */
+/** The player this app is tracking. */
 export type TrainingType = 'team' | 'keeper' | 'gym' | 'individual' | 'recovery' | 'other';
 
 export const TRAINING_TYPE_LABEL: Record<TrainingType, string> = {
@@ -200,6 +213,9 @@ export interface TrainingSession {
   notes: string;
   createdAt: string;
   updatedAt: string;
+  /** Set instead of dropping the row, so a delete syncs rather than being undone
+      by the next device that pushes. */
+  deletedAt: string | null;
 }
 
 export interface Profile {

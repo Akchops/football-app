@@ -73,6 +73,28 @@ describe('parseData', () => {
     expect(parseData(JSON.stringify(withLength)).matches[0].durationMinutes).toBe(60);
   });
 
+  it('gives teams and competitions from before sharing an edit time', () => {
+    const data = parseData(V1_BACKUP);
+    // Backfilled from createdAt, so a record nobody has touched since the
+    // upgrade loses to one that has actually been edited.
+    expect(data.competitions[0].updatedAt).toBe(data.competitions[0].createdAt);
+    expect(data.teams[0].updatedAt).toBe(data.teams[0].createdAt);
+  });
+
+  it('marks nothing as deleted when upgrading an old backup', () => {
+    const data = parseData(V1_BACKUP);
+    for (const row of [...data.matches, ...data.teams, ...data.competitions, ...data.training]) {
+      expect(row.deletedAt).toBeNull();
+    }
+  });
+
+  it('keeps a tombstone through a round trip so the delete still syncs', () => {
+    const data = parseData(V1_BACKUP);
+    data.matches[0].deletedAt = '2026-05-01T00:00:00.000Z';
+    const round2 = parseData(JSON.stringify(data));
+    expect(round2.matches[0].deletedAt).toBe('2026-05-01T00:00:00.000Z');
+  });
+
   it('leaves already-migrated data alone', () => {
     const migrated = parseData(V1_BACKUP);
     const round2 = parseData(JSON.stringify(migrated));

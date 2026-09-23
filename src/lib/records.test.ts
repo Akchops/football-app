@@ -33,6 +33,7 @@ function played(over: PlayedOver = {}): Match {
     remindAfter: null,
     createdAt: '',
     updatedAt: '',
+    deletedAt: null,
     result: { ...emptyResult('GK'), ...result },
     ...matchOver,
   };

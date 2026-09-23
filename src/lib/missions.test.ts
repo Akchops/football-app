@@ -25,6 +25,7 @@ function match(date: string, over: MatchOver = {}): Match {
     remindAfter: null,
     createdAt: '',
     updatedAt: '',
+    deletedAt: null,
     result: { ...emptyResult('GK'), ...result },
     ...rest,
   };
@@ -44,6 +45,7 @@ function session(date: string, durationMinutes = 60): TrainingSession {
     notes: '',
     createdAt: '',
     updatedAt: '',
+    deletedAt: null,
   };
 }
 

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNo
 import type {
   AppData, Competition, Match, MatchResult, Profile, Settings, Team, TrainingSession,
 } from '../types';
-import { createId, emptyData, loadData, parseData, saveData } from './storage';
+import { createId, emptyData, live, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
 
 type Action =
@@ -23,8 +23,18 @@ type Action =
   | { type: 'training/update'; id: string; patch: Partial<TrainingSession> }
   | { type: 'training/delete'; id: string };
 
-function touch(match: Match): Match {
-  return { ...match, updatedAt: new Date().toISOString() };
+function touch<T extends { updatedAt: string }>(row: T): T {
+  return { ...row, updatedAt: new Date().toISOString() };
+}
+
+/**
+ * A delete has to be a thing that happened, not an absence. Dropping the row
+ * leaves nothing to sync, so the next phone to push its copy puts it straight
+ * back. The row stays, marked, and `live()` keeps it out of the app's sight.
+ */
+function bury<T extends { updatedAt: string; deletedAt: string | null }>(row: T): T {
+  const at = new Date().toISOString();
+  return { ...row, updatedAt: at, deletedAt: at };
 }
 
 export function reducer(state: AppData, action: Action): AppData {
@@ -48,7 +58,7 @@ export function reducer(state: AppData, action: Action): AppData {
       // Matches outlive their team, same as competitions.
       return {
         ...state,
-        teams: state.teams.filter((t) => t.id !== action.id),
+        teams: state.teams.map((t) => (t.id === action.id ? bury(t) : t)),
         matches: state.matches.map((m) => (m.teamId === action.id ? touch({ ...m, teamId: null }) : m)),
       };
 
@@ -67,7 +77,7 @@ export function reducer(state: AppData, action: Action): AppData {
       };
 
     case 'training/delete':
-      return { ...state, training: state.training.filter((t) => t.id !== action.id) };
+      return { ...state, training: state.training.map((t) => (t.id === action.id ? bury(t) : t)) };
 
     case 'competition/add':
       return { ...state, competitions: [...state.competitions, action.competition] };
@@ -82,7 +92,7 @@ export function reducer(state: AppData, action: Action): AppData {
       // Matches outlive their competition - they just become uncategorised.
       return {
         ...state,
-        competitions: state.competitions.filter((c) => c.id !== action.id),
+        competitions: state.competitions.map((c) => (c.id === action.id ? bury(c) : c)),
         matches: state.matches.map((m) =>
           m.competitionId === action.id ? touch({ ...m, competitionId: null }) : m,
         ),
@@ -98,7 +108,7 @@ export function reducer(state: AppData, action: Action): AppData {
       };
 
     case 'match/delete':
-      return { ...state, matches: state.matches.filter((m) => m.id !== action.id) };
+      return { ...state, matches: state.matches.map((m) => (m.id === action.id ? bury(m) : m)) };
 
     default:
       return state;
@@ -211,14 +221,23 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo<StoreValue>(() => {
     const now = () => new Date().toISOString();
 
+    // Deleted rows stay in `data` so the delete reaches the other phones, but
+    // nothing in the app should ever meet one. Everything below reads these,
+    // including the lookups, which would otherwise happily hand back a team
+    // that was just deleted.
+    const matches = live(data.matches);
+    const competitions = live(data.competitions);
+    const teams = live(data.teams);
+    const training = live(data.training);
+
     return {
       data,
       profile: data.profile,
       settings: data.settings,
-      matches: data.matches,
-      competitions: data.competitions,
-      teams: data.teams,
-      training: data.training,
+      matches,
+      competitions,
+      teams,
+      training,
 
       addMatch(input) {
         const match: Match = {
@@ -229,6 +248,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           remindAfter: null,
           createdAt: now(),
           updatedAt: now(),
+          deletedAt: null,
         };
         dispatch({ type: 'match/add', match });
         return match;
@@ -269,6 +289,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...input,
           archived: false,
           createdAt: now(),
+          updatedAt: now(),
+          deletedAt: null,
         };
         dispatch({ type: 'competition/add', competition });
         return competition;
@@ -290,6 +312,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           type: 'tournament',
           archived: false,
           createdAt: now(),
+          updatedAt: now(),
+          deletedAt: null,
         };
         dispatch({ type: 'competition/add', competition });
 
@@ -311,6 +335,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             remindAfter: null,
             createdAt: now(),
             updatedAt: now(),
+            deletedAt: null,
           }));
         if (created.length) dispatch({ type: 'match/addMany', matches: created });
         return competition;
@@ -322,6 +347,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...input,
           createdAt: now(),
           updatedAt: now(),
+          deletedAt: null,
         };
         dispatch({ type: 'training/add', session });
         return session;
@@ -336,7 +362,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       },
 
       addTeam(input) {
-        const team: Team = { id: createId('team'), ...input, createdAt: now() };
+        const team: Team = { id: createId('team'), ...input, createdAt: now(), updatedAt: now(), deletedAt: null };
         dispatch({ type: 'team/add', team });
         return team;
       },
@@ -358,16 +384,16 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       },
 
       competitionOf(match) {
-        return data.competitions.find((c) => c.id === match.competitionId) ?? null;
+        return competitions.find((c) => c.id === match.competitionId) ?? null;
       },
 
       teamOf(match) {
-        return data.teams.find((t) => t.id === match.teamId) ?? null;
+        return teams.find((t) => t.id === match.teamId) ?? null;
       },
 
       colorOf(match) {
-        const competition = data.competitions.find((c) => c.id === match.competitionId);
-        const team = data.teams.find((t) => t.id === match.teamId);
+        const competition = competitions.find((c) => c.id === match.competitionId);
+        const team = teams.find((t) => t.id === match.teamId);
         const preferred = data.settings.calendarColorBy === 'team' ? team?.color : competition?.color;
         return preferred ?? competition?.color ?? team?.color ?? 'var(--accent)';
       },

@@ -18,24 +18,25 @@ export function buildSampleData(now: Date = new Date()): AppData {
 
   const club: Team = {
     id: createId('team'), name: 'Wanderers FC', ageGroup: 'U16', position: 'GK',
-    color: TEAM_COLORS[0], notes: 'Main club', createdAt: stamp,
+    color: TEAM_COLORS[0], notes: 'Main club', createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const sundaySide: Team = {
     id: createId('team'), name: 'City Sunday XI', ageGroup: 'Open age', position: 'GK',
-    color: TEAM_COLORS[1], notes: 'Sunday side with mates', createdAt: stamp,
+    color: TEAM_COLORS[1], notes: 'Sunday side with mates', createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
 
   const league: Competition = {
     id: createId('comp'), name: 'Sunday League', type: 'league', season,
-    color: COMPETITION_COLORS[0], notes: 'Division 2', archived: false, createdAt: stamp,
+    color: COMPETITION_COLORS[0], notes: 'Division 2', archived: false, createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const cup: Competition = {
     id: createId('comp'), name: 'County Cup', type: 'cup', season,
-    color: COMPETITION_COLORS[2], notes: '', archived: false, createdAt: stamp,
+    color: COMPETITION_COLORS[2], notes: '', archived: false, createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const tournament: Competition = {
     id: createId('comp'), name: 'Easter 7s', type: 'tournament', season,
     color: COMPETITION_COLORS[3], notes: 'Group stage + knockouts, all in one day', archived: false, createdAt: stamp,
+    updatedAt: stamp, deletedAt: null,
   };
 
   const result = (over: Partial<MatchResult>): MatchResult => ({
@@ -47,7 +48,7 @@ export function buildSampleData(now: Date = new Date()): AppData {
   const make = (over: Partial<Match>): Match => ({
     id: createId('match'), competitionId: league.id, teamId: club.id, opponent: 'TBC', date: iso(0),
     time: '16:30', venue: 'home', location: '', durationMinutes: 80, status: 'scheduled', result: null, notes: '',
-    remindAfter: null, createdAt: stamp, updatedAt: stamp, ...over,
+    remindAfter: null, createdAt: stamp, updatedAt: stamp, deletedAt: null, ...over,
   });
 
   const matches: Match[] = [

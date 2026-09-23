@@ -5,7 +5,7 @@ import {
 } from '../types';
 
 export const STORAGE_KEY = 'matchday.data.v1';
-export const DATA_VERSION = 4;
+export const DATA_VERSION = 5;
 
 export function emptyData(): AppData {
   return {
@@ -64,6 +64,7 @@ function migrateResult(raw: MatchResult | null): MatchResult | null {
 function normaliseMatch(m: Match): Match {
   return {
     ...m,
+    deletedAt: m.deletedAt ?? null,
     competitionId: m.competitionId ?? null,
     teamId: m.teamId ?? null,
     location: m.location ?? '',
@@ -84,6 +85,35 @@ interface LegacySettings {
 }
 
 /**
+ * Sharing data between phones needs two things every record did not used to
+ * have: an edit time to compare, and a tombstone so a delete travels instead of
+ * being undone by the next device that pushes.
+ *
+ * Records from before the upgrade take their first `updatedAt` from when they
+ * were created. That means an untouched record loses to one that has actually
+ * been edited since, which is the right way round.
+ */
+function normaliseTeam(t: Team): Team {
+  return { ...t, updatedAt: t.updatedAt ?? t.createdAt ?? '', deletedAt: t.deletedAt ?? null };
+}
+
+function normaliseCompetition(c: Competition): Competition {
+  return { ...c, updatedAt: c.updatedAt ?? c.createdAt ?? '', deletedAt: c.deletedAt ?? null };
+}
+
+function normaliseTraining(t: TrainingSession): TrainingSession {
+  return { ...t, updatedAt: t.updatedAt ?? t.createdAt ?? '', deletedAt: t.deletedAt ?? null };
+}
+
+/**
+ * Tombstoned records stay in storage so the delete can reach the other phones,
+ * but nothing in the app should ever see them.
+ */
+export function live<T extends { deletedAt: string | null }>(rows: T[]): T[] {
+  return rows.filter((row) => row.deletedAt === null);
+}
+
+/**
  * Defensive parse: anything malformed falls back to a sane default rather than
  * blowing up the whole app, since this is the only copy of the user's data.
  */
@@ -94,11 +124,12 @@ export function parseData(raw: string | null): AppData {
     const base = emptyData();
     const legacySettings = (parsed.settings ?? {}) as LegacySettings;
 
-    const teams: Team[] = Array.isArray(parsed.teams) ? (parsed.teams as Team[]) : [];
+    const teams: Team[] = Array.isArray(parsed.teams) ? (parsed.teams as Team[]).map(normaliseTeam) : [];
     let matches = Array.isArray(parsed.matches) ? (parsed.matches as Match[]).map(normaliseMatch) : [];
 
     // v1 -> v2: the single settings.teamName becomes the player's first team.
     if (teams.length === 0 && legacySettings.teamName && legacySettings.teamName !== 'My team') {
+      const stamp = new Date().toISOString();
       const team: Team = {
         id: createId('team'),
         name: legacySettings.teamName,
@@ -106,7 +137,9 @@ export function parseData(raw: string | null): AppData {
         position: legacySettings.defaultPosition ?? '',
         color: TEAM_COLORS[0],
         notes: '',
-        createdAt: new Date().toISOString(),
+        createdAt: stamp,
+        updatedAt: stamp,
+        deletedAt: null,
       };
       teams.push(team);
       matches = matches.map((m) => (m.teamId ? m : { ...m, teamId: team.id }));
@@ -126,9 +159,13 @@ export function parseData(raw: string | null): AppData {
       profile,
       settings: { ...base.settings, ...(parsed.settings ?? {}) },
       teams,
-      competitions: Array.isArray(parsed.competitions) ? (parsed.competitions as Competition[]) : [],
+      competitions: Array.isArray(parsed.competitions)
+        ? (parsed.competitions as Competition[]).map(normaliseCompetition)
+        : [],
       matches,
-      training: Array.isArray(parsed.training) ? (parsed.training as TrainingSession[]) : [],
+      training: Array.isArray(parsed.training)
+        ? (parsed.training as TrainingSession[]).map(normaliseTraining)
+        : [],
     };
   } catch {
     return emptyData();
