@@ -42,11 +42,13 @@ export function reducer(state: AppData, action: Action): AppData {
     case 'data/replace':
       return action.data;
 
+    // Settings and the profile are single records rather than lists, so they
+    // carry their own edit time and merge whole.
     case 'settings/update':
-      return { ...state, settings: { ...state.settings, ...action.patch } };
+      return { ...state, settings: touch({ ...state.settings, ...action.patch }) };
 
     case 'profile/update':
-      return { ...state, profile: { ...state.profile, ...action.patch } };
+      return { ...state, profile: touch({ ...state.profile, ...action.patch }) };
 
     case 'team/add':
       return { ...state, teams: [...state.teams, action.team] };

@@ -230,6 +230,8 @@ export interface Profile {
   positionGroup: PositionGroup;
   /** null until the setup screen has been completed. */
   onboardedAt: string | null;
+  /** Bumped on every edit, so the newest copy wins when two devices disagree. */
+  updatedAt: string;
 }
 
 export interface Settings {
@@ -246,6 +248,8 @@ export interface Settings {
   reminderLeadMinutes: number;
   /** Default length of a new training session, in minutes. */
   defaultTrainingLength: number;
+  /** Bumped on every edit, so the newest copy wins when two devices disagree. */
+  updatedAt: string;
 }
 
 export interface AppData {
@@ -328,6 +332,7 @@ export const DEFAULT_PROFILE: Profile = {
   position: 'GK',
   positionGroup: 'goalkeeper',
   onboardedAt: null,
+  updatedAt: '',
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -338,4 +343,5 @@ export const DEFAULT_SETTINGS: Settings = {
   calendarColorBy: 'competition',
   reminderLeadMinutes: 120,
   defaultTrainingLength: 60,
+  updatedAt: '',
 };

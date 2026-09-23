@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PROVIDER_LABEL, type Provider } from '../lib/aiTypes';
 import { getApiKey, getModel, getProvider, setApiKey, setModel, setProvider } from '../lib/apiKey';
 import { proxyAvailable, sharedUsage } from '../lib/proxy';
+import { DEFAULT_PROFILE } from '../types';
 import { Field, Section } from './ui';
 
 interface Option {
@@ -74,7 +75,7 @@ export function AiSection() {
       } else {
         const { CLAUDE_DEFAULT_MODEL, claudeDrills } = await import('../lib/claude');
         await claudeDrills(
-          { name: '', photo: '', dateOfBirth: '', ageGroup: '', position: 'GK', positionGroup: 'goalkeeper', onboardedAt: null },
+          DEFAULT_PROFILE,
           'one quick warm-up only, keep it very short',
         );
         setModels([{ id: CLAUDE_DEFAULT_MODEL, label: 'Claude Opus 5', free: false }]);
