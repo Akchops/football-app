@@ -1,0 +1,37 @@
+name: Check AI proxy
+
+# Calls Gemini and the deployed worker from GitHub's runners, which can reach
+# both, and prints what really happens: which model each job is on, what status
+# comes back, how long it takes, and Google's own words when it fails.
+#
+# Run it by hand from the Actions tab - after deploying the worker, or whenever
+# the Coach, clip reading or import stops working. It uses the same two things
+# the deploy does: the GEMINI_API_KEY secret and the AI_PROXY_URL variable.
+# A full run makes about fifteen Gemini calls.
+on:
+  workflow_dispatch:
+    inputs:
+      google:
+        description: 'Probe Gemini directly with the repo key'
+        type: boolean
+        default: true
+      worker:
+        description: 'Call the deployed worker the way the app does'
+        type: boolean
+        default: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node --experimental-strip-types worker/scripts/check-ai.mjs
+        env:
+          GEMINI_API_KEY: ${{ inputs.google && secrets.GEMINI_API_KEY || '' }}
+          PROXY_URL: ${{ inputs.worker && vars.AI_PROXY_URL || '' }}
