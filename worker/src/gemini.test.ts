@@ -166,7 +166,7 @@ describe('generate', () => {
     expect(calls).toEqual(['gemini-2.5-flash-lite']);
   });
 
-  it('lets a model that has been withdrawn sit out for a day, not a quarter of an hour', async () => {
+  it('lets a withdrawn model sit out for a day, and a busy one only briefly', async () => {
     const store = memoryStore();
     fakeGoogle({
       'gemini-2.5-flash': [error(404, 'This model models/gemini-2.5-flash is no longer available to new users.')],
@@ -175,7 +175,7 @@ describe('generate', () => {
     });
     await ask(env(store));
     expect(store.ttl.get('cooldown:gemini-2.5-flash')).toBe(24 * 60 * 60);
-    expect(store.ttl.get('cooldown:gemini-2.5-flash-lite')).toBe(15 * 60);
+    expect(store.ttl.get('cooldown:gemini-2.5-flash-lite')).toBe(2 * 60);
   });
 
   it('does not start a second model once the budget is nearly spent', async () => {

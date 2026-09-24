@@ -98,7 +98,8 @@ retired model never breaks the app. Two rules, both learnt the hard way:
   `-latest` aliases can never be chosen.
 - **One fallback.** If a model answers with a server error, a missing model or
   out of quota, the request goes once to the next model - inside a time limit
-  that ends before the app gives up. A model that failed sits out for 15 minutes.
+  that ends before the app gives up. A busy model sits out for two minutes; one
+  Google has withdrawn, for a day.
 
 If the Coach, clips or import stop working, run **Check AI proxy** in the
 Actions tab. It lists every model with how it actually answered - status,

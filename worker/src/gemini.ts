@@ -17,8 +17,10 @@ import { rankModels, thinkingLight, thinkingOff, type ListedModel, type Purpose 
  *   gone, a model out of quota - moves on to the next model, up to four, but
  *   only inside one time budget that ends before the app itself gives up.
  *   Retries that each got their own full timeout once stacked to eight minutes.
- * - A model that just failed sits out - a quarter of an hour when overloaded,
- *   a day when gone - so the next request does not pay for it again.
+ * - A model that just failed sits out - two minutes when busy, a day when
+ *   gone. Busy is kept short on purpose: the fast model's refusals come back
+ *   in well under five seconds, so asking it again soon costs little, while
+ *   every request it does take comes back in seconds instead of twenty.
  * - Every failure carries the status, the model and Google's own words, because
  *   "(upstream)" alone is how this went unexplained for weeks.
  */
@@ -26,7 +28,7 @@ import { rankModels, thinkingLight, thinkingOff, type ListedModel, type Purpose 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 const MODELS_KEY = 'models:v2';
 const MODELS_TTL_SECONDS = 6 * 60 * 60;
-const COOLDOWN_SECONDS = 15 * 60;
+const COOLDOWN_SECONDS = 2 * 60;
 /** A model that answers 404 has been withdrawn for this key; it is not coming back soon. */
 const GONE_SECONDS = 24 * 60 * 60;
 /** How long a model that answered stays the first one tried. */
