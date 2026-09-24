@@ -139,8 +139,12 @@ export function scheduleProblem(file: File): string {
 
 /** Past this, something has gone wrong and waiting longer will not fix it. */
 const READ_TIMEOUT_MS = 90_000;
-/** The coach answers in seconds when it answers at all. */
-const COACH_TIMEOUT_MS = 60_000;
+/**
+ * The same as reading a schedule. The Coach answers in seconds when Google has
+ * room for it, but the model it falls back to on the free tier took 20-45s on
+ * 24 Sep - and giving up at 60s turned slow answers into errors.
+ */
+const COACH_TIMEOUT_MS = 90_000;
 
 /**
  * Read fixtures off a schedule someone was sent. Gemini takes a PDF directly;

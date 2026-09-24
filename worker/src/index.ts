@@ -7,6 +7,8 @@
  * URL can waste quota but cannot be repurposed as a free LLM endpoint.
  */
 
+import { describeFailure, generate } from './gemini';
+
 export interface Env {
   GEMINI_API_KEY: string;
   /** Comma-separated origins allowed to call this worker. */
@@ -14,9 +16,21 @@ export interface Env {
   /** Requests allowed per IP per day. */
   DAILY_LIMIT?: string;
   RATE_LIMIT: KVNamespace;
+  /** Coach and clip models to try first, best first, comma-separated. */
+  GEMINI_MODEL?: string;
+  /** Schedule import models to try first, best first, comma-separated. */
+  GEMINI_FAST_MODEL?: string;
 }
 
-const API = 'https://generativelanguage.googleapis.com/v1beta';
+/**
+ * Each request has to be finished before the app gives up on it, so that the
+ * worker's own message - which says what went wrong - is the one shown. The
+ * app waits 90s for all three, and the upload comes out of that. The budget is
+ * this long because the model most likely to answer on the free tier took
+ * 20-45s to do it on 24 Sep - and an answer at forty seconds beats an error at
+ * three.
+ */
+const BUDGET_MS = { drills: 80_000, clip: 80_000, fixtures: 80_000 };
 const DEFAULT_DAILY_LIMIT = 40;
 /** Clip requests carry base64 video; anything larger is refused outright. */
 const MAX_BODY_BYTES = 22 * 1024 * 1024;
@@ -168,119 +182,6 @@ async function checkRateLimit(request: Request, env: Env): Promise<{ ok: boolean
   return { ok: true, used: current + 1, limit };
 }
 
-async function callGemini(
-  env: Env,
-  model: string,
-  parts: unknown[],
-  system: string,
-  schema: unknown,
-  maxOutputTokens?: number,
-) {
-  const response = await postToGemini(env, model, parts, system, schema, maxOutputTokens);
-
-  const body = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
-    error?: { message?: string };
-  };
-  if (!response.ok) {
-    throw Object.assign(new Error(body.error?.message ?? `Gemini returned ${response.status}`), {
-      status: response.status,
-      code: 'upstream',
-    });
-  }
-
-  const candidate = body.candidates?.[0];
-  const text = candidate?.content?.parts?.map((p) => p.text ?? '').join('') ?? '';
-  const finish = candidate?.finishReason ?? '';
-
-  // A long answer that runs out of room comes back as valid-looking but truncated
-  // JSON, which then fails to parse for reasons the parse error cannot explain.
-  if (finish === 'MAX_TOKENS') {
-    throw Object.assign(new Error('Ran out of room before finishing.'), { code: 'truncated' });
-  }
-  if (!text) {
-    throw Object.assign(new Error(`Empty response (finishReason ${finish || 'none'}).`), {
-      code: finish === 'SAFETY' || finish === 'PROHIBITED_CONTENT' ? 'blocked' : 'empty',
-    });
-  }
-
-  const cleaned = text.trim().startsWith('```')
-    ? text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim()
-    : text.trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    throw Object.assign(new Error('The reply was not usable JSON.'), { code: 'badjson' });
-  }
-}
-
-function postToGemini(
-  env: Env,
-  model: string,
-  parts: unknown[],
-  system: string,
-  schema: unknown,
-  maxOutputTokens?: number,
-): Promise<Response> {
-  // Nothing here touches thinkingConfig on purpose. Setting a thinking budget
-  // was tried twice and broke schedule reading both times - the model refuses
-  // the whole request - and it was never what made the import fast anyway.
-  const generationConfig: Record<string, unknown> = {
-    responseMimeType: 'application/json',
-    responseJsonSchema: schema,
-  };
-  if (maxOutputTokens) generationConfig.maxOutputTokens = maxOutputTokens;
-
-  return fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts }],
-      systemInstruction: { parts: [{ text: system }] },
-      generationConfig,
-    }),
-    // A backstop only. The app gives up at 90s and its message is the one worth
-    // showing, so this must never fire first - a 75s limit here cut off reads
-    // that were merely slow and reported them as a failure.
-    signal: AbortSignal.timeout(120_000),
-  });
-}
-
-/**
- * The model to use, discovered once and cached so a rename doesn't break the app.
- *
- * `preferLite` picks the lightest capable model instead of the newest. Reading a
- * table off a photo is extraction, not reasoning, and the wait for it is what
- * makes importing a schedule feel broken - where a drill plan is worth the
- * better model. Cached separately so the two choices never overwrite each other.
- */
-async function pickModel(env: Env, preferLite = false): Promise<string> {
-  const key = preferLite ? 'model:gemini:fast' : 'model:gemini';
-  const cached = await env.RATE_LIMIT.get(key);
-  if (cached) return cached;
-
-  const response = await fetch(`${API}/models`, { headers: { 'x-goog-api-key': env.GEMINI_API_KEY } });
-  const body = (await response.json()) as { models?: { name?: string; supportedGenerationMethods?: string[] }[] };
-  const usable = (body.models ?? [])
-    .map((m) => (m.name ?? '').replace(/^models\//, ''))
-    .filter((id) => id && !/embedding|aqa|imagen|veo|tts|audio|image-generation|learnlm|gemma/i.test(id))
-    .filter((id) => /flash|lite/i.test(id))
-    .sort((a, b) => {
-      const version = (id: string) => {
-        const m = id.match(/(\d+)\.?(\d+)?/);
-        return m ? Number(m[1]) * 100 + Number(m[2] ?? 0) : 0;
-      };
-      return version(b) - version(a);
-    });
-
-  // Newest first either way; a lite variant only wins when one actually exists,
-  // so a key without one still gets a working model rather than nothing.
-  const pick = (preferLite ? usable.find((id) => /lite/i.test(id)) : undefined) ?? usable[0];
-  if (!pick) throw new Error('No usable Gemini model is available to this key.');
-  await env.RATE_LIMIT.put(key, pick, { expirationTtl: 60 * 60 * 24 });
-  return pick;
-}
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const origin = request.headers.get('origin');
@@ -325,14 +226,15 @@ export default {
         const player = clean(payload.player, 500);
         const ask = clean(payload.ask, 500);
         if (!ask) return json({ error: 'Say what you want to work on.' }, 400, headers);
-        const result = await callGemini(
+        const { result, model } = await generate(
           env,
-          await pickModel(env),
+          'standard',
           [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
           DRILLS_SYSTEM,
           DRILL_SCHEMA,
+          { budgetMs: BUDGET_MS.drills },
         );
-        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+        return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
 
       if (url.pathname.endsWith('/clip')) {
@@ -355,8 +257,10 @@ export default {
         parts.push({ text: prompt });
 
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
-        const result = await callGemini(env, await pickModel(env), parts, clipSystem(sawVideo), CLIP_SCHEMA);
-        return json({ result, used: limit.used, limit: limit.limit }, 200, headers);
+        const { result, model } = await generate(env, 'standard', parts, clipSystem(sawVideo), CLIP_SCHEMA, {
+          budgetMs: BUDGET_MS.clip,
+        });
+        return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
 
       if (url.pathname.endsWith('/fixtures')) {
@@ -379,8 +283,10 @@ export default {
         // Extraction, and the one call whose wait people actually feel, so it
         // goes to the lightest model. That and the smaller picture are what made
         // this quick; nothing here treats a PDF differently from a photo.
-        const model = await pickModel(env, true);
-        const result = await callGemini(env, model, parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, 16_384);
+        const { result, model } = await generate(env, 'fast', parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, {
+          budgetMs: BUDGET_MS.fixtures,
+          maxOutputTokens: 16_384,
+        });
         // Naming the model is not sensitive and makes a slow read attributable
         // to a specific one, rather than to the feature in general.
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
@@ -388,34 +294,10 @@ export default {
 
       return json({ error: 'Unknown endpoint.' }, 404, headers);
     } catch (error) {
-      const status = (error as { status?: number }).status ?? 500;
-      const name = (error as { name?: string }).name ?? '';
-      const code = (error as { code?: string }).code ?? '';
-      const message = error instanceof Error ? error.message : 'The coach failed.';
-
-      // Every non-HTTP failure used to collapse into one sentence, so a timeout,
-      // a truncated reply and a genuine upstream fault were indistinguishable -
-      // to the reader and to anyone trying to fix it. Each says which it is, and
-      // carries a short code that names the cause without leaking any detail.
-      const [safe, tag] =
-        status === 429
-          ? ['The coach is busy right now. Try again in a minute.', 'busy']
-          : name === 'TimeoutError' || name === 'AbortError'
-            ? ['That took too long to read. Try a smaller picture, or one page at a time.', 'timeout']
-            : code === 'truncated'
-              ? ['That schedule was too long to read in one go. Try one page, or half of it.', 'truncated']
-              : code === 'blocked'
-                ? ['The coach would not read that image. Try a different photo.', 'blocked']
-                : code === 'empty'
-                  ? ['The coach read that but sent nothing back. Try again, or a clearer picture.', 'empty']
-                  : code === 'badjson'
-                    ? ['The coach garbled its answer. Try again.', 'badjson']
-                    : status >= 500
-                      // Never let an upstream error leak the key or internal detail.
-                      ? ['The coach had a problem. Try again.', code === 'upstream' ? 'upstream' : 'unknown']
-                      : [message.slice(0, 200), 'request'];
-
-      return json({ error: `${safe} (${tag})`, code: tag }, status >= 400 && status < 600 ? status : 500, headers);
+      // Says what failed in words for the player, then in brackets the status,
+      // the model and Google's own reason - see describeFailure.
+      const { status, body } = describeFailure(error);
+      return json(body, status, headers);
     }
   },
 };

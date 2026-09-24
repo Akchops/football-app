@@ -75,7 +75,9 @@ It is deliberately **not** a general Gemini proxy:
 - Each IP gets `DAILY_LIMIT` requests a day (40 by default). Past that, the app
   tells the player to add their own free key in Setup.
 - Requests over ~22MB are refused before reaching Gemini.
-- Upstream errors are rewritten before being returned, so nothing internal leaks.
+- Errors say what failed in plain words, then in brackets the status, the model
+  and Google's own reason, with anything shaped like a key removed - so a
+  screenshot of the error is enough to know what went wrong.
 
 ## Costs and limits
 
@@ -86,6 +88,23 @@ players to add their own key.
 
 If you later put a card on the Google account, every clip analysed bills to
 you. `DAILY_LIMIT` in `wrangler.toml` is the lever: lower it to cap exposure.
+
+## Which model it uses
+
+The worker picks its models from Google's list itself (`src/models.ts`), so a
+retired model never breaks the app. Two rules, both learnt the hard way:
+
+- **Stable models only.** Previews, image, speech and live models, and the
+  `-latest` aliases can never be chosen.
+- **One fallback.** If a model answers with a server error, a missing model or
+  out of quota, the request goes once to the next model - inside a time limit
+  that ends before the app gives up. A model that failed sits out for 15 minutes.
+
+If the Coach, clips or import stop working, run **Check AI proxy** in the
+Actions tab. It lists every model with how it actually answered - status,
+seconds, and Google's own words - and calls the live worker the way the app
+does. To force a model, set `GEMINI_MODEL` (Coach and clips) or
+`GEMINI_FAST_MODEL` (schedule import) in `wrangler.toml` and redeploy.
 
 ## Changing things later
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rankModels, thinkingOff, type ListedModel } from './models';
+import { rankModels, thinkingLight, thinkingOff, type ListedModel } from './models';
 
 const TEXT = ['generateContent', 'countTokens'];
 
@@ -88,11 +88,23 @@ describe('rankModels', () => {
     expect(rankModels(previewsOnly, 'standard')).toEqual(['gemini-3-flash-preview']);
   });
 
-  it('tries a pinned model first, even one missing from the list', () => {
-    expect(rankModels(GOOGLE, 'standard', { pinned: 'gemini-2.0-flash' })[0]).toBe('gemini-2.0-flash');
-    expect(rankModels(GOOGLE, 'standard', { pinned: 'gemini-9-flash' })[0]).toBe('gemini-9-flash');
-    // And the rest still follow, so a bad pin still has somewhere to fall back to.
-    expect(rankModels(GOOGLE, 'standard', { pinned: 'gemini-9-flash' })[1]).toBe('gemini-2.5-flash');
+  it('tries preferred models first, in order, even one missing from the list', () => {
+    expect(rankModels(GOOGLE, 'standard', { preferred: ['gemini-2.0-flash'] })[0]).toBe('gemini-2.0-flash');
+    expect(rankModels(GOOGLE, 'standard', { preferred: ['gemini-9-flash'] })[0]).toBe('gemini-9-flash');
+    // And the rest still follow, so a bad preference still has somewhere to go.
+    expect(rankModels(GOOGLE, 'standard', { preferred: ['gemini-9-flash'] })[1]).toBe('gemini-2.5-flash');
+    expect(rankModels(GOOGLE, 'standard', { preferred: ['gemini-2.0-flash', 'gemini-2.5-flash-lite'] }).slice(0, 3)).toEqual([
+      'gemini-2.0-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.5-flash',
+    ]);
+  });
+
+  it('ignores blank and repeated preferences', () => {
+    expect(rankModels(GOOGLE, 'standard', { preferred: ['', '  ', 'gemini-2.0-flash', 'gemini-2.0-flash'] }).slice(0, 2)).toEqual([
+      'gemini-2.0-flash',
+      'gemini-2.5-flash',
+    ]);
   });
 
   it('sends a model that just failed to the back rather than dropping it', () => {
@@ -123,5 +135,16 @@ describe('thinkingOff', () => {
   it('sends nothing to a model too old to think', () => {
     expect(thinkingOff('gemini-2.0-flash')).toEqual({});
     expect(thinkingOff('something-else')).toEqual({});
+  });
+});
+
+describe('thinkingLight', () => {
+  it('asks Gemini 3 and later for a short think', () => {
+    expect(thinkingLight('gemini-3.6-flash')).toEqual({ thinkingConfig: { thinkingLevel: 'low' } });
+    expect(thinkingLight('gemini-4-flash')).toEqual({ thinkingConfig: { thinkingLevel: 'low' } });
+  });
+
+  it('leaves older models to their own default', () => {
+    expect(thinkingLight('gemini-2.5-flash')).toEqual({});
   });
 });

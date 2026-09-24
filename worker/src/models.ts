@@ -30,8 +30,11 @@ export interface ListedModel {
 export type Purpose = 'standard' | 'fast';
 
 export interface RankOptions {
-  /** A model named in config, tried before anything discovered. */
-  pinned?: string;
+  /**
+   * Models to try before anything discovered, best first - one forced in
+   * config, then the last one that actually answered.
+   */
+  preferred?: readonly string[];
   /** Models that failed recently. Moved to the back, never dropped. */
   coolingDown?: ReadonlySet<string>;
 }
@@ -55,6 +58,17 @@ export function thinkingOff(id: string): Record<string, unknown> {
   if (major >= 3) return { thinkingConfig: { thinkingLevel: 'minimal' } };
   if (major === 2 && minor >= 5) return { thinkingConfig: { thinkingBudget: 0 } };
   return {};
+}
+
+/**
+ * For the Coach and clips: some thought, but not an open-ended amount. Left to
+ * its default a Gemini 3 model thinks at length, and the wait is what makes the
+ * Coach feel broken - on 24 Sep, 3.6-flash wrote a three-drill plan at 'low'
+ * in 6.6s. Older models are left to their own default.
+ */
+export function thinkingLight(id: string): Record<string, unknown> {
+  const major = Number(/^gemini-(\d+)/.exec(id)?.[1] ?? 0);
+  return major >= 3 ? { thinkingConfig: { thinkingLevel: 'low' } } : {};
 }
 
 /**
@@ -114,7 +128,7 @@ function candidates(models: ListedModel[]): Candidate[] {
  * Every usable model for a job, best first. The caller tries them in order, so
  * the order is the whole policy:
  *
- * 1. A pinned model, if config names one.
+ * 1. Preferred models: forced in config, or the last one that answered.
  * 2. Stable models before any preview, always.
  * 3. For `standard`, full flash before lite; for `fast`, lite before full flash.
  * 4. Newer versions first; the plain name before a numbered build of it.
@@ -133,8 +147,8 @@ export function rankModels(models: ListedModel[], purpose: Purpose, options: Ran
     )
     .map((c) => c.id);
 
-  const pinned = options.pinned?.trim();
-  const ordered = pinned ? [pinned, ...ranked.filter((id) => id !== pinned)] : ranked;
+  const preferred = [...new Set((options.preferred ?? []).map((id) => id.trim()).filter(Boolean))];
+  const ordered = [...preferred, ...ranked.filter((id) => !preferred.includes(id))];
 
   const cooling = options.coolingDown;
   if (!cooling || cooling.size === 0) return ordered;
