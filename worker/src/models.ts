@@ -39,6 +39,25 @@ export interface RankOptions {
 const STABLE = /^gemini-(\d+)(?:\.(\d+))?-flash(-lite)?(?:-\d{3})?$/;
 
 /**
+ * The setting that makes a model answer straight away instead of deliberating
+ * first, which differs by generation - and getting it wrong is not harmless.
+ *
+ * Gemini 2.5 takes a thinking budget, and 0 switches thinking off. Gemini 3 and
+ * later reject a budget of 0 outright with "Request contains an invalid
+ * argument" (measured 24 Sep; the same error took schedule import down on 27
+ * Aug) and take a thinking level instead, where 'minimal' is the lowest.
+ * Anything older gets nothing, since it does not think to begin with.
+ */
+export function thinkingOff(id: string): Record<string, unknown> {
+  const match = /^gemini-(\d+)(?:\.(\d+))?/.exec(id);
+  const major = Number(match?.[1] ?? 0);
+  const minor = Number(match?.[2] ?? 0);
+  if (major >= 3) return { thinkingConfig: { thinkingLevel: 'minimal' } };
+  if (major === 2 && minor >= 5) return { thinkingConfig: { thinkingBudget: 0 } };
+  return {};
+}
+
+/**
  * Never used, even as a last resort. Most cannot give a JSON text answer at all;
  * the -latest aliases can, but Google repoints them without notice, which is
  * exactly the kind of silent switch this file exists to stop.

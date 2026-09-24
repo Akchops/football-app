@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rankModels } from '../src/models.ts';
+import { rankModels, thinkingOff } from '../src/models.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAMPLES = join(HERE, 'samples');
@@ -142,6 +142,23 @@ const FIX_SCHEMA = {
   },
   required: ['fixtures'],
 };
+const COACH_SCHEMA = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    drills: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { name: { type: 'string' }, minutes: { type: 'integer' }, how: { type: 'string' } },
+        required: ['name', 'minutes', 'how'],
+      },
+    },
+  },
+  required: ['title', 'drills'],
+};
+const COACH_PROMPT =
+  'Plan a 30-minute handling session for a U16 goalkeeper who spills crosses. Three drills, each with how to run it.';
 const FIX_PROMPT = [
   `Today's date is ${TODAY}.`,
   'The player turns out for: Oakwood Rangers U16. The opponent is the other side.',
@@ -175,10 +192,11 @@ async function checkGoogle() {
   report('google', 'new picker finds a coach model', after.standard.length > 0, after.standard[0] ?? 'none');
   report('google', 'new picker finds an import model', after.fast.length > 0, after.fast[0] ?? 'none');
 
-  heading('Google: does each candidate answer at all');
-  const probe = [...new Set([before.standard, before.fast, ...after.standard.slice(0, 2), ...after.fast.slice(0, 2)])]
-    .filter(Boolean)
-    .slice(0, 5);
+  heading('Google: does each stable model answer at all');
+  const listed = new Set(models.map((m) => (m.name ?? '').replace(/^models\//, '')));
+  const probe = [...new Set([before.standard, before.fast, ...after.standard, ...after.fast])]
+    .filter((id) => id && !/preview/.test(id))
+    .slice(0, 10);
   for (const id of probe) {
     const result = await generate(id, [{ text: 'Reply with ok set to true.' }], TINY_SCHEMA);
     const tag = [id === before.standard || id === before.fast ? 'LIVE NOW' : '', after.standard[0] === id || after.fast[0] === id ? 'NEW PICK' : '']
@@ -187,28 +205,34 @@ async function checkGoogle() {
     report('google', `${id}${tag ? ` [${tag}]` : ''}`, result.status === 200, describe(result));
   }
 
-  heading('Google: reading the sample schedule');
+  heading('Google: reading the sample schedule, thinking switched off');
   const photo = [{ inlineData: { mimeType: 'image/jpeg', data: sample('schedule.jpg') } }, { text: FIX_PROMPT }];
-  const importers = [...new Set([after.fast[0], before.fast])].filter(Boolean).slice(0, 2);
-  for (const id of importers) {
-    const variants = [['as is', {}], ['thinking budget 0', { thinkingConfig: { thinkingBudget: 0 } }]];
-    if (Number((/gemini-(\d+)/.exec(id) ?? [])[1] ?? 0) >= 3) {
-      variants.push(['thinking level minimal', { thinkingConfig: { thinkingLevel: 'minimal' } }]);
-    }
-    for (const [label, extra] of variants) {
-      const result = await generate(id, photo, FIX_SCHEMA, extra);
+  const pdf = [{ inlineData: { mimeType: 'application/pdf', data: sample('schedule.pdf') } }, { text: FIX_PROMPT }];
+  const readers = [...new Set(['gemini-2.5-flash-lite', 'gemini-2.5-flash', ...after.fast.slice(0, 2)])]
+    .filter((id) => listed.has(id))
+    .slice(0, 4);
+  for (const id of readers) {
+    for (const [label, parts] of [['photo', photo], ['PDF', pdf]]) {
+      const result = await generate(id, parts, FIX_SCHEMA, thinkingOff(id));
       const read = readFixtures(result.text);
       const correct = result.status === 200 && read.count === EXPECT_FIXTURES && EXPECT_FIRST.test(read.first);
-      report('google', `${id} photo, ${label}`, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
+      report('google', `${id} ${label}`, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
     }
   }
 
-  if (after.fast[0]) {
-    const pdf = [{ inlineData: { mimeType: 'application/pdf', data: sample('schedule.pdf') } }, { text: FIX_PROMPT }];
-    const result = await generate(after.fast[0], pdf, FIX_SCHEMA);
-    const read = readFixtures(result.text);
-    const correct = result.status === 200 && read.count === EXPECT_FIXTURES && EXPECT_FIRST.test(read.first);
-    report('google', `${after.fast[0]} PDF, as is`, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
+  heading('Google: a Coach-sized answer');
+  const coaches = [...new Set(['gemini-2.5-flash', 'gemini-2.5-flash-lite', after.standard[0]])].filter((id) => listed.has(id));
+  for (const id of coaches) {
+    for (const [label, extra] of [['as is', {}], ['thinking off', thinkingOff(id)]]) {
+      const result = await generate(id, [{ text: COACH_PROMPT }], COACH_SCHEMA, extra);
+      let drills = 0;
+      try {
+        drills = JSON.parse(result.text).drills?.length ?? 0;
+      } catch {
+        // counted as no drills
+      }
+      report('google', `${id} coach, ${label}`, result.status === 200 && drills > 0, `${describe(result)} · ${drills} drills`);
+    }
   }
 }
 

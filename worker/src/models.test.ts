@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rankModels, type ListedModel } from './models';
+import { rankModels, thinkingOff, type ListedModel } from './models';
 
 const TEXT = ['generateContent', 'countTokens'];
 
@@ -105,5 +105,23 @@ describe('rankModels', () => {
   it('returns nothing rather than a wrong model when nothing fits', () => {
     expect(rankModels([model('gemini-2.5-pro'), model('gemini-embedding-001', ['embedContent'])], 'standard')).toEqual([]);
     expect(rankModels([], 'fast')).toEqual([]);
+  });
+});
+
+describe('thinkingOff', () => {
+  it('uses a zero budget for Gemini 2.5, which accepts it', () => {
+    expect(thinkingOff('gemini-2.5-flash')).toEqual({ thinkingConfig: { thinkingBudget: 0 } });
+    expect(thinkingOff('gemini-2.5-flash-lite')).toEqual({ thinkingConfig: { thinkingBudget: 0 } });
+  });
+
+  it('never sends a zero budget to Gemini 3 or later, which rejects the whole request for it', () => {
+    for (const id of ['gemini-3-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-4-flash']) {
+      expect(thinkingOff(id)).toEqual({ thinkingConfig: { thinkingLevel: 'minimal' } });
+    }
+  });
+
+  it('sends nothing to a model too old to think', () => {
+    expect(thinkingOff('gemini-2.0-flash')).toEqual({});
+    expect(thinkingOff('something-else')).toEqual({});
   });
 });
