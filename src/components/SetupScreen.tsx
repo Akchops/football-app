@@ -8,6 +8,7 @@ import { MATCH_LENGTHS, REMINDER_LEADS, TRAINING_LENGTHS } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
+import { AccountSection } from './AccountSettings';
 import { AiSection } from './AiSettings';
 import { DurationPicker, EmptyState, Field, Section } from './ui';
 import { AvatarPicker } from './Avatar';
@@ -321,6 +322,8 @@ export function SetupScreen({
           </Field>
         </div>
       </Section>
+
+      <AccountSection />
 
       <Section title="Your data">
         <p className="muted small">
