@@ -157,6 +157,12 @@ const COACH_SCHEMA = {
   },
   required: ['title', 'drills'],
 };
+const CLIP_SCHEMA = {
+  type: 'object',
+  properties: { rating: { type: 'integer' }, headline: { type: 'string' } },
+  required: ['rating', 'headline'],
+};
+const CLIP_PROMPT = 'Rate the goalkeeper in yellow on positioning, 1 to 100, and give a one-line headline.';
 const COACH_PROMPT =
   'Plan a 30-minute handling session for a U16 goalkeeper who spills crosses. Three drills, each with how to run it.';
 const FIX_PROMPT = [
@@ -194,45 +200,84 @@ async function checkGoogle() {
 
   heading('Google: does each stable model answer at all');
   const listed = new Set(models.map((m) => (m.name ?? '').replace(/^models\//, '')));
-  const probe = [...new Set([before.standard, before.fast, ...after.standard, ...after.fast])]
-    .filter((id) => id && !/preview/.test(id))
-    .slice(0, 10);
-  for (const id of probe) {
+  const stable = [...new Set([...after.standard, ...after.fast])].filter((id) => /^gemini-\d/.test(id) && !/preview/.test(id));
+  const healthy = [];
+  for (const id of stable.slice(0, 10)) {
     const result = await generate(id, [{ text: 'Reply with ok set to true.' }], TINY_SCHEMA);
     const tag = [id === before.standard || id === before.fast ? 'LIVE NOW' : '', after.standard[0] === id || after.fast[0] === id ? 'NEW PICK' : '']
       .filter(Boolean)
       .join('+');
     report('google', `${id}${tag ? ` [${tag}]` : ''}`, result.status === 200, describe(result));
+    if (result.status === 200) healthy.push({ id, ms: result.ms });
   }
 
-  heading('Google: reading the sample schedule, thinking switched off');
+  // The full workload goes to whichever model is named in FOCUS, or else the
+  // fastest one that just answered - so a future run tests the model that is
+  // actually worth switching to, without anyone having to know its name.
+  const focus = (process.env.FOCUS ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id && listed.has(id));
+  if (focus.length === 0 && healthy.length > 0) focus.push(healthy.sort((a, b) => a.ms - b.ms)[0].id);
+  for (const id of focus) await workload(id);
+}
+
+/** Every job the app gives a model, with each thinking setting worth comparing. */
+async function workload(id) {
+  heading(`Google: the full workload on ${id}`);
+  const major = Number(/^gemini-(\d+)/.exec(id)?.[1] ?? 0);
+  const variants =
+    major >= 3
+      ? [['as is', {}], ['thinking low', { thinkingConfig: { thinkingLevel: 'low' } }], ['thinking minimal', { thinkingConfig: { thinkingLevel: 'minimal' } }]]
+      : [['as is', {}], ['thinking off', thinkingOff(id)]];
+
   const photo = [{ inlineData: { mimeType: 'image/jpeg', data: sample('schedule.jpg') } }, { text: FIX_PROMPT }];
   const pdf = [{ inlineData: { mimeType: 'application/pdf', data: sample('schedule.pdf') } }, { text: FIX_PROMPT }];
-  const readers = [...new Set(['gemini-2.5-flash-lite', 'gemini-2.5-flash', ...after.fast.slice(0, 2)])]
-    .filter((id) => listed.has(id))
-    .slice(0, 4);
-  for (const id of readers) {
-    for (const [label, parts] of [['photo', photo], ['PDF', pdf]]) {
-      const result = await generate(id, parts, FIX_SCHEMA, thinkingOff(id));
-      const read = readFixtures(result.text);
-      const correct = result.status === 200 && read.count === EXPECT_FIXTURES && EXPECT_FIRST.test(read.first);
-      report('google', `${id} ${label}`, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
-    }
+
+  let best = null;
+  for (const [label, extra] of variants) {
+    const result = await generate(id, photo, FIX_SCHEMA, extra);
+    const read = readFixtures(result.text);
+    const correct = result.status === 200 && read.count === EXPECT_FIXTURES && EXPECT_FIRST.test(read.first);
+    report('google', `${id} photo, ${label}`, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
+    if (correct && (!best || result.ms < best.ms)) best = { label, extra, ms: result.ms };
   }
 
-  heading('Google: a Coach-sized answer');
-  const coaches = [...new Set(['gemini-2.5-flash', 'gemini-2.5-flash-lite', after.standard[0]])].filter((id) => listed.has(id));
-  for (const id of coaches) {
-    for (const [label, extra] of [['as is', {}], ['thinking off', thinkingOff(id)]]) {
-      const result = await generate(id, [{ text: COACH_PROMPT }], COACH_SCHEMA, extra);
-      let drills = 0;
-      try {
-        drills = JSON.parse(result.text).drills?.length ?? 0;
-      } catch {
-        // counted as no drills
-      }
-      report('google', `${id} coach, ${label}`, result.status === 200 && drills > 0, `${describe(result)} · ${drills} drills`);
+  const pdfSetting = best ?? { label: 'as is', extra: {} };
+  {
+    const result = await generate(id, pdf, FIX_SCHEMA, pdfSetting.extra);
+    const read = readFixtures(result.text);
+    const correct = result.status === 200 && read.count === EXPECT_FIXTURES && EXPECT_FIRST.test(read.first);
+    report('google', `${id} PDF, ${pdfSetting.label}`, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
+  }
+
+  for (const [label, extra] of variants.slice(0, 2)) {
+    const result = await generate(id, [{ text: COACH_PROMPT }], COACH_SCHEMA, extra);
+    let drills = 0;
+    try {
+      drills = JSON.parse(result.text).drills?.length ?? 0;
+    } catch {
+      // counted as no drills
     }
+    report('google', `${id} coach, ${label}`, result.status === 200 && drills > 0, `${describe(result)} · ${drills} drills`);
+  }
+
+  const frames = ['frame-1.jpg', 'frame-2.jpg', 'frame-3.jpg'].flatMap((file, i) => [
+    { text: `Frame at 0:0${i}` },
+    { inlineData: { mimeType: 'image/jpeg', data: sample(file) } },
+  ]);
+  for (const [label, parts] of [
+    ['clip frames', [...frames, { text: CLIP_PROMPT }]],
+    ['clip video', [{ inlineData: { mimeType: 'video/webm', data: sample('clip.webm') } }, { text: CLIP_PROMPT }]],
+  ]) {
+    const result = await generate(id, parts, CLIP_SCHEMA);
+    let rating = 0;
+    try {
+      rating = Number(JSON.parse(result.text).rating) || 0;
+    } catch {
+      // counted as no rating
+    }
+    report('google', `${id} ${label}`, result.status === 200 && rating > 0, `${describe(result)} · rating ${rating}`);
   }
 }
 

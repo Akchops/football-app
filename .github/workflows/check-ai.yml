@@ -19,6 +19,10 @@ on:
         description: 'Call the deployed worker the way the app does'
         type: boolean
         default: true
+      focus:
+        description: 'Models to give the full workload, comma-separated. Blank = the fastest one that answers.'
+        type: string
+        default: ''
 
 jobs:
   check:
@@ -35,3 +39,4 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ inputs.google && secrets.GEMINI_API_KEY || '' }}
           PROXY_URL: ${{ inputs.worker && vars.AI_PROXY_URL || '' }}
+          FOCUS: ${{ inputs.focus }}
