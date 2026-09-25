@@ -110,7 +110,7 @@ describe('worker', () => {
     expect(response.status).toBe(500);
     expect(body.code).toBe('upstream');
     expect(body.error).toBe(
-      'The coach had a problem. Try again. (upstream 500 · gemini-3-flash-preview · An internal error has occurred.)',
+      'The coach had a problem. Try again. (upstream · gemini-2.5-flash 500, gemini-2.5-flash-lite 500, gemini-3-flash-preview 500 · An internal error has occurred.)',
     );
   });
 

@@ -356,7 +356,11 @@ async function checkWorker() {
     'Read every fixture in this document.',
   ].join('\n');
   const imports = [
-    ...Array.from({ length: REPEAT }, (_, i) => [`Import photo ${i + 1}/${REPEAT} (/fixtures)`, 'schedule.jpg', 'image/jpeg']),
+    // Every other photo is the realistic one: a tilted, shadowed phone photo of paper.
+    ...Array.from({ length: REPEAT }, (_, i) => {
+      const file = i % 2 === 1 ? 'schedule-hard.jpg' : 'schedule.jpg';
+      return [`Import ${file.replace('.jpg', '')} ${i + 1}/${REPEAT} (/fixtures)`, file, 'image/jpeg'];
+    }),
     ['Import PDF (/fixtures)', 'schedule.pdf', 'application/pdf'],
   ];
   for (const [label, file, mimeType] of imports) {

@@ -59,8 +59,8 @@ function env(store = memoryStore(), extra: Partial<GeminiEnv> = {}): GeminiEnv {
   return { GEMINI_API_KEY: 'test-key', RATE_LIMIT: store, ...extra };
 }
 
-const ask = (e: GeminiEnv, purpose: 'standard' | 'fast' = 'standard', budgetMs = 50_000, minRetryMs?: number) =>
-  generate(e, purpose, [{ text: 'hi' }], 'system', { type: 'object' }, { budgetMs, minRetryMs });
+const ask = (e: GeminiEnv, purpose: 'standard' | 'fast' = 'standard', budgetMs = 50_000, minRetryMs?: number, pauseMs = 0) =>
+  generate(e, purpose, [{ text: 'hi' }], 'system', { type: 'object' }, { budgetMs, minRetryMs, pauseMs });
 
 beforeEach(() => vi.unstubAllGlobals());
 afterEach(() => {
@@ -321,6 +321,94 @@ describe('generate', () => {
     });
     await expect(ask(env(), 'fast')).rejects.toMatchObject({ code: 'truncated', model: 'gemini-2.5-flash-lite' });
     expect(calls.filter((c) => c !== 'list')).toHaveLength(1);
+  });
+});
+
+/**
+ * What 24 Sep looked like, and what the first version got wrong: two models
+ * named in config that answer some of the time, listed alongside models that
+ * never answer. After one "busy" the trusted models were sent to the back, so
+ * every request for two minutes tried only the dead ones.
+ */
+describe('trusted models', () => {
+  const TRUSTED = { GEMINI_MODEL: 'gemini-2.5-flash,gemini-2.5-flash-lite' };
+  // In MODELS, the only other usable model is gemini-3-flash-preview: "dead".
+
+  it('stay ahead of discovered models even while both are sitting out', async () => {
+    const store = memoryStore({ 'cooldown:gemini-2.5-flash': 'busy', 'cooldown:gemini-2.5-flash-lite': 'busy' });
+    const calls = fakeGoogle({ 'gemini-2.5-flash': [ok({ fine: true })] });
+    await expect(ask(env(store, TRUSTED))).resolves.toMatchObject({ model: 'gemini-2.5-flash' });
+    expect(calls).not.toContain('gemini-3-flash-preview');
+  });
+
+  it('put the one that is not sitting out first', async () => {
+    const store = memoryStore({ 'cooldown:gemini-2.5-flash': 'busy' });
+    const calls = fakeGoogle({ 'gemini-2.5-flash-lite': [ok({})] });
+    await ask(env(store, TRUSTED));
+    expect(calls.slice(1)).toEqual(['gemini-2.5-flash-lite']);
+  });
+
+  it('read an entry left by the previous version as busy, not withdrawn', async () => {
+    const store = memoryStore({ 'cooldown:gemini-2.5-flash': '1' });
+    const calls = fakeGoogle({ 'gemini-2.5-flash-lite': [error(503, 'busy')], 'gemini-2.5-flash': [ok({})] });
+    await expect(ask(env(store, TRUSTED))).resolves.toMatchObject({ model: 'gemini-2.5-flash' });
+    expect(calls.slice(1)).toEqual(['gemini-2.5-flash-lite', 'gemini-2.5-flash']);
+  });
+
+  it('get a second go when busy, before any model nobody vouched for', async () => {
+    const calls = fakeGoogle({
+      'gemini-2.5-flash': [error(503, 'high demand'), ok({ second: true })],
+      'gemini-2.5-flash-lite': [error(503, 'high demand')],
+    });
+    await expect(ask(env(memoryStore(), TRUSTED))).resolves.toEqual({ result: { second: true }, model: 'gemini-2.5-flash' });
+    expect(calls.slice(1)).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash']);
+  });
+
+  it('are given a moment before being asked again', async () => {
+    fakeGoogle({
+      'gemini-2.5-flash': [error(503, 'high demand'), ok({})],
+      'gemini-2.5-flash-lite': [error(503, 'high demand')],
+    });
+    const started = Date.now();
+    await ask(env(memoryStore(), TRUSTED), 'standard', 50_000, undefined, 60);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(55);
+  });
+
+  it('give way to discovered models only once every one has been withdrawn', async () => {
+    const store = memoryStore();
+    const calls = fakeGoogle({
+      'gemini-2.5-flash': [error(404, 'no longer available to new users')],
+      'gemini-2.5-flash-lite': [error(404, 'no longer available to new users')],
+      'gemini-3-flash-preview': [ok({ rescued: true })],
+    });
+    await expect(ask(env(store, TRUSTED))).resolves.toMatchObject({ model: 'gemini-3-flash-preview' });
+    expect(calls.slice(1)).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview']);
+    expect(store.data.get('cooldown:gemini-2.5-flash')).toBe('gone');
+  });
+
+  it('are not asked again in the same request once withdrawn', async () => {
+    const calls = fakeGoogle({
+      'gemini-2.5-flash': [error(503, 'high demand'), error(503, 'high demand')],
+      'gemini-2.5-flash-lite': [error(404, 'no longer available to new users')],
+    });
+    await ask(env(memoryStore(), TRUSTED)).catch(() => {});
+    expect(calls.filter((c) => c === 'gemini-2.5-flash-lite')).toHaveLength(1);
+  });
+
+  it('are reported as busy - not blamed on a withdrawn model - when Google was only busy', async () => {
+    fakeGoogle({
+      'gemini-2.5-flash': [error(503, 'This model is currently experiencing high demand.'), error(503, 'This model is currently experiencing high demand.')],
+      'gemini-2.5-flash-lite': [error(404, 'This model is no longer available to new users.')],
+    });
+    const failure = await ask(env(memoryStore(), TRUSTED)).catch((e: unknown) => e);
+    expect(failure).toMatchObject({ code: 'busy', status: 503, model: 'gemini-2.5-flash' });
+
+    const out = describeFailure(failure);
+    expect(out.status).toBe(503);
+    expect(out.body.code).toBe('busy');
+    expect(out.body.error).toBe(
+      'The coach is busy right now. Try again in a minute. (busy · gemini-2.5-flash 503, gemini-2.5-flash-lite 404, gemini-2.5-flash 503 · This model is currently experiencing high demand.)',
+    );
   });
 });
 

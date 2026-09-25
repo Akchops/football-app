@@ -21,6 +21,13 @@ import { rankModels, thinkingLight, thinkingOff, type ListedModel, type Purpose 
  *   gone. Busy is kept short on purpose: the fast model's refusals come back
  *   in well under five seconds, so asking it again soon costs little, while
  *   every request it does take comes back in seconds instead of twenty.
+ * - The models named in config are trusted, and a sit-out only ever reorders
+ *   them among themselves. The first version of this pushed a busy trusted
+ *   model behind every model it had discovered - which on 24 Sep meant behind
+ *   four that had never once answered - so after a single "high demand" every
+ *   import for two minutes spent all its attempts on dead models. A busy
+ *   trusted model now gets a second go after a short pause, and models nobody
+ *   vouched for are only tried once every trusted one has been withdrawn.
  * - Every failure carries the status, the model and Google's own words, because
  *   "(upstream)" alone is how this went unexplained for weeks.
  */
@@ -68,8 +75,17 @@ export interface GenerateOptions {
   /** The whole request, every attempt included, has to finish inside this. */
   budgetMs: number;
   maxOutputTokens?: number;
-  /** Tests shrink this; nothing else should. */
+  /** Tests shrink these; nothing else should. */
   minRetryMs?: number;
+  pauseMs?: number;
+}
+
+/** One model asked during a request, and what came back. */
+export interface Attempt {
+  model: string;
+  status?: number;
+  code?: string;
+  detail?: string;
 }
 
 /** What a failure carries, beyond its message. */
@@ -79,6 +95,8 @@ export interface Failure extends Error {
   model?: string;
   /** Google's own error text, when there is any. */
   detail?: string;
+  /** Every model asked, in order, when there was more than one. */
+  attempts?: Attempt[];
 }
 
 function failure(message: string, extra: Omit<Partial<Failure>, 'message'>): Failure {
@@ -139,10 +157,40 @@ async function listModels(env: GeminiEnv): Promise<ListedModel[]> {
   return models;
 }
 
-async function coolingAmong(env: GeminiEnv, models: string[]): Promise<Set<string>> {
+/** Why a model is sitting out. Entries written before this held '1': busy. */
+type SitOut = 'busy' | 'gone';
+
+async function sittingOut(env: GeminiEnv, models: string[]): Promise<Map<string, SitOut>> {
   const flags = await Promise.all(models.map((m) => env.RATE_LIMIT.get(`cooldown:${m}`).catch(() => null)));
-  return new Set(models.filter((_, i) => flags[i] !== null));
+  const out = new Map<string, SitOut>();
+  models.forEach((m, i) => {
+    const flag = flags[i];
+    if (flag !== null) out.set(m, flag === 'gone' ? 'gone' : 'busy');
+  });
+  return out;
 }
+
+/** Available ones first, busy ones after; withdrawn ones not at all. */
+function byReadiness(models: string[], sitting: Map<string, SitOut>): string[] {
+  return [...models.filter((id) => !sitting.has(id)), ...models.filter((id) => sitting.get(id) === 'busy')];
+}
+
+const isBusy = (status: number | undefined) => status === 503 || status === 429;
+
+/**
+ * The failure to report once every attempt has failed. When the only problems
+ * were busy models - and withdrawn ones, which are not what the person needs to
+ * hear about - it is reported as busy, with Google's words from a busy one.
+ */
+function finalFailure(last: Failure, attempts: Attempt[]): Failure {
+  const withList = Object.assign(last, { attempts });
+  const busyOnly = attempts.some((a) => isBusy(a.status)) && attempts.every((a) => isBusy(a.status) || a.status === 404);
+  if (!busyOnly) return withList;
+  const telling = [...attempts].reverse().find((a) => isBusy(a.status));
+  return Object.assign(withList, { code: 'busy', status: telling?.status ?? 503, model: telling?.model, detail: telling?.detail ?? '' });
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 async function callOnce(
   env: GeminiEnv,
@@ -246,27 +294,53 @@ export async function generate(
   }
 
   const lastGood = (await env.RATE_LIMIT.get(goodKey(purpose)).catch(() => null)) ?? undefined;
-  // Config names the order worth trying; after that, whatever answered last.
-  // A configured model that fails sits out like any other and comes back first
-  // once its cooldown is over - so the fast model is used whenever it can be.
-  const preferred = [...configured, lastGood].filter((id): id is string => Boolean(id));
-  const ranked = rankModels(listed, purpose, { preferred });
-  const cooling = await coolingAmong(env, ranked.slice(0, MAX_ATTEMPTS + 2));
-  const order = cooling.size > 0 ? rankModels(listed, purpose, { preferred, coolingDown: cooling }) : ranked;
-  if (order.length === 0) {
+
+  // Trusted: the models config names, then whatever answered last. Everything
+  // else Google lists is only discovered, and gets asked last if at all.
+  const trusted = [...new Set([...configured, lastGood].filter((id): id is string => Boolean(id)))];
+  const discovered = rankModels(listed, purpose).filter((id) => !trusted.includes(id));
+  const sitting = await sittingOut(env, [...trusted, ...discovered.slice(0, MAX_ATTEMPTS + 2)]);
+  const trustedReady = byReadiness(trusted, sitting);
+  const discoveredReady = byReadiness(discovered, sitting);
+
+  // With models named in config, those are tried twice over before anything
+  // discovered - which only comes in if every trusted model has been withdrawn.
+  // Without, it is whatever answered last and then the discovered list, once.
+  const strict = configured.length > 0 && trustedReady.length > 0;
+  const queue = strict ? [...trustedReady, ...trustedReady] : [...trustedReady, ...discoveredReady];
+  if (queue.length === 0) {
     throw failure('No usable Gemini model is available to this key.', { code: 'nomodel', status: 503 });
   }
 
   const asFailure = (error: unknown, model: string) =>
     Object.assign(error instanceof Error ? error : new Error(String(error)), { model }) as Failure;
 
+  const attempts: Attempt[] = [];
+  const goneNow = new Set<string>();
+  const asked = new Set<string>();
+  let fellBack = !strict;
   let last: Failure | undefined;
-  for (const [attempt, model] of order.slice(0, MAX_ATTEMPTS).entries()) {
-    const remaining = deadline - Date.now();
-    if (attempt > 0 && remaining < minRetry) break;
+
+  while (attempts.length < MAX_ATTEMPTS) {
+    const model = queue.shift();
+    if (model === undefined) {
+      if (!fellBack && trustedReady.every((id) => goneNow.has(id))) {
+        fellBack = true;
+        queue.push(...discoveredReady.filter((id) => !goneNow.has(id)));
+        continue;
+      }
+      break;
+    }
+    if (goneNow.has(model)) continue;
+    if (attempts.length > 0 && deadline - Date.now() < minRetry) break;
+
+    // Asking a model that was busy a moment ago: give it that moment first.
+    if (asked.has(model)) await sleep(options.pauseMs ?? 1_000);
+    asked.add(model);
+
     const settings = settingsFor(model, purpose);
     try {
-      const result = await callOnce(env, model, parts, system, schema, settings, remaining, options.maxOutputTokens);
+      const result = await callOnce(env, model, parts, system, schema, settings, deadline - Date.now(), options.maxOutputTokens);
       await remember(env, purpose, model, lastGood);
       return { result, model };
     } catch (error) {
@@ -286,12 +360,17 @@ export async function generate(
         }
       }
 
-      if (!worthAnotherModel(last)) throw last;
-      const seconds = last.status === 404 ? GONE_SECONDS : COOLDOWN_SECONDS;
-      await env.RATE_LIMIT.put(`cooldown:${model}`, '1', { expirationTtl: seconds }).catch(() => {});
+      attempts.push({ model, status: last.status, code: last.code, detail: last.detail });
+      if (!worthAnotherModel(last)) throw finalFailure(last, attempts);
+
+      const gone = last.status === 404;
+      if (gone) goneNow.add(model);
+      await env.RATE_LIMIT.put(`cooldown:${model}`, gone ? 'gone' : 'busy', {
+        expirationTtl: gone ? GONE_SECONDS : COOLDOWN_SECONDS,
+      }).catch(() => {});
     }
   }
-  throw last ?? failure('The coach did not answer.', { code: 'unknown' });
+  throw finalFailure(last ?? failure('The coach did not answer.', { code: 'unknown' }), attempts);
 }
 
 /** Anything in a message shaped like a Google API key. */
@@ -314,7 +393,7 @@ export function describeFailure(error: unknown): { status: number; body: { error
   let tag: string;
   let httpStatus = status >= 400 && status < 600 ? status : 500;
 
-  if (status === 429) {
+  if (status === 429 || code === 'busy') {
     // Google out of quota is not this person's daily limit, and the app treats
     // any 429 as exactly that - so it goes back as "busy" with a 503.
     [friendly, tag, httpStatus] = ['The coach is busy right now. Try again in a minute.', 'busy', 503];
@@ -338,8 +417,16 @@ export function describeFailure(error: unknown): { status: number; body: { error
     [friendly, tag] = ['The coach could not take that request.', 'request'];
   }
 
-  const why = [e.status ? String(e.status) : '', e.model ?? '', redact(e.detail ?? '').slice(0, 140)]
-    .filter(Boolean)
-    .join(' · ');
-  return { status: httpStatus, body: { error: `${friendly} (${tag}${why ? ` ${why}` : ''})`, code: tag } };
+  const detail = redact(e.detail ?? '');
+  const attempts = e.attempts ?? [];
+  // More than one model asked: name each with what it said, so the bracket
+  // shows the whole story rather than whichever came last.
+  const why =
+    attempts.length > 1
+      ? ` · ${attempts.map((a) => `${a.model} ${a.status ?? a.code ?? '?'}`).join(', ')}${detail ? ` · ${detail.slice(0, 100)}` : ''}`
+      : (() => {
+          const single = [e.status ? String(e.status) : '', e.model ?? '', detail.slice(0, 140)].filter(Boolean).join(' · ');
+          return single ? ` ${single}` : '';
+        })();
+  return { status: httpStatus, body: { error: `${friendly} (${tag}${why})`, code: tag } };
 }

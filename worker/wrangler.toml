@@ -7,15 +7,18 @@ compatibility_date = "2026-08-01"
 ALLOWED_ORIGINS = "https://akchops.github.io"
 # Coach requests allowed per person per day, before they're asked for their own key.
 DAILY_LIMIT = "40"
-# Models to try first, best first. Anything else Google lists comes after, and
-# the worker remembers whichever last answered. Measured 24 Sep 2026 on this key
-# (free tier): 3.6-flash answers in seconds when Google has room for it;
-# 3.5-flash-lite nearly always answers but takes 20-45s; 3.8, 3.7, 3.5-flash and
-# 3.1-flash-lite returned "high demand" every time; the 2.5 models are gone.
+# Models to try first, best first. These are trusted: they are always tried
+# before anything else Google lists, and a busy one gets a second go. Measured on
+# this key (free tier), 24-25 Sep 2026:
+#   3.5-flash-lite  answered 19 of 20 requests, today mostly in seconds
+#   3.6-flash       answered about half; its refusals took up to 30s to arrive
+#   3.8, 3.7, 3.5-flash  "high demand" every time; the 2.5 models are gone
+# Import leads with 3.5-flash-lite for that reason. The Coach and clips still
+# lead with 3.6-flash, which wrote the better drill plan when it answered.
 # When things change, run "Check AI proxy" in the Actions tab, put the models
 # that pass here, and redeploy. Empty lets the worker choose on its own.
 GEMINI_MODEL = "gemini-3.6-flash,gemini-3.5-flash-lite"
-GEMINI_FAST_MODEL = "gemini-3.6-flash,gemini-3.5-flash-lite"
+GEMINI_FAST_MODEL = "gemini-3.5-flash-lite,gemini-3.6-flash"
 
 # Created by setup.sh - holds the per-IP daily counters and the cached model id.
 [[kv_namespaces]]
