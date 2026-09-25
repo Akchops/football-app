@@ -25,6 +25,11 @@ const KEY = process.env.GEMINI_API_KEY ?? '';
 const PROXY = (process.env.PROXY_URL ?? '').replace(/\/+$/, '');
 const ORIGIN = process.env.ORIGIN || 'https://akchops.github.io';
 const TODAY = new Date().toISOString().slice(0, 10);
+/** Only the schedule import, sent several times - reliability, not one lucky pass. */
+const IMPORT_ONLY = process.env.IMPORT_ONLY === 'true';
+const REPEAT = Math.max(1, Number(process.env.REPEAT || (IMPORT_ONLY ? 3 : 1)));
+/** Compare media resolutions for reading the schedule, on the models import uses. */
+const SPEED = process.env.SPEED === 'true';
 
 /** The sample sheet has exactly these; a read that gets them is a correct read. */
 const EXPECT_FIXTURES = 8;
@@ -218,8 +223,31 @@ async function checkGoogle() {
     .split(',')
     .map((id) => id.trim())
     .filter((id) => id && listed.has(id));
-  if (focus.length === 0 && healthy.length > 0) focus.push(healthy.sort((a, b) => a.ms - b.ms)[0].id);
+  if (focus.length === 0 && healthy.length > 0 && !SPEED) focus.push(healthy.sort((a, b) => a.ms - b.ms)[0].id);
   for (const id of focus) await workload(id);
+  if (SPEED) await mediaResolution(listed);
+}
+
+/**
+ * Fewer tokens per picture is the one speed lever that costs nothing - but a
+ * schedule is small print, so it only counts if every fixture still comes back.
+ */
+async function mediaResolution(listed) {
+  const photo = [{ inlineData: { mimeType: 'image/jpeg', data: sample('schedule.jpg') } }, { text: FIX_PROMPT }];
+  const pdf = [{ inlineData: { mimeType: 'application/pdf', data: sample('schedule.pdf') } }, { text: FIX_PROMPT }];
+  for (const id of ['gemini-3.6-flash', 'gemini-3.5-flash-lite'].filter((m) => listed.has(m))) {
+    heading(`Google: media resolution on ${id}`);
+    for (const level of ['', 'MEDIA_RESOLUTION_MEDIUM', 'MEDIA_RESOLUTION_LOW']) {
+      for (const [label, parts] of [['photo', photo], ['PDF', pdf]]) {
+        const extra = { ...thinkingOff(id), ...(level ? { mediaResolution: level } : {}) };
+        const result = await generate(id, parts, FIX_SCHEMA, extra);
+        const read = readFixtures(result.text);
+        const correct = result.status === 200 && read.count === EXPECT_FIXTURES && EXPECT_FIRST.test(read.first);
+        const name = `${id} ${label}, ${level ? level.replace('MEDIA_RESOLUTION_', '').toLowerCase() : 'default'}`;
+        report('google', name, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
+      }
+    }
+  }
 }
 
 /** Every job the app gives a model, with each thinking setting worth comparing. */
@@ -312,8 +340,10 @@ async function checkWorker() {
   heading(`Live worker: ${PROXY}`);
   const player = 'Position: GK (Goalkeeper)\nAge group: U16';
 
-  const drills = await callWorker('/drills', { player, ask: 'one short warm-up for handling crosses' });
-  report('worker', 'Coach (/drills)', drills.status === 200 && Boolean(drills.body.result), workerDetail(drills));
+  if (!IMPORT_ONLY) {
+    const drills = await callWorker('/drills', { player, ask: 'one short warm-up for handling crosses' });
+    report('worker', 'Coach (/drills)', drills.status === 200 && Boolean(drills.body.result), workerDetail(drills));
+  }
 
   const fixturesPrompt = [
     `Today's date is ${TODAY}.`,
@@ -321,15 +351,18 @@ async function checkWorker() {
     '',
     'Read every fixture in this document.',
   ].join('\n');
-  for (const [label, file, mimeType] of [
-    ['Import photo (/fixtures)', 'schedule.jpg', 'image/jpeg'],
+  const imports = [
+    ...Array.from({ length: REPEAT }, (_, i) => [`Import photo ${i + 1}/${REPEAT} (/fixtures)`, 'schedule.jpg', 'image/jpeg']),
     ['Import PDF (/fixtures)', 'schedule.pdf', 'application/pdf'],
-  ]) {
+  ];
+  for (const [label, file, mimeType] of imports) {
     const result = await callWorker('/fixtures', { prompt: fixturesPrompt, media: [{ mimeType, data: sample(file) }] });
     const list = Array.isArray(result.body.result?.fixtures) ? result.body.result.fixtures : [];
     const correct = result.status === 200 && list.length === EXPECT_FIXTURES && EXPECT_FIRST.test(String(list[0]?.opponent ?? ''));
     report('worker', label, correct, workerDetail(result, `read ${list.length}/${EXPECT_FIXTURES}`));
   }
+
+  if (IMPORT_ONLY) return;
 
   const clipPrompt = (shown) => [player, '', 'Which player they are: the goalkeeper in yellow', '', shown].join('\n');
   const frames = await callWorker('/clip', {

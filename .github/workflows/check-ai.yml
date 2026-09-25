@@ -23,6 +23,14 @@ on:
         description: 'Models to give the full workload, comma-separated. Blank = the fastest one that answers.'
         type: string
         default: ''
+      import_only:
+        description: 'Only the schedule import through the worker - the photo three times, then the PDF'
+        type: boolean
+        default: false
+      speed:
+        description: 'Compare media resolutions for reading the schedule (checks every fixture still comes back)'
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -40,3 +48,5 @@ jobs:
           GEMINI_API_KEY: ${{ inputs.google && secrets.GEMINI_API_KEY || '' }}
           PROXY_URL: ${{ inputs.worker && vars.AI_PROXY_URL || '' }}
           FOCUS: ${{ inputs.focus }}
+          IMPORT_ONLY: ${{ inputs.import_only }}
+          SPEED: ${{ inputs.speed }}
