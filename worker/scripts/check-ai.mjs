@@ -30,6 +30,9 @@ const IMPORT_ONLY = process.env.IMPORT_ONLY === 'true';
 const REPEAT = Math.max(1, Number(process.env.REPEAT || (IMPORT_ONLY ? 3 : 1)));
 /** Compare media resolutions for reading the schedule, on the models import uses. */
 const SPEED = process.env.SPEED === 'true';
+/** Which samples and resolutions the speed comparison reads - blank level = default. */
+const SPEED_FILES = (process.env.SPEED_FILES || 'schedule.jpg,schedule.pdf').split(',').map((f) => f.trim()).filter(Boolean);
+const SPEED_LEVELS = (process.env.SPEED_LEVELS ?? ',MEDIUM,LOW').split(',').map((l) => l.trim().toUpperCase());
 
 /** The sample sheet has exactly these; a read that gets them is a correct read. */
 const EXPECT_FIXTURES = 8;
@@ -207,7 +210,7 @@ async function checkGoogle() {
   const listed = new Set(models.map((m) => (m.name ?? '').replace(/^models\//, '')));
   const stable = [...new Set([...after.standard, ...after.fast])].filter((id) => /^gemini-\d/.test(id) && !/preview/.test(id));
   const healthy = [];
-  for (const id of stable.slice(0, 10)) {
+  for (const id of SPEED ? [] : stable.slice(0, 10)) {
     const result = await generate(id, [{ text: 'Reply with ok set to true.' }], TINY_SCHEMA);
     const tag = [id === before.standard || id === before.fast ? 'LIVE NOW' : '', after.standard[0] === id || after.fast[0] === id ? 'NEW PICK' : '']
       .filter(Boolean)
@@ -233,18 +236,19 @@ async function checkGoogle() {
  * schedule is small print, so it only counts if every fixture still comes back.
  */
 async function mediaResolution(listed) {
-  const photo = [{ inlineData: { mimeType: 'image/jpeg', data: sample('schedule.jpg') } }, { text: FIX_PROMPT }];
-  const pdf = [{ inlineData: { mimeType: 'application/pdf', data: sample('schedule.pdf') } }, { text: FIX_PROMPT }];
+  const files = SPEED_FILES.map((file) => [
+    file,
+    [{ inlineData: { mimeType: file.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg', data: sample(file) } }, { text: FIX_PROMPT }],
+  ]);
   for (const id of ['gemini-3.6-flash', 'gemini-3.5-flash-lite'].filter((m) => listed.has(m))) {
     heading(`Google: media resolution on ${id}`);
-    for (const level of ['', 'MEDIA_RESOLUTION_MEDIUM', 'MEDIA_RESOLUTION_LOW']) {
-      for (const [label, parts] of [['photo', photo], ['PDF', pdf]]) {
-        const extra = { ...thinkingOff(id), ...(level ? { mediaResolution: level } : {}) };
+    for (const level of SPEED_LEVELS) {
+      for (const [file, parts] of files) {
+        const extra = { ...thinkingOff(id), ...(level ? { mediaResolution: `MEDIA_RESOLUTION_${level}` } : {}) };
         const result = await generate(id, parts, FIX_SCHEMA, extra);
         const read = readFixtures(result.text);
         const correct = result.status === 200 && read.count === EXPECT_FIXTURES && EXPECT_FIRST.test(read.first);
-        const name = `${id} ${label}, ${level ? level.replace('MEDIA_RESOLUTION_', '').toLowerCase() : 'default'}`;
-        report('google', name, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
+        report('google', `${id} ${file}, ${level ? level.toLowerCase() : 'default'}`, correct, `${describe(result)} · read ${read.count}/${EXPECT_FIXTURES}`);
       }
     }
   }

@@ -31,6 +31,14 @@ on:
         description: 'Compare media resolutions for reading the schedule (checks every fixture still comes back)'
         type: boolean
         default: false
+      speed_files:
+        description: 'Samples for the speed comparison, comma-separated'
+        type: string
+        default: 'schedule.jpg,schedule.pdf'
+      speed_levels:
+        description: 'Resolutions to compare, comma-separated - blank = default, then MEDIUM, LOW'
+        type: string
+        default: ',MEDIUM,LOW'
 
 jobs:
   check:
@@ -50,3 +58,5 @@ jobs:
           FOCUS: ${{ inputs.focus }}
           IMPORT_ONLY: ${{ inputs.import_only }}
           SPEED: ${{ inputs.speed }}
+          SPEED_FILES: ${{ inputs.speed_files }}
+          SPEED_LEVELS: ${{ inputs.speed_levels }}
