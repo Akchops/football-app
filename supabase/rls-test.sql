@@ -36,6 +36,29 @@ begin
   raise notice 'set up Family A';
 end $$;
 
+-- synced_at is the server's to set; updated_at is the phone's to keep.
+do $$
+declare pid uuid; t1 timestamptz; t2 timestamptz;
+begin
+  select v into pid from t_ids where k = 'pid_a';
+  insert into public.matches (player_id, id, data, updated_at, synced_at)
+    values (pid, 'match_clock', '{"date":"2026-12-01"}', '2000-01-01', '2000-01-01')
+    returning synced_at into t1;
+  if t1 < now() - interval '1 minute' then raise exception 'FAIL: a phone set synced_at to %', t1; end if;
+  raise notice 'PASS: the server stamps synced_at, whatever the phone sends';
+
+  perform pg_sleep(0.01);
+  update public.matches set data = '{"date":"2026-12-02"}' where player_id = pid and id = 'match_clock'
+    returning synced_at into t2;
+  if t2 <= t1 then raise exception 'FAIL: an update did not move synced_at'; end if;
+  if (select updated_at from public.matches where player_id = pid and id = 'match_clock') <> '2000-01-01' then
+    raise exception 'FAIL: the server changed updated_at';
+  end if;
+  raise notice 'PASS: an update moves synced_at and leaves updated_at alone';
+
+  delete from public.matches where player_id = pid and id = 'match_clock';
+end $$;
+
 -- ===========================================================================
 -- Family B signs in and sets itself up.
 -- ===========================================================================
@@ -175,6 +198,22 @@ begin
   raise notice 'PASS: B can add a match to the shared player';
 end $$;
 
+-- The member list, with emails, for the household you are in.
+do $$
+declare n int; hid_a uuid;
+begin
+  select v into hid_a from t_ids where k = 'hid_a';
+  select count(*) into n from public.household_people(hid_a);
+  if n <> 2 then raise exception 'FAIL: household_people shows % people, expected 2', n; end if;
+  if not exists (select 1 from public.household_people(hid_a) where email = 'parent.a@example.com' and role = 'owner') then
+    raise exception 'FAIL: household_people is missing the owner';
+  end if;
+  if not exists (select 1 from public.household_people(hid_a) where email = 'parent.b@example.com' and is_me) then
+    raise exception 'FAIL: household_people does not mark the caller';
+  end if;
+  raise notice 'PASS: members can see who else is in their household';
+end $$;
+
 -- An invite meant for somebody else must not be claimable.
 do $$
 declare hid_b uuid; inv uuid;
@@ -212,6 +251,10 @@ begin
   select count(*) into n from public.matches;
   if n <> 1 then raise exception 'FAIL: after leaving, B still sees % matches', n; end if;
   raise notice 'PASS: after leaving, B is back to only its own match';
+
+  select count(*) into n from public.household_people(hid_a);
+  if n <> 0 then raise exception 'FAIL: after leaving, B can still list A''s members'; end if;
+  raise notice 'PASS: nobody outside a household can list its members';
 end $$;
 
 reset role;

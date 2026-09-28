@@ -16,6 +16,12 @@
 -- 2. A delete is an update. Rows are never removed by the app; deleted_at is
 --    set instead, so the delete reaches the other phones. Only the household
 --    removing itself deletes anything for real.
+--
+-- 3. The one time the server does own is synced_at: when a row last reached
+--    it, by the server's clock. Phones ask for "everything since the last
+--    synced_at I saw". Asking by updated_at instead would quietly skip changes
+--    made on a phone whose clock is behind - they would look older than a pull
+--    that had already happened.
 
 create extension if not exists "pgcrypto";
 
@@ -146,12 +152,48 @@ create table if not exists public.competitions (
   primary key (player_id, id)
 );
 
--- Pulling only what changed since the last sync is the common query, on every
--- table, so each gets the same index.
-create index if not exists matches_since_idx on public.matches (player_id, updated_at);
-create index if not exists training_since_idx on public.training_sessions (player_id, updated_at);
-create index if not exists teams_since_idx on public.teams (player_id, updated_at);
-create index if not exists competitions_since_idx on public.competitions (player_id, updated_at);
+-- When each row last reached the server, by the server's clock (rule 3). Added
+-- as its own step so a database made from an earlier version of this file
+-- gains it too.
+alter table public.matches           add column if not exists synced_at timestamptz not null default clock_timestamp();
+alter table public.training_sessions add column if not exists synced_at timestamptz not null default clock_timestamp();
+alter table public.teams             add column if not exists synced_at timestamptz not null default clock_timestamp();
+alter table public.competitions      add column if not exists synced_at timestamptz not null default clock_timestamp();
+
+-- Stamped on every insert and update, whatever the phone sent - a phone cannot
+-- set it, so it cannot get it wrong.
+create or replace function public.stamp_synced_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.synced_at := clock_timestamp();
+  return new;
+end;
+$$;
+
+drop trigger if exists stamp_synced_at on public.matches;
+create trigger stamp_synced_at before insert or update on public.matches
+  for each row execute function public.stamp_synced_at();
+drop trigger if exists stamp_synced_at on public.training_sessions;
+create trigger stamp_synced_at before insert or update on public.training_sessions
+  for each row execute function public.stamp_synced_at();
+drop trigger if exists stamp_synced_at on public.teams;
+create trigger stamp_synced_at before insert or update on public.teams
+  for each row execute function public.stamp_synced_at();
+drop trigger if exists stamp_synced_at on public.competitions;
+create trigger stamp_synced_at before insert or update on public.competitions
+  for each row execute function public.stamp_synced_at();
+
+-- "Everything for this player since synced_at X" is the query every sync runs.
+drop index if exists public.matches_since_idx;
+drop index if exists public.training_since_idx;
+drop index if exists public.teams_since_idx;
+drop index if exists public.competitions_since_idx;
+create index if not exists matches_synced_idx on public.matches (player_id, synced_at);
+create index if not exists training_synced_idx on public.training_sessions (player_id, synced_at);
+create index if not exists teams_synced_idx on public.teams (player_id, synced_at);
+create index if not exists competitions_synced_idx on public.competitions (player_id, synced_at);
 create index if not exists matches_date_idx on public.matches (player_id, match_date);
 
 -- ---------------------------------------------------------------------------
@@ -347,7 +389,27 @@ begin
 end;
 $$;
 
+-- Who is in a household, by email, for the list in Setup. Emails live in
+-- auth.users, which nobody can read directly - so this hands out only the
+-- members of a household the caller is in, and nothing else.
+create or replace function public.household_people(hid uuid)
+returns table (user_id uuid, email text, role text, is_me boolean)
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select m.user_id, u.email::text, m.role, m.user_id = auth.uid()
+  from public.household_members m
+  join auth.users u on u.id = m.user_id
+  where m.household_id = hid
+    and public.is_household_member(hid)
+  order by m.created_at;
+$$;
+
 revoke all on function public.create_household(text) from public;
 revoke all on function public.accept_invite(uuid) from public;
+revoke all on function public.household_people(uuid) from public;
 grant execute on function public.create_household(text) to authenticated;
 grant execute on function public.accept_invite(uuid) to authenticated;
+grant execute on function public.household_people(uuid) to authenticated;
