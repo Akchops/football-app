@@ -127,6 +127,14 @@ export function describeAuthError(message: string): string {
   if (text.includes('failed to fetch') || text.includes('network')) {
     return 'Could not reach the account server. Everything is still saved on this phone.';
   }
+  // Supabase's built-in email only reaches the project's own team; everyone
+  // else needs the project's email sending set up (supabase/README.md).
+  if (text.includes('not authorized')) {
+    return "Matchday can't email that address yet - its email sending isn't fully set up. Ask whoever set up Matchday to finish it.";
+  }
+  if (text.includes('signups not allowed')) {
+    return "New sign-ins are switched off for Matchday's account server. Ask whoever set it up to switch them on.";
+  }
   if (text.includes('token has expired') || text.includes('invalid otp') || text.includes('otp')) {
     return 'That code did not work. Check it, or send a new one - each code only lasts a few minutes.';
   }

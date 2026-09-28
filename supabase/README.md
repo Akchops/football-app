@@ -32,25 +32,44 @@ Matchday.
 | `local-auth-stub.sql` | Stands in for the Supabase-provided `auth` schema so the files above can run against a plain local Postgres. Never run this against the real project. |
 | `local-api.mjs` | A local stand-in for a whole project, for testing sync in a browser. See the end of this file. Never point it at anything real. |
 
-## Setting up the real project (about 10 minutes, free, no card)
+## Setting up the real project (about 15 minutes, free, no card)
 
 1. Go to **supabase.com**, sign in with GitHub, and create a **New project**:
    name it `matchday`, pick the region nearest you (London for the UK), and
    choose any database password (save it somewhere; the app never needs it).
 2. **SQL Editor** → New query → paste all of `schema.sql` → **Run**.
-3. **Authentication → Emails → Magic Link** template (called *Magic Link* or
-   *Sign in* depending on the dashboard version): make the message body
+3. **Email sending — needed before anyone else can get a code.** Supabase's
+   built-in email only delivers to the people on your Supabase account's own
+   team, and at most 2 emails an hour; anyone else gets *Email address not
+   authorized*. Sending through your own Gmail fixes both, for free:
+   1. Your Google Account → **Security** → turn on **2-Step Verification** if
+      it is not on already.
+   2. Open **myaccount.google.com/apppasswords**, create one called
+      `Matchday`, and copy the 16-letter password it shows.
+   3. Supabase → **Authentication → Emails → SMTP Settings** → enable custom
+      SMTP and fill in: sender email = your Gmail address, sender name =
+      `Matchday`, host = `smtp.gmail.com`, port = `465`, username = your Gmail
+      address, password = the 16-letter app password. Save.
+
+   Supabase then allows 30 emails an hour, which is plenty. (If Google will
+   not offer an app password — some supervised or work accounts cannot — a
+   free Brevo account does the same job: host `smtp-relay.brevo.com`, port
+   `587`, and the login and SMTP key from Brevo's SMTP settings page.)
+4. **Authentication → Emails → Templates**. Two of them send sign-in emails:
+   **Confirm sign up** goes to someone signing in for the very first time, and
+   **Magic link** to everyone after that. In both, replace the message with
 
    ```
    Your Matchday code is {{ .Token }}
    ```
 
-   The `{{ .Token }}` is what makes the email carry a code rather than a link.
-4. **Authentication → URL Configuration → Site URL**:
+   and make the subject `Your Matchday code`. The `{{ .Token }}` is what makes
+   the email carry a code rather than a link.
+5. **Authentication → URL Configuration → Site URL**:
    `https://<your-github-username>.github.io/football-app/`
-5. **Project Settings → API** (or *API Keys*): copy the **Project URL** and the
+6. **Project Settings → API** (or *API Keys*): copy the **Project URL** and the
    **anon** / **publishable** key — never the *service_role* / *secret* one.
-6. GitHub → the repository → **Settings → Secrets and variables → Actions →
+7. GitHub → the repository → **Settings → Secrets and variables → Actions →
    Variables** tab → add two repository variables:
    - `VITE_SUPABASE_URL` — the Project URL
    - `VITE_SUPABASE_ANON_KEY` — the anon / publishable key
@@ -58,15 +77,13 @@ Matchday.
    These are build variables, like `AI_PROXY_URL`. The anon key is designed to
    be public: it identifies the project and grants nothing by itself. What
    protects the data is the access rules in `schema.sql`.
-7. GitHub → **Actions → Check accounts setup → Run workflow**. It reports each
+8. GitHub → **Actions → Check accounts setup → Run workflow**. It reports each
    thing that is right or wrong, with the fix. Then re-run **Deploy to GitHub
    Pages** (or push anything) so the app is rebuilt with sign-in switched on.
 
-The one thing no check here can prove is that Supabase actually delivers the
-email: the first sign-in is that test. Supabase's built-in email sends only a
-few messages an hour — plenty for a family, but if a code does not arrive after
-several tries, wait an hour. (A custom SMTP provider in Authentication → Emails
-lifts that limit.)
+The one thing no check here can prove is that the emails arrive: the first
+sign-in is that test. If a code does not come, look in spam, then check steps 3
+and 4 — a link instead of a code means a template still has the old text.
 
 ### Optional: Google sign-in
 

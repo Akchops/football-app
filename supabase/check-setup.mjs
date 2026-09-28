@@ -108,7 +108,8 @@ for (const table of TABLES) {
 
 console.log('');
 console.log('Not checkable from here - worth a look in the dashboard:');
-console.log('  - Authentication -> Emails -> Magic Link template contains {{ .Token }}, so the email carries a code');
+console.log('  - Authentication -> Emails -> SMTP Settings: custom SMTP is on (without it, codes only reach your own Supabase team)');
+console.log('  - Authentication -> Emails -> Templates: both "Confirm sign up" and "Magic link" contain {{ .Token }}');
 console.log('  - Authentication -> URL Configuration -> Site URL is the app address');
 console.log('');
 console.log(failed ? `${failed} problem${failed === 1 ? '' : 's'} to fix.` : 'All good - the project is ready for Matchday.');
