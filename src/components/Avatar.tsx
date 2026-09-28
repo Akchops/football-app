@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { toSquareDataUrl } from '../lib/photo';
+import { useSync } from '../store/SyncProvider';
 
 /** The player's photo, or their initials when there isn't one. */
 export function Avatar({ photo, name, size = 40 }: { photo: string; name: string; size?: number }) {
@@ -29,6 +30,7 @@ export function AvatarPicker({
   onChange: (photo: string) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const signedIn = Boolean(useSync().account);
 
   return (
     <div className="avatar-picker">
@@ -42,7 +44,10 @@ export function AvatarPicker({
             Remove
           </button>
         )}
-        <span className="muted small">Stays on this device. Shown around the app and on shared match cards.</span>
+        <span className="muted small">
+          {signedIn ? 'Shared with your family, like the rest of the profile.' : 'Stays on this device.'} Shown around the
+          app and on shared match cards.
+        </span>
       </div>
       <input
         ref={fileRef}

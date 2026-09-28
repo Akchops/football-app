@@ -160,8 +160,14 @@ export function mergeRemote(local: AppData, remote: RemoteChanges): AppData {
   let changed = false;
   const next: AppData = { ...local };
   for (const table of TABLES) {
-    const theirs = remote[table];
+    const theirs = remote[table] as Syncable[] | undefined;
     if (!theirs || theirs.length === 0) continue;
+    // Pulls overlap on purpose, so the server often sends back exactly what the
+    // phone already has. If every record it sent loses to - or is - the local
+    // one, nothing has changed, and saying otherwise would redraw the screen and
+    // set off another sync, over and over.
+    const mine = new Map((local[table] as Syncable[]).map((r) => [r.id, r]));
+    if (theirs.every((r) => mine.has(r.id) && pick(mine.get(r.id)!, r) === mine.get(r.id))) continue;
     // Each list is merged with its own record type; the cast only names which.
     (next as unknown as Record<Table, unknown[]>)[table] = mergeList(
       local[table] as RecordOf[typeof table][],

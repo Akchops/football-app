@@ -114,7 +114,7 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
     expect(first.created).toBe(true);
     expect(first.pushed).toBe(3);
 
-    const onServer = await b.sb.from('matches').select('id, deleted_at').eq('player_id', first.household.playerId);
+    const onServer = await b.sb.from('matches').select('id, deleted_at').eq('player_id', first.household!.playerId);
     expect(onServer.error).toBeNull();
     expect(onServer.data).toHaveLength(2);
 
@@ -122,9 +122,9 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
     expect((await brother.sync()).pushed).toBe(0);
 
     // He invites mum; inviting twice is not an error.
-    await brother.remote.invite(first.household.id, email('mum'));
-    await brother.remote.invite(first.household.id, email('Mum').toUpperCase());
-    expect((await brother.remote.sentInvites(first.household.id)).map((i) => i.email)).toEqual([email('mum')]);
+    await brother.remote.invite(first.household!.id, email('mum'));
+    await brother.remote.invite(first.household!.id, email('Mum').toUpperCase());
+    expect((await brother.remote.sentInvites(first.household!.id)).map((i) => i.email)).toEqual([email('mum')]);
 
     // Mum signs in on an empty phone: she sees who invited her, and joins.
     const m = await signIn(email('mum'));
@@ -137,12 +137,12 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
     const mum = new Phone(mumRemote, m.userId);
     const joined = await mum.sync();
     expect(joined.joined).toBe(true);
-    expect(joined.household.id).toBe(first.household.id);
+    expect(joined.household!.id).toBe(first.household!.id);
     expect(mum.opponents()).toEqual(['Hillcrest Athletic', 'Riverside Rovers']);
     expect(mum.data.profile.name).toBe('Arjun');
 
     // Both of them, and each marked correctly.
-    const people = await mumRemote.people(joined.household.id);
+    const people = await mumRemote.people(joined.household!.id);
     expect(people.map((p) => [p.email, p.role, p.isMe])).toEqual([
       [email('brother'), 'owner', false],
       [email('mum'), 'adult', true],
@@ -172,16 +172,16 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
     // Someone outside the family sees none of it and can change none of it.
     const s = await signIn(email('stranger'));
     const strangerRemote = supabaseRemote(s.sb, s.userId);
-    const peek = await strangerRemote.pull(first.household.playerId, '');
+    const peek = await strangerRemote.pull(first.household!.playerId, '');
     expect(peek.rows.matches).toEqual([]);
     expect(peek.rows.training).toEqual([]);
     expect(peek.profile).toBeNull();
     await expect(
-      strangerRemote.push(first.household.playerId, {
+      strangerRemote.push(first.household!.playerId, {
         rows: { matches: [match('Injected FC')], training: [], teams: [], competitions: [] },
       }),
     ).rejects.toThrow();
-    expect(await strangerRemote.people(first.household.id)).toEqual([]);
+    expect(await strangerRemote.people(first.household!.id)).toEqual([]);
     expect(await strangerRemote.invitesForMe()).toEqual([]);
 
     // And the brother's view was not touched by the attempt.
@@ -195,7 +195,7 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
     season.matches = [match('Castle Vale FC')];
     const brother = new Phone(supabaseRemote(b.sb, b.userId), b.userId, season);
     const first = await brother.sync();
-    await brother.remote.invite(first.household.id, email('dad'));
+    await brother.remote.invite(first.household!.id, email('dad'));
 
     const d = await signIn(email('dad'));
     const dadData = emptyData();

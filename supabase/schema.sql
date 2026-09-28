@@ -425,12 +425,45 @@ as $$
   order by i.created_at desc;
 $$;
 
-revoke all on function public.my_invites() from public;
+-- From anon by name as well as from public: Supabase's defaults grant new
+-- functions to anon directly, which revoking from public does not undo.
+revoke all on function public.my_invites() from public, anon;
 grant execute on function public.my_invites() to authenticated;
 
-revoke all on function public.create_household(text) from public;
-revoke all on function public.accept_invite(uuid) from public;
-revoke all on function public.household_people(uuid) from public;
+revoke all on function public.create_household(text) from public, anon;
+revoke all on function public.accept_invite(uuid) from public, anon;
+revoke all on function public.household_people(uuid) from public, anon;
 grant execute on function public.create_household(text) to authenticated;
 grant execute on function public.accept_invite(uuid) to authenticated;
 grant execute on function public.household_people(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Who may use the tables at all. Row-level security above decides which rows;
+-- this decides whether the API lets a role near the tables in the first place.
+-- Written out rather than left to the project's defaults, which differ between
+-- projects and have changed before. Someone not signed in gets nothing.
+-- ---------------------------------------------------------------------------
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete on
+  public.households, public.household_members, public.household_invites,
+  public.players, public.player_settings,
+  public.matches, public.training_sessions, public.teams, public.competitions
+  to authenticated;
+
+revoke all on
+  public.households, public.household_members, public.household_invites,
+  public.players, public.player_settings,
+  public.matches, public.training_sessions, public.teams, public.competitions
+  from anon;
+
+-- Which version of this file a project has, so a check can tell whether the
+-- latest one was run. Bump it with any change the app depends on.
+create or replace function public.schema_version()
+returns integer
+language sql
+immutable
+as $$ select 1 $$;
+
+revoke all on function public.schema_version() from public;
+grant execute on function public.schema_version() to anon, authenticated;

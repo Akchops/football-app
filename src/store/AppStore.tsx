@@ -4,9 +4,11 @@ import type {
 } from '../types';
 import { createId, emptyData, live, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
+import { mergeRemote, type RemoteChanges } from '../lib/sync';
 
 type Action =
   | { type: 'data/replace'; data: AppData }
+  | { type: 'data/merge'; changes: RemoteChanges }
   | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'profile/update'; patch: Partial<Profile> }
   | { type: 'team/add'; team: Team }
@@ -41,6 +43,12 @@ export function reducer(state: AppData, action: Action): AppData {
   switch (action.type) {
     case 'data/replace':
       return action.data;
+
+    // Records from the server are merged against whatever is here at this
+    // moment, in one step - so an edit made while a sync was on its way is
+    // never overwritten by what the sync saw before it.
+    case 'data/merge':
+      return mergeRemote(state, action.changes);
 
     // Settings and the profile are single records rather than lists, so they
     // carry their own edit time and merge whole.
@@ -209,6 +217,10 @@ interface StoreValue {
   clearAllData(): void;
   importData(json: string): { ok: true } | { ok: false; error: string };
   exportData(): string;
+  /** Records from the server, merged in record by record. */
+  applyRemote(changes: RemoteChanges): void;
+  /** Everything replaced at once - only for "use the family's only" when joining. */
+  replaceData(data: AppData): void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -406,6 +418,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       clearAllData() {
         dispatch({ type: 'data/replace', data: emptyData() });
+      },
+
+      applyRemote(changes) {
+        dispatch({ type: 'data/merge', changes });
+      },
+
+      replaceData(next) {
+        dispatch({ type: 'data/replace', data: next });
       },
 
       exportData() {

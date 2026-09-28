@@ -264,5 +264,38 @@ begin
 end $$;
 
 reset role;
+
+-- Someone who is not signed in cannot reach the tables at all - not even to
+-- be told there is nothing for them - but can ask which schema version runs.
+set role anon;
+do $$
+declare n int;
+begin
+  begin
+    select count(*) into n from public.matches;
+    raise exception 'FAIL: someone signed out could query the matches table';
+  exception when insufficient_privilege then
+    raise notice 'PASS: someone signed out cannot touch the tables';
+  end;
+
+  begin
+    insert into public.household_invites (household_id, email) values (gen_random_uuid(), 'x@example.com');
+    raise exception 'FAIL: someone signed out could write an invite';
+  exception when insufficient_privilege then
+    raise notice 'PASS: someone signed out cannot write';
+  end;
+
+  begin
+    perform public.create_household('Signed out');
+    raise exception 'FAIL: someone signed out could call create_household';
+  exception when insufficient_privilege then
+    raise notice 'PASS: someone signed out cannot call the sign-in functions';
+  end;
+
+  if public.schema_version() is null then raise exception 'FAIL: no schema version'; end if;
+  raise notice 'PASS: the schema version can be read without signing in';
+end $$;
+reset role;
+
 \echo ''
 \echo 'ALL RLS CHECKS PASSED'

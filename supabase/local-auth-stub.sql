@@ -35,5 +35,8 @@ grant anon, authenticated to authenticator;
 
 grant usage on schema public, auth to anon, authenticated;
 -- No grant on auth.users: as in Supabase, signed-in users cannot read it.
-alter default privileges in schema public grant all on tables to authenticated;
-alter default privileges in schema public grant all on sequences to authenticated;
+-- Supabase's defaults hand everything new in public to anon as well as to
+-- authenticated. Copied here so the tests prove schema.sql takes anon's away.
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
+alter default privileges in schema public grant all on functions to anon, authenticated;

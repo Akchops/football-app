@@ -94,10 +94,18 @@ export interface SyncHooks {
   askJoin(question: { householdName: string; localMatches: number }): Promise<'merge' | 'replace'>;
   /** Keeps a copy of whatever "take the household's only" is about to discard. */
   backup(data: AppData): void;
+  /**
+   * Whether a household may be started for someone who is in none and has no
+   * invite waiting. Not while the phone is still being set up: signing in
+   * there is for joining a family, and a household started then would have
+   * nobody's details in it. Left out, one always may.
+   */
+  mayCreate?(): boolean;
 }
 
 export interface SyncResult {
-  household: Household;
+  /** Null only when there is no household to be in and `mayCreate` said not to start one. */
+  household: Household | null;
   pulled: number;
   pushed: number;
   /** An invite was accepted on this sync. */
@@ -133,8 +141,10 @@ export async function syncOnce(h: SyncHooks): Promise<SyncResult> {
   if (state && state.userId !== h.userId) state = null;
 
   const households = await h.remote.households();
-  // Removed from the household, or left it on another phone: start over.
-  if (state && !households.some((x) => x.id === state?.householdId)) state = null;
+  // The household to be in is the one joined last, so joining a new one on
+  // any phone moves all of that person's phones. Being removed from the one
+  // this phone remembers starts it over too.
+  if (state && households[0]?.id !== state.householdId) state = null;
 
   let household: Household;
   let joined = false;
@@ -157,6 +167,8 @@ export async function syncOnce(h: SyncHooks): Promise<SyncResult> {
     }
     if (pool.length > 0) {
       household = pool[0];
+    } else if (h.mayCreate && !h.mayCreate()) {
+      return { household: null, pulled: 0, pushed: 0, joined, created };
     } else {
       const local = h.getLocal();
       household = await h.remote.createHousehold(householdName(local.profile), local.profile, local.settings);
@@ -194,30 +206,40 @@ export async function syncOnce(h: SyncHooks): Promise<SyncResult> {
     confirmed.settings = fingerprint(changes.settings);
   }
 
-  // A phone joining a household that already has records, while holding its
-  // own: the one moment this phone's data and the household's could be two
-  // different seasons. Asked, never assumed.
   let local = h.getLocal();
-  const householdHasRecords = TABLES.some((t) => pulled.rows[t].length > 0);
-  if (firstTime && !created && householdHasRecords && hasContent(local)) {
-    const choice = await h.askJoin({ householdName: household.name, localMatches: live(local.matches).length });
-    if (choice === 'replace') {
-      h.backup(local);
-      const theirs: AppData = {
-        version: local.version,
-        profile: changes.profile ?? local.profile,
-        settings: changes.settings ?? local.settings,
-        matches: changes.matches ?? [],
-        training: changes.training ?? [],
-        teams: changes.teams ?? [],
-        competitions: changes.competitions ?? [],
-      };
-      h.replaceLocal(theirs);
-      local = theirs;
-    } else {
-      h.applyRemote(changes);
-      local = mergeRemote(local, changes);
+  if (firstTime && !created) {
+    // Joining a household from this phone for the first time.
+    const householdHasRecords = TABLES.some((t) => pulled.rows[t].length > 0);
+    const recordsHere = live(local.matches).length + live(local.training).length;
+    let choice: 'merge' | 'replace' = 'merge';
+    if (householdHasRecords && recordsHere > 0) {
+      // This phone's season and the household's could be two different ones:
+      // asked, never assumed.
+      choice = await h.askJoin({ householdName: household.name, localMatches: live(local.matches).length });
+    } else if (householdHasRecords) {
+      // Nothing here but what setting the app up leaves behind - a team or two.
+      // Keeping it would only duplicate the household's.
+      choice = 'replace';
     }
+    if (choice === 'replace' && hasContent(local)) h.backup(local);
+
+    const lists: RemoteChanges = {};
+    for (const table of TABLES) (lists as Record<Table, unknown[]>)[table] = (changes[table] as unknown[] | undefined) ?? [];
+    const merged = choice === 'replace' ? null : mergeRemote(local, lists);
+    const joinedData: AppData = {
+      version: local.version,
+      // The household's player is the household's. A profile made while
+      // setting up this phone must not overwrite theirs - unless nobody has
+      // set the household's up yet, when this phone's is the one to keep.
+      profile: changes.profile && changes.profile.onboardedAt ? changes.profile : local.profile,
+      settings: changes.settings ?? local.settings,
+      matches: merged ? merged.matches : changes.matches ?? [],
+      training: merged ? merged.training : changes.training ?? [],
+      teams: merged ? merged.teams : changes.teams ?? [],
+      competitions: merged ? merged.competitions : changes.competitions ?? [],
+    };
+    h.replaceLocal(joinedData);
+    local = joinedData;
   } else {
     h.applyRemote(changes);
     local = mergeRemote(local, changes);

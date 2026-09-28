@@ -139,6 +139,7 @@ class Phone {
   state: SyncState | null = null;
   backedUp: AppData | null = null;
   asked = 0;
+  mayCreate = true;
 
   constructor(
     private server: MemoryServer,
@@ -175,6 +176,7 @@ class Phone {
       backup: (data) => {
         this.backedUp = data;
       },
+      mayCreate: () => this.mayCreate,
     });
   }
 
@@ -237,7 +239,7 @@ describe('the first phone to sign in', () => {
     const result = await brother.sync();
 
     expect(result.created).toBe(true);
-    expect(result.household.name).toBe("Arjun's family");
+    expect(result.household!.name).toBe("Arjun's family");
     expect(server.count('matches')).toBe(2);
     expect(server.count('training')).toBe(1);
     // The phone keeps everything it had.
@@ -275,9 +277,9 @@ describe('another phone', () => {
     const result = await mum.sync();
 
     expect(result.joined).toBe(true);
-    expect(result.household.id).toBe(brother.state!.householdId);
+    expect(result.household!.id).toBe(brother.state!.householdId);
     expect(mum.opponents()).toEqual(['Hillcrest Athletic', 'Riverside Rovers']);
-    expect(await mum.remote.sentInvites(result.household.id)).toEqual([]);
+    expect(await mum.remote.sentInvites(result.household!.id)).toEqual([]);
   });
 
   it('belonging to someone who was not invited gets a household of its own', async () => {
@@ -426,6 +428,66 @@ describe('a phone that already has matches, joining', () => {
   });
 });
 
+describe('a phone that has only just been set up, joining', () => {
+  function setUpPhone(): AppData {
+    // What finishing the setup screens leaves: a profile and a team, no matches.
+    const data = emptyData();
+    data.profile = { ...data.profile, name: 'Typed by mum', dateOfBirth: '1980-01-01', onboardedAt: '2026-09-28T09:00:00.000Z', updatedAt: '2026-09-28T09:00:00.000Z' };
+    data.teams = [{
+      id: 'team_mum', name: 'Oakwood Rangers', ageGroup: 'U16', position: 'GK', color: '#38bdf8', notes: '',
+      createdAt: '2026-09-28T09:00:00.000Z', updatedAt: '2026-09-28T09:00:00.000Z', deletedAt: null,
+    }];
+    return data;
+  }
+
+  it('keeps the household\'s player rather than the profile typed while setting up', async () => {
+    const server = new MemoryServer();
+    const brother = await brotherSignedIn(server);
+    await invite(brother, 'mum@example.com');
+
+    const mum = new Phone(server, 'u-mum', 'mum@example.com', setUpPhone());
+    await mum.sync();
+
+    expect(mum.data.profile.name).toBe('Arjun');
+    // ...and does not send the typed one back over his.
+    await brother.sync();
+    expect(brother.data.profile.name).toBe('Arjun');
+  });
+
+  it('is not asked about setup leftovers, and does not duplicate the team', async () => {
+    const server = new MemoryServer();
+    const brother = await brotherSignedIn(server);
+    await invite(brother, 'mum@example.com');
+
+    const mum = new Phone(server, 'u-mum', 'mum@example.com', setUpPhone());
+    await mum.sync();
+
+    expect(mum.asked).toBe(0);
+    expect(live(mum.data.teams)).toEqual([]);
+    expect(mum.opponents()).toEqual(['Hillcrest Athletic', 'Riverside Rovers']);
+    // Kept, in case the team mattered after all.
+    expect(mum.backedUp?.teams.map((t) => t.name)).toEqual(['Oakwood Rangers']);
+  });
+
+  it('keeps its own profile when the household\'s was never set up', async () => {
+    const server = new MemoryServer();
+    const brother = new Phone(server, 'u-brother', 'arjun@example.com'); // empty, never set up
+    await brother.sync();
+    await invite(brother, 'dad@example.com');
+
+    const dadData = setUpPhone();
+    dadData.profile = { ...dadData.profile, name: 'Arjun' };
+    dadData.matches = [match('Dad Sunday League')];
+    const dad = new Phone(server, 'u-dad', 'dad@example.com', dadData);
+    await dad.sync();
+
+    expect(dad.data.profile.name).toBe('Arjun');
+    await brother.sync();
+    expect(brother.data.profile.name).toBe('Arjun');
+    expect(brother.opponents()).toEqual(['Dad Sunday League']);
+  });
+});
+
 describe('when things go wrong', () => {
   it('a change that failed to send goes next time', async () => {
     const server = new MemoryServer();
@@ -465,5 +527,77 @@ describe('when things go wrong', () => {
     await mum.sync();
 
     expect(mum.state!.householdId).not.toBe(household);
+  });
+});
+
+describe('signing in on the first setup screen', () => {
+  it('waits for an invite rather than starting a household with nobody in it', async () => {
+    const server = new MemoryServer();
+    const mum = new Phone(server, 'u-mum', 'mum@example.com');
+    mum.mayCreate = false;
+
+    const early = await mum.sync();
+    expect(early.household).toBeNull();
+    expect(server.households.size).toBe(0);
+    expect(mum.state).toBeNull();
+
+    // The brother invites her; the next sync joins and brings his details.
+    const brother = await brotherSignedIn(server);
+    await invite(brother, 'mum@example.com');
+    const result = await mum.sync();
+
+    expect(result.joined).toBe(true);
+    expect(result.household!.id).toBe(brother.state!.householdId);
+    expect(mum.data.profile.name).toBe('Arjun');
+    expect(mum.data.profile.onboardedAt).toBeTruthy();
+    expect(mum.opponents()).toEqual(['Hillcrest Athletic', 'Riverside Rovers']);
+  });
+
+  it('starts a household once setting up is finished, named after the player', async () => {
+    const server = new MemoryServer();
+    const phone = new Phone(server, 'u-brother', 'arjun@example.com');
+    phone.mayCreate = false;
+    expect((await phone.sync()).household).toBeNull();
+
+    phone.act({ type: 'profile/update', patch: { name: 'Arjun', onboardedAt: '2026-09-28T10:00:00.000Z' } });
+    phone.mayCreate = true;
+    const result = await phone.sync();
+
+    expect(result.created).toBe(true);
+    expect(result.household!.name).toBe("Arjun's family");
+  });
+});
+
+describe('joining a second household', () => {
+  it('moves every phone of that person to it', async () => {
+    const server = new MemoryServer();
+    const brother = await brotherSignedIn(server);
+
+    // Mum signed in before anyone invited her, on her phone and her tablet,
+    // and so has a household of her own.
+    const phone = new Phone(server, 'u-mum', 'mum@example.com');
+    await phone.sync();
+    const tablet = new Phone(server, 'u-mum', 'mum@example.com');
+    await tablet.sync();
+    const own = phone.state!.householdId;
+    expect(tablet.state!.householdId).toBe(own);
+
+    // Then the invite comes, and she accepts it on her phone.
+    await invite(brother, 'mum@example.com');
+    const [waiting] = await phone.remote.invitesForMe();
+    await phone.remote.acceptInvite(waiting.id);
+    await phone.sync();
+    await tablet.sync();
+
+    for (const device of [phone, tablet]) {
+      expect(device.state!.householdId).toBe(brother.state!.householdId);
+      expect(device.opponents()).toEqual(['Hillcrest Athletic', 'Riverside Rovers']);
+      expect(device.data.profile.name).toBe('Arjun');
+      expect(device.asked).toBe(0);
+    }
+
+    // And they stay there.
+    await tablet.sync();
+    expect(tablet.state!.householdId).toBe(brother.state!.householdId);
   });
 });

@@ -36,6 +36,11 @@ jobs:
           # Set this repository variable to the AI proxy's URL (see worker/README.md).
           # Left empty, the app falls back to asking each player for their own key.
           VITE_AI_PROXY_URL: ${{ vars.AI_PROXY_URL }}
+          # The Supabase project behind signing in and family sharing (see
+          # supabase/README.md). The anon key is public by design. Left empty,
+          # the app has no accounts and keeps everything on the one phone.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
 
       # Static host with no server-side routing, so the 404 page serves the app.
       - run: cp dist/index.html dist/404.html
