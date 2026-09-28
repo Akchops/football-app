@@ -61,7 +61,7 @@ function migrateResult(raw: MatchResult | null): MatchResult | null {
 }
 
 /** Fill in fields added after a match was first saved. */
-function normaliseMatch(m: Match): Match {
+export function normaliseMatch(m: Match): Match {
   return {
     ...m,
     deletedAt: m.deletedAt ?? null,
@@ -93,15 +93,15 @@ interface LegacySettings {
  * were created. That means an untouched record loses to one that has actually
  * been edited since, which is the right way round.
  */
-function normaliseTeam(t: Team): Team {
+export function normaliseTeam(t: Team): Team {
   return { ...t, updatedAt: t.updatedAt ?? t.createdAt ?? '', deletedAt: t.deletedAt ?? null };
 }
 
-function normaliseCompetition(c: Competition): Competition {
+export function normaliseCompetition(c: Competition): Competition {
   return { ...c, updatedAt: c.updatedAt ?? c.createdAt ?? '', deletedAt: c.deletedAt ?? null };
 }
 
-function normaliseTraining(t: TrainingSession): TrainingSession {
+export function normaliseTraining(t: TrainingSession): TrainingSession {
   return { ...t, updatedAt: t.updatedAt ?? t.createdAt ?? '', deletedAt: t.deletedAt ?? null };
 }
 
