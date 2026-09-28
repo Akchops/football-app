@@ -407,6 +407,27 @@ as $$
   order by m.created_at;
 $$;
 
+-- Invites addressed to the caller, with the household's name and who sent
+-- them - which normal access rules would hide, since the caller is not a
+-- member yet. Knowing who is asking is the point of an invite.
+create or replace function public.my_invites()
+returns table (id uuid, household_id uuid, household_name text, invited_by_email text)
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select i.id, i.household_id, h.name, u.email::text
+  from public.household_invites i
+  join public.households h on h.id = i.household_id
+  left join auth.users u on u.id = i.invited_by
+  where lower(i.email) = lower(auth.jwt() ->> 'email')
+  order by i.created_at desc;
+$$;
+
+revoke all on function public.my_invites() from public;
+grant execute on function public.my_invites() to authenticated;
+
 revoke all on function public.create_household(text) from public;
 revoke all on function public.accept_invite(uuid) from public;
 revoke all on function public.household_people(uuid) from public;

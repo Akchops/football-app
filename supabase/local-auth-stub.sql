@@ -34,6 +34,6 @@ end $$;
 grant anon, authenticated to authenticator;
 
 grant usage on schema public, auth to anon, authenticated;
-grant select on auth.users to authenticated;
+-- No grant on auth.users: as in Supabase, signed-in users cannot read it.
 alter default privileges in schema public grant all on tables to authenticated;
 alter default privileges in schema public grant all on sequences to authenticated;

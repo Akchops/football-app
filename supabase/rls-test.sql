@@ -184,6 +184,12 @@ begin
   if n <> 1 then raise exception 'FAIL: B sees % invites, expected 1', n; end if;
   raise notice 'PASS: B can see the invite addressed to them';
 
+  -- ...and who it is from and which household, though not a member yet.
+  if not exists (select 1 from public.my_invites() where household_name = 'Family A' and invited_by_email = 'parent.a@example.com') then
+    raise exception 'FAIL: my_invites does not say who invited B, or to what';
+  end if;
+  raise notice 'PASS: an invite says who sent it and which household';
+
   select id into inv from public.household_invites limit 1;
   hid := public.accept_invite(inv);
 
