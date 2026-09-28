@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, emptyResult, type Match, type MatchResult, type Settings } from '../types';
+import { DEFAULT_SETTINGS, emptyResult, type Competition, type Match, type MatchResult, type Settings } from '../types';
 import {
-  computeStats, outcomeOf, pendingResultMatches, scoreline, shootoutWinner, statsByCompetition,
-  statsByMonth, statsByVenue, upcomingMatches,
+  computeStats, mainPositionGroup, outcomeOf, pendingResultMatches, placingLabel, scoreline, shootoutWinner,
+  statsByCompetition, statsByMonth, statsByTournament, statsByVenue, tournamentsReadyToFinish, upcomingMatches,
 } from './stats';
 
 let seq = 0;
@@ -44,6 +44,13 @@ function played(goalsFor: number, goalsAgainst: number, over: PlayedOver = {}): 
     opponent: opponent ?? 'Opponent',
     result: { ...emptyResult('CM'), goalsFor, goalsAgainst, ...resultOver },
   });
+}
+
+function comp(id: string, over: Partial<Competition> = {}): Competition {
+  return {
+    id, name: `Comp ${id}`, type: 'tournament', season: '25/26', ageGroup: '', color: '#fff', notes: '',
+    archived: false, placing: '', createdAt: '', updatedAt: '', deletedAt: null, ...over,
+  };
 }
 
 const settings: Settings = { ...DEFAULT_SETTINGS };
@@ -194,7 +201,7 @@ describe('breakdowns', () => {
   it('splits the record by competition, keeping uncategorised matches', () => {
     const rows = statsByCompetition(
       [played(1, 0, { competitionId: 'c1' }), played(0, 1, { competitionId: 'c1' }), played(2, 2)],
-      [{ id: 'c1', name: 'League', type: 'league', season: '25/26', color: '#fff', notes: '', archived: false, createdAt: '', updatedAt: '', deletedAt: null }],
+      [comp('c1', { name: 'League', type: 'league' })],
     );
     const league = rows.find((r) => r.competition?.id === 'c1');
     const none = rows.find((r) => r.competition === null);
@@ -220,5 +227,89 @@ describe('breakdowns', () => {
     expect(buckets).toHaveLength(6);
     expect(buckets[buckets.length - 1].played).toBe(1);
     expect(buckets.reduce((sum, b) => sum + b.played, 0)).toBe(1);
+  });
+});
+
+describe('tournaments', () => {
+  it('lists every tournament with a result, newest first, with its record and dates', () => {
+    const rows = statsByTournament(
+      [
+        played(2, 0, { competitionId: 'spring', date: '2026-03-14' }),
+        played(0, 1, { competitionId: 'spring', date: '2026-03-15' }),
+        played(3, 1, { competitionId: 'easter', date: '2026-04-05' }),
+        // A league is not a tournament, and a tournament nobody has played yet has no record.
+        played(1, 1, { competitionId: 'league', date: '2026-04-20' }),
+        match({ competitionId: 'summer', date: '2026-06-01' }),
+      ],
+      [comp('spring'), comp('easter'), comp('league', { type: 'league' }), comp('summer')],
+    );
+    expect(rows.map((r) => r.competition.id)).toEqual(['easter', 'spring']);
+    expect(rows[1]).toMatchObject({ played: 2, wins: 1, losses: 1, from: '2026-03-14', to: '2026-03-15' });
+  });
+
+  describe('ready to finish', () => {
+    const now = new Date(2026, 3, 12, 18, 0);
+
+    it('asks once every match has a result', () => {
+      const ready = tournamentsReadyToFinish(
+        [comp('t1')],
+        [played(1, 0, { competitionId: 't1', date: '2026-04-11' }), played(0, 0, { competitionId: 't1', date: '2026-04-11' })],
+        now,
+      );
+      expect(ready.map((c) => c.id)).toEqual(['t1']);
+    });
+
+    it('counts a round called off as done', () => {
+      const ready = tournamentsReadyToFinish(
+        [comp('t1')],
+        [played(1, 0, { competitionId: 't1', date: '2026-04-11' }), match({ competitionId: 't1', date: '2026-04-11', status: 'cancelled' })],
+        now,
+      );
+      expect(ready).toHaveLength(1);
+    });
+
+    it('waits while any match still needs a result', () => {
+      const ready = tournamentsReadyToFinish(
+        [comp('t1')],
+        [played(1, 0, { competitionId: 't1', date: '2026-04-11' }), match({ competitionId: 't1', date: '2026-04-11' })],
+        now,
+      );
+      expect(ready).toEqual([]);
+    });
+
+    it('leaves alone anything finished, not a tournament, never played, or long gone', () => {
+      const matches = [
+        played(1, 0, { competitionId: 'done', date: '2026-04-11' }),
+        played(1, 0, { competitionId: 'league', date: '2026-04-11' }),
+        match({ competitionId: 'off', date: '2026-04-11', status: 'cancelled' }),
+        played(1, 0, { competitionId: 'old', date: '2026-03-01' }),
+      ];
+      const competitions = [
+        comp('done', { archived: true }),
+        comp('league', { type: 'league' }),
+        comp('off'),
+        comp('old'),
+      ];
+      expect(tournamentsReadyToFinish(competitions, matches, now)).toEqual([]);
+    });
+  });
+
+  it('judges the player on the position they played most', () => {
+    const matches = [
+      played(1, 0, { positionGroup: 'goalkeeper' }),
+      played(1, 0, { positionGroup: 'goalkeeper' }),
+      played(1, 0, { positionGroup: 'defender' }),
+      // Sitting a match out says nothing about position.
+      played(1, 0, { positionGroup: 'forward', didPlay: false }),
+    ];
+    expect(mainPositionGroup(matches, 'midfielder')).toBe('goalkeeper');
+    expect(mainPositionGroup([], 'midfielder')).toBe('midfielder');
+  });
+
+  it('puts a medal on a podium finish only', () => {
+    expect(placingLabel('Winners')).toBe('🏆 Winners');
+    expect(placingLabel('Runners-up')).toBe('🥈 Runners-up');
+    expect(placingLabel('Group stage')).toBe('Group stage');
+    expect(placingLabel('')).toBe('');
   });
 });

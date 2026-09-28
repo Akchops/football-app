@@ -5,8 +5,8 @@ import { formatDateShort } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import {
-  computeStats, recentScores, recordSummary, scoreline, statsByCompetition, statsByMonth,
-  statsByOpponent, statsByTeam, statsByVenue,
+  computeStats, mainPositionGroup, placingLabel, recentScores, recordSummary, scoreline, statsByCompetition,
+  statsByMonth, statsByOpponent, statsByTeam, statsByTournament, statsByVenue,
 } from '../lib/stats';
 import { milestones, personalBests } from '../lib/records';
 import { TRAINING_TYPE_LABEL } from '../types';
@@ -14,7 +14,15 @@ import { Avatar } from './Avatar';
 import { MissionBoard } from './MissionBoard';
 import { EmptyState, Section, StatTile } from './ui';
 
-export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: () => void }) {
+export function StatsScreen({
+  now,
+  onGoToMatches,
+  onOpenCompetition,
+}: {
+  now: Date;
+  onGoToMatches: () => void;
+  onOpenCompetition: (id: string) => void;
+}) {
   const { matches, competitions, teams, profile, training } = useStore();
   const [competitionId, setCompetitionId] = useState<string>('all');
   const [teamId, setTeamId] = useState<string>('all');
@@ -29,6 +37,7 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
 
   const stats = useMemo(() => computeStats(scoped), [scoped]);
   const byComp = useMemo(() => statsByCompetition(matches, competitions), [matches, competitions]);
+  const byTournament = useMemo(() => statsByTournament(matches, competitions), [matches, competitions]);
   const byTeam = useMemo(() => statsByTeam(matches, teams), [matches, teams]);
   const byMonth = useMemo(() => statsByMonth(scoped, 6, now), [scoped, now]);
   const byVenue = useMemo(() => statsByVenue(scoped), [scoped]);
@@ -45,23 +54,15 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
   }, [training, now]);
 
   // Judge the player by the position they actually played most in this selection.
-  const group: PositionGroup = useMemo(() => {
-    const counts = new Map<PositionGroup, number>();
-    for (const m of scoped) {
-      if (m.result?.didPlay) counts.set(m.result.positionGroup, (counts.get(m.result.positionGroup) ?? 0) + 1);
-    }
-    let best: PositionGroup = profile.positionGroup;
-    let bestCount = 0;
-    for (const [g, count] of counts) {
-      if (count > bestCount) {
-        best = g;
-        bestCount = count;
-      }
-    }
-    return best;
-  }, [scoped, profile.positionGroup]);
+  const group: PositionGroup = useMemo(
+    () => mainPositionGroup(scoped, profile.positionGroup),
+    [scoped, profile.positionGroup],
+  );
 
   const bests = useMemo(() => personalBests(scoped, group), [scoped, group]);
+  // Tournaments pile up over the years, so anything not from this one says which.
+  const dayLabel = (iso: string) =>
+    iso.startsWith(String(now.getFullYear())) ? formatDateShort(iso) : `${formatDateShort(iso)} ${iso.slice(0, 4)}`;
   const goals = useMemo(() => milestones(scoped, group), [scoped, group]);
 
   if (stats.played === 0) {
@@ -272,6 +273,36 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
                 <span className="table-value best-value">{best.value}</span>
                 <span className="table-sub">{best.detail}</span>
               </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {byTournament.length > 0 && competitionId === 'all' && (
+        <Section title="Tournaments">
+          <div className="table">
+            {byTournament.map((row) => (
+              <button
+                key={row.competition.id}
+                type="button"
+                className="table-row table-link"
+                onClick={() => onOpenCompetition(row.competition.id)}
+              >
+                <span className="table-name">
+                  <span className="swatch" style={{ background: row.competition.color }} />
+                  {row.competition.name}
+                </span>
+                <span className="table-value">{recordSummary(row)}</span>
+                <span className="table-sub">
+                  {[
+                    row.competition.archived ? placingLabel(row.competition.placing) || 'Finished' : 'In progress',
+                    row.competition.ageGroup,
+                    row.from === row.to ? dayLabel(row.to) : `${dayLabel(row.from)} – ${dayLabel(row.to)}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </button>
             ))}
           </div>
         </Section>

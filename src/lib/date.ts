@@ -1,5 +1,7 @@
 /** Date helpers. Everything is handled in the device's local timezone. */
 
+import { AGE_GROUPS, type Profile } from '../types';
+
 export const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -160,4 +162,43 @@ export function suggestAgeGroup(dob: string, now: Date = new Date()): string {
   if (age < 23) return 'U23';
   if (age >= 35) return 'Veterans';
   return 'Open age';
+}
+
+/**
+ * The age group a player moves into when a new season starts, or null when it
+ * stays the same. Youth bands are a year wide, so it's simply the next one up -
+ * which keeps anyone playing a year up or down exactly where they were. From
+ * U18 the bands span several years, so the date of birth decides.
+ */
+export function nextSeasonAgeGroup(current: string, dob: string, now: Date = new Date()): string | null {
+  if (!current) return null;
+  const youth = /^U(\d+)$/.exec(current);
+  if (youth && Number(youth[1]) < 18) return `U${Number(youth[1]) + 1}`;
+  const byBirthday = suggestAgeGroup(dob, now);
+  return byBirthday && AGE_GROUPS.indexOf(byBirthday) > AGE_GROUPS.indexOf(current) ? byBirthday : null;
+}
+
+/** The new-season question: move up from `from` to `to`? */
+export interface AgeGroupCheck {
+  season: string;
+  from: string;
+  to: string;
+}
+
+/**
+ * The age group never moves by itself - the player might be playing up, or
+ * staying down - so once each new season the app asks. Null when there is
+ * nothing to ask: no group set, already answered this season, or no band above.
+ */
+export function ageGroupCheck(
+  profile: Pick<Profile, 'ageGroup' | 'ageGroupSeason' | 'dateOfBirth' | 'onboardedAt'>,
+  now: Date = new Date(),
+): AgeGroupCheck | null {
+  if (!profile.onboardedAt || !profile.ageGroup) return null;
+  const season = seasonLabel(now);
+  // Labels lead with the starting year, so they sort as text. A later season
+  // counts as answered too, so a phone with its clock wrong doesn't nag.
+  if (profile.ageGroupSeason >= season) return null;
+  const to = nextSeasonAgeGroup(profile.ageGroup, profile.dateOfBirth, now);
+  return to ? { season, from: profile.ageGroup, to } : null;
 }

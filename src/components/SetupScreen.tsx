@@ -5,8 +5,8 @@ import {
   type Competition, type PositionGroup, type Team,
 } from '../types';
 import { MATCH_LENGTHS, REMINDER_LEADS, TRAINING_LENGTHS } from '../types';
-import { currentAge, suggestAgeGroup } from '../lib/date';
-import { computeStats } from '../lib/stats';
+import { currentAge, seasonLabel, suggestAgeGroup } from '../lib/date';
+import { computeStats, placingLabel } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
 import { AccountSection } from './AccountSettings';
 import { AiSection } from './AiSettings';
@@ -120,7 +120,12 @@ export function SetupScreen({
                 : undefined
             }
           >
-            <select className="input" value={profile.ageGroup} onChange={(e) => updateProfile({ ageGroup: e.target.value })}>
+            <select
+              className="input"
+              value={profile.ageGroup}
+              // Picking it by hand answers this season's move-up question too.
+              onChange={(e) => updateProfile({ ageGroup: e.target.value, ageGroupSeason: seasonLabel() })}
+            >
               <option value="">Not set</option>
               {AGE_GROUPS.map((g) => (
                 <option key={g} value={g}>
@@ -236,8 +241,10 @@ export function SetupScreen({
                     <span className="comp-name">{c.name}</span>
                     <span className="comp-meta">
                       {COMPETITION_TYPE_LABEL[c.type]}
+                      {c.ageGroup ? ` · ${c.ageGroup}` : ''}
                       {c.season ? ` · ${c.season}` : ''} · {matchCount(c)} match{matchCount(c) === 1 ? '' : 'es'}
                       {compStats.played > 0 && ` · ${compStats.wins}W ${compStats.draws}D ${compStats.losses}L`}
+                      {c.archived && ` · ${placingLabel(c.placing) || 'Finished'}`}
                     </span>
                   </button>
                   <button className="icon-btn" onClick={() => removeCompetition(c)} aria-label={`Delete ${c.name}`}>

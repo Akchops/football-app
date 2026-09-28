@@ -8,7 +8,13 @@ export interface Competition {
   color: string;
   /** Optional free text, e.g. "U16 South Division" */
   notes: string;
+  /** Age group played in this competition, e.g. "U14", or '' when not set. Kept as
+      it was on the day, so it stays right after the player's own group moves up. */
+  ageGroup: string;
+  /** Finished: it's over, and no longer offered when adding fixtures. */
   archived: boolean;
+  /** How far the team got, e.g. "Winners" - '' until it's finished and said. */
+  placing: string;
   createdAt: string;
   /** Bumped on every edit; when two devices disagree, the newest one wins. */
   updatedAt: string;
@@ -226,6 +232,9 @@ export interface Profile {
   dateOfBirth: string;
   /** Age group they currently play in, e.g. 'U16'. */
   ageGroup: string;
+  /** Season the age group was last picked or confirmed for, e.g. '2026/27'. When a
+      new season starts the app asks, once, whether to move up. */
+  ageGroupSeason: string;
   position: string;
   positionGroup: PositionGroup;
   /** null until the setup screen has been completed. */
@@ -269,6 +278,9 @@ export const COMPETITION_TYPE_LABEL: Record<CompetitionType, string> = {
   friendly: 'Friendly',
   other: 'Other',
 };
+
+/** Quick picks for how far a competition went. Anything else can be typed. */
+export const PLACINGS = ['Winners', 'Runners-up', 'Third place', 'Semi-finals', 'Quarter-finals', 'Group stage'];
 
 export const VENUE_LABEL: Record<Venue, string> = {
   home: 'Home',
@@ -329,6 +341,7 @@ export const DEFAULT_PROFILE: Profile = {
   photo: '',
   dateOfBirth: '',
   ageGroup: '',
+  ageGroupSeason: '',
   position: 'GK',
   positionGroup: 'goalkeeper',
   onboardedAt: null,

@@ -779,6 +779,8 @@ select.input { background-image: none; }
 .detail-list > div:last-child { border-bottom: 0; }
 .detail-list dt { color: var(--muted); font-size: 13px; }
 .detail-list dd { margin: 0; font-weight: 600; font-size: 14px; text-align: right; }
+/* A value that opens something keeps the row the same height as the rest. */
+.detail-list .link-btn { padding: 0; text-align: right; }
 
 .your-game { display: flex; flex-direction: column; gap: 8px; }
 .your-game h3, .notes-block h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -1604,3 +1606,46 @@ select.input { background-image: none; }
    this yet" looked identical to "press me". */
 button:disabled { opacity: 0.45; }
 button:disabled:active { transform: none; }
+
+/* ---------- nudges ---------- */
+/* Something worth doing now - a new season's age group, a tournament that looks
+   over. Gold rather than green so it doesn't read as a result. */
+.nudge {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid rgba(245, 196, 81, 0.35);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.nudge.nudge-row { flex-direction: row; align-items: center; }
+.nudge-icon { font-size: 24px; line-height: 1; flex: none; }
+.nudge-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.nudge-text strong { font-size: 15px; }
+.nudge-text span { font-size: 13px; color: var(--muted); }
+.nudge-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- competition sheet ---------- */
+.placing-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(245, 196, 81, 0.1);
+  border: 1px solid rgba(245, 196, 81, 0.35);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.placing-hero strong { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--gold); }
+.placing-hero span { font-size: 13px; color: var(--muted); }
+
+/* A table row that opens something: the same look, with a button's behaviour. */
+.table-row.table-link {
+  width: 100%;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: left;
+}
+.table-row.table-link:last-child { border-bottom: 0; }
+.table-row.table-link:active { background: var(--surface-2); }

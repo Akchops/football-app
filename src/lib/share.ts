@@ -132,7 +132,8 @@ export async function renderShareCard({ match, team, competition, profile }: Sha
   ctx.fillStyle = MUTED;
   ctx.font = '500 28px -apple-system, "Segoe UI", Roboto, sans-serif';
   ctx.fillText(
-    [result.position, team?.name, profile.ageGroup].filter(Boolean).join(' · '),
+    // A tournament played up (or down) a year says so, rather than the usual group.
+    [result.position, team?.name, competition?.ageGroup || profile.ageGroup].filter(Boolean).join(' · '),
     textLeft,
     y + 68,
   );

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { COMPETITION_COLORS, MATCH_LENGTHS } from '../types';
+import { AGE_GROUPS, COMPETITION_COLORS, MATCH_LENGTHS } from '../types';
 import { seasonLabel, todayISO } from '../lib/date';
 import { DurationPicker, Field, Sheet } from './ui';
 
@@ -17,11 +17,13 @@ const START_TIMES = ['09:30', '11:00', '12:30'];
  * competition and all of its fixtures in one go rather than one at a time.
  */
 export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { addTournament, teams, competitions, settings } = useStore();
+  const { addTournament, teams, competitions, settings, profile } = useStore();
 
   const [name, setName] = useState('');
   const [date, setDate] = useState(todayISO());
   const [teamId, setTeamId] = useState('');
+  const [ageGroup, setAgeGroup] = useState('');
+  const [touchedAgeGroup, setTouchedAgeGroup] = useState(false);
   const [location, setLocation] = useState('');
   const [color, setColor] = useState(COMPETITION_COLORS[3]);
   const [multiDay, setMultiDay] = useState(false);
@@ -29,12 +31,19 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
   const [fixtures, setFixtures] = useState<FixtureDraft[]>([]);
   const [error, setError] = useState('');
 
+  // A tournament can be played in a different age group to usual - up a year, say -
+  // so it starts from the team's and can be changed for this one alone.
+  const ageGroupFor = (id: string) => teams.find((t) => t.id === id)?.ageGroup || profile.ageGroup;
+
   useEffect(() => {
     if (!open) return;
     const today = todayISO();
+    const initialTeam = teams.length === 1 ? teams[0].id : '';
     setName('');
     setDate(today);
-    setTeamId(teams.length === 1 ? teams[0].id : '');
+    setTeamId(initialTeam);
+    setAgeGroup(ageGroupFor(initialTeam));
+    setTouchedAgeGroup(false);
     setLocation('');
     setColor(COMPETITION_COLORS[(competitions.length + 3) % COMPETITION_COLORS.length]);
     setMultiDay(false);
@@ -42,7 +51,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     setDurationMinutes(Math.min(settings.defaultMatchLength, 40));
     setFixtures(START_TIMES.map((time) => ({ opponent: '', time, date: today })));
     setError('');
-  }, [open, teams, competitions.length, settings.defaultMatchLength]);
+  }, [open, teams, competitions.length, settings.defaultMatchLength, profile.ageGroup]);
 
   if (!open) return null;
 
@@ -73,6 +82,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
       name: name.trim(),
       type: 'tournament',
       season: seasonLabel(),
+      ageGroup,
       color,
       notes: '',
       teamId: teamId || null,
@@ -123,7 +133,14 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
           />
         </Field>
         <Field label="Playing for">
-          <select className="input" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+          <select
+            className="input"
+            value={teamId}
+            onChange={(e) => {
+              setTeamId(e.target.value);
+              if (!touchedAgeGroup) setAgeGroup(ageGroupFor(e.target.value));
+            }}
+          >
             <option value="">No team set</option>
             {teams.map((t) => (
               <option key={t.id} value={t.id}>
@@ -133,6 +150,24 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
           </select>
         </Field>
       </div>
+
+      <Field label="Age group" hint="Playing up or down at this one? Change it here — just for this tournament.">
+        <select
+          className="input"
+          value={ageGroup}
+          onChange={(e) => {
+            setAgeGroup(e.target.value);
+            setTouchedAgeGroup(true);
+          }}
+        >
+          <option value="">Not set</option>
+          {AGE_GROUPS.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <Field label="Venue" hint="Optional — applied to every match">
         <input

@@ -58,8 +58,9 @@ export function MatchFormSheet({
       setOpponent('');
       setDate(target.dateISO ?? todayISO());
       setTime(settings.defaultKickoff);
-      // Default to the only competition when there is just one - one less tap.
-      setCompetitionId(competitions.length === 1 ? competitions[0].id : '');
+      // Default to the only competition still running when there is just one - one less tap.
+      const running = competitions.filter((c) => !c.archived);
+      setCompetitionId(running.length === 1 ? running[0].id : '');
       setTeamId(teams.length >= 1 ? teams[0].id : '');
       setVenue('home');
       // A team that plays shorter games keeps its length as the starting point.
@@ -163,12 +164,15 @@ export function MatchFormSheet({
       >
         <select className="input" value={competitionId} onChange={(e) => setCompetitionId(e.target.value)}>
           <option value="">No competition</option>
-          {competitions.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-              {c.season ? ` (${c.season})` : ''}
-            </option>
-          ))}
+          {/* A finished one isn't taking new fixtures, but a match already in it keeps it. */}
+          {competitions
+            .filter((c) => !c.archived || c.id === editing?.competitionId)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.season ? ` (${c.season})` : ''}
+              </option>
+            ))}
         </select>
       </Field>
 

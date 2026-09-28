@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { METRIC_BY_ID, VENUE_LABEL, type Match, type MetricId } from '../types';
+import { METRIC_BY_ID, VENUE_LABEL, type Competition, type Match, type MetricId } from '../types';
 import { formatDateLong, formatTime, kickoffAt, relativeDayLabel } from '../lib/date';
 import { outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
@@ -15,6 +15,7 @@ export function MatchDetailSheet({
   onClose,
   onEdit,
   onEnterResult,
+  onOpenCompetition,
   onSeeAllMedia,
 }: {
   match: Match | null;
@@ -22,6 +23,8 @@ export function MatchDetailSheet({
   onClose: () => void;
   onEdit: (match: Match) => void;
   onEnterResult: (match: Match) => void;
+  /** Opens the whole tournament (or league, or cup) this match is part of. */
+  onOpenCompetition?: (competition: Competition) => void;
   onSeeAllMedia?: () => void;
 }) {
   const { competitionOf, teamOf, deleteMatch, cancelMatch, restoreMatch, profile, settings } = useStore();
@@ -185,7 +188,17 @@ export function MatchDetailSheet({
         </div>
         <div>
           <dt>Competition</dt>
-          <dd>{competition ? `${competition.name}${competition.season ? ` · ${competition.season}` : ''}` : 'None'}</dd>
+          <dd>
+            {!competition ? (
+              'None'
+            ) : onOpenCompetition ? (
+              <button className="link-btn" onClick={() => onOpenCompetition(competition)}>
+                {[competition.name, competition.ageGroup, competition.season].filter(Boolean).join(' · ')} ›
+              </button>
+            ) : (
+              [competition.name, competition.ageGroup, competition.season].filter(Boolean).join(' · ')
+            )}
+          </dd>
         </div>
         <div>
           <dt>Status</dt>

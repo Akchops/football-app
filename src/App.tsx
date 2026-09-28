@@ -13,6 +13,7 @@ import { MatchDetailSheet } from './components/MatchDetailSheet';
 import { ResultSheet } from './components/ResultSheet';
 import { ResultPrompt } from './components/ResultPrompt';
 import { CompetitionFormSheet, type CompetitionFormTarget } from './components/CompetitionFormSheet';
+import { CompetitionSheet, type CompetitionView } from './components/CompetitionSheet';
 import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
 import { TournamentSheet } from './components/TournamentSheet';
 import { ImportFixturesSheet } from './components/ImportFixturesSheet';
@@ -37,7 +38,7 @@ const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
 ];
 
 function Shell() {
-  const { matches, settings, profile, training } = useStore();
+  const { matches, settings, profile, training, competitions } = useStore();
   const now = useNow();
 
   const [tab, setTab] = useState<Tab>('calendar');
@@ -45,6 +46,7 @@ function Shell() {
   const [detailMatch, setDetailMatch] = useState<Match | null>(null);
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [competitionForm, setCompetitionForm] = useState<CompetitionFormTarget | null>(null);
+  const [competitionView, setCompetitionView] = useState<CompetitionView | null>(null);
   const [teamForm, setTeamForm] = useState<TeamFormTarget | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -73,10 +75,19 @@ function Shell() {
 
   const openResult = (match: Match) => {
     setDetailMatch(null);
+    setCompetitionView(null);
     setResultMatch(match);
   };
 
-  const showPrompt = !promptHidden && pending.length > 0 && !resultMatch && !matchForm;
+  const openCompetition = (id: string, step: CompetitionView['step'] = 'summary') => {
+    setDetailMatch(null);
+    setCompetitionView({ id, step });
+  };
+
+  // A competition deleted elsewhere can't leave an invisible sheet holding the prompt back.
+  const viewing = competitionView && competitions.some((c) => c.id === competitionView.id) ? competitionView : null;
+
+  const showPrompt = !promptHidden && pending.length > 0 && !resultMatch && !matchForm && !viewing;
 
   // First run: collect the player's details before showing the app proper.
   if (!profile.onboardedAt) return <OnboardingScreen />;
@@ -122,6 +133,8 @@ function Shell() {
               if (session) setTrainingForm({ mode: 'edit', session });
             }}
             onEnterResult={openResult}
+            onOpenCompetition={openCompetition}
+            onOpenSetup={() => setTab('setup')}
           />
         )}
         {tab === 'matches' && (
@@ -138,7 +151,9 @@ function Shell() {
             <AIScreen onOpenSetup={() => setTab('setup')} />
           </Suspense>
         )}
-        {tab === 'stats' && <StatsScreen now={now} onGoToMatches={() => setTab('matches')} />}
+        {tab === 'stats' && (
+          <StatsScreen now={now} onGoToMatches={() => setTab('matches')} onOpenCompetition={(id) => openCompetition(id)} />
+        )}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
       </main>
 
@@ -181,10 +196,22 @@ function Shell() {
           setMatchForm({ mode: 'edit', match: m });
         }}
         onEnterResult={openResult}
+        onOpenCompetition={(c) => openCompetition(c.id)}
         onSeeAllMedia={() => {
           setDetailMatch(null);
           setTab('media');
         }}
+      />
+
+      <CompetitionSheet
+        view={viewing}
+        now={now}
+        onClose={() => setCompetitionView(null)}
+        onOpenMatch={(m) => {
+          setCompetitionView(null);
+          setDetailMatch(m);
+        }}
+        onEnterResult={openResult}
       />
 
       <ResultSheet

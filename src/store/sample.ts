@@ -26,17 +26,24 @@ export function buildSampleData(now: Date = new Date()): AppData {
   };
 
   const league: Competition = {
-    id: createId('comp'), name: 'Sunday League', type: 'league', season,
-    color: COMPETITION_COLORS[0], notes: 'Division 2', archived: false, createdAt: stamp, updatedAt: stamp, deletedAt: null,
+    id: createId('comp'), name: 'Sunday League', type: 'league', season, ageGroup: 'U16',
+    color: COMPETITION_COLORS[0], notes: 'Division 2', archived: false, placing: '', createdAt: stamp, updatedAt: stamp,
+    deletedAt: null,
   };
   const cup: Competition = {
-    id: createId('comp'), name: 'County Cup', type: 'cup', season,
-    color: COMPETITION_COLORS[2], notes: '', archived: false, createdAt: stamp, updatedAt: stamp, deletedAt: null,
+    id: createId('comp'), name: 'County Cup', type: 'cup', season, ageGroup: 'U16',
+    color: COMPETITION_COLORS[2], notes: '', archived: false, placing: '', createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const tournament: Competition = {
-    id: createId('comp'), name: 'Easter 7s', type: 'tournament', season,
-    color: COMPETITION_COLORS[3], notes: 'Group stage + knockouts, all in one day', archived: false, createdAt: stamp,
-    updatedAt: stamp, deletedAt: null,
+    id: createId('comp'), name: 'Easter 7s', type: 'tournament', season, ageGroup: 'U16',
+    color: COMPETITION_COLORS[3], notes: 'Group stage + knockouts, all in one day', archived: false, placing: '',
+    createdAt: stamp, updatedAt: stamp, deletedAt: null,
+  };
+  // Already finished - played a year up - so the demo shows a tournament kept with its stats.
+  const springSevens: Competition = {
+    id: createId('comp'), name: 'Spring 7s', type: 'tournament', season, ageGroup: 'U17',
+    color: COMPETITION_COLORS[5], notes: 'Played up a year', archived: true, placing: 'Runners-up',
+    createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
 
   const result = (over: Partial<MatchResult>): MatchResult => ({
@@ -51,7 +58,20 @@ export function buildSampleData(now: Date = new Date()): AppData {
     remindAfter: null, createdAt: stamp, updatedAt: stamp, deletedAt: null, ...over,
   });
 
+  const spring = (over: Partial<Match>): Match =>
+    make({ date: iso(-35), venue: 'neutral', competitionId: springSevens.id, location: 'Riverside Park',
+      durationMinutes: 30, status: 'played', ...over });
+
   const matches: Match[] = [
+    spring({ opponent: 'Group B: Oakfield', time: '10:00',
+      result: result({ goalsFor: 2, goalsAgainst: 0, minutes: 30, rating: 8,
+        metrics: { saves: 4, conceded: 0, claims: 2 } }) }),
+    spring({ opponent: 'Semi-final: Hillcrest', time: '12:30',
+      result: result({ goalsFor: 1, goalsAgainst: 1, penaltiesFor: 3, penaltiesAgainst: 2, minutes: 30, rating: 9,
+        motm: true, metrics: { saves: 5, conceded: 1, penaltiesSaved: 2 } }) }),
+    spring({ opponent: 'Final: Vale FC', time: '15:00',
+      result: result({ goalsFor: 0, goalsAgainst: 1, minutes: 30, rating: 7,
+        metrics: { saves: 6, conceded: 1, claims: 1 } }) }),
     make({ opponent: 'Riverside FC', date: iso(-28), time: '14:00', venue: 'away', status: 'played',
       result: result({ goalsFor: 2, goalsAgainst: 1, rating: 8, motm: true,
         metrics: { saves: 5, conceded: 1, claims: 3 } }) }),
@@ -94,12 +114,13 @@ export function buildSampleData(now: Date = new Date()): AppData {
       photo: '',
       dateOfBirth: `${birthYear}-04-12`,
       ageGroup: 'U16',
+      ageGroupSeason: season,
       position: 'GK',
       positionGroup: 'goalkeeper',
       onboardedAt: stamp,
     },
     teams: [club, sundaySide],
-    competitions: [league, cup, tournament],
+    competitions: [league, cup, tournament, springSevens],
     matches,
   };
 }

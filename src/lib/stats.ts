@@ -1,5 +1,5 @@
-import type { Competition, Match, MatchResult, MetricTotals, Settings, Team, Venue } from '../types';
-import { MONTH_NAMES, fromISODate, kickoffAt, toISODate } from './date';
+import type { Competition, Match, MatchResult, MetricTotals, PositionGroup, Settings, Team, Venue } from '../types';
+import { MONTH_NAMES, daysBetween, fromISODate, kickoffAt, toISODate } from './date';
 import { addMetrics } from './metrics';
 import { matchScore } from './score';
 
@@ -117,6 +117,13 @@ function addToRecord(rec: Record_, result: MatchResult): void {
 
 export function recordSummary(rec: Record_): string {
   return `${rec.wins}W ${rec.draws}D ${rec.losses}L`;
+}
+
+const MEDALS: Record<string, string> = { Winners: '🏆', 'Runners-up': '🥈', 'Third place': '🥉' };
+
+/** "🏆 Winners" for a podium finish, just the words for anything else. */
+export function placingLabel(placing: string): string {
+  return MEDALS[placing] ? `${MEDALS[placing]} ${placing}` : placing;
 }
 
 export function computeStats(matches: Match[]): Stats {
@@ -253,6 +260,66 @@ export function statsByCompetition(matches: Match[], competitions: Competition[]
   const out = [...byId.values()];
   for (const entry of out) entry.points = entry.wins * 3 + entry.draws;
   return out.sort((a, b) => b.played - a.played);
+}
+
+export interface TournamentBreakdown extends Record_ {
+  competition: Competition;
+  /** First and last dates it was played on, 'YYYY-MM-DD'. */
+  from: string;
+  to: string;
+}
+
+/** Every tournament with a result in it, most recent first. */
+export function statsByTournament(matches: Match[], competitions: Competition[]): TournamentBreakdown[] {
+  const out: TournamentBreakdown[] = [];
+  for (const competition of competitions) {
+    if (competition.type !== 'tournament') continue;
+    const played = playedMatches(matches.filter((m) => m.competitionId === competition.id)); // newest first
+    if (played.length === 0) continue;
+    const rec = emptyRecord();
+    for (const match of played) addToRecord(rec, match.result);
+    out.push({ competition, ...rec, from: played[played.length - 1].date, to: played[0].date });
+  }
+  return out.sort((a, b) => (a.to < b.to ? 1 : a.to > b.to ? -1 : 0));
+}
+
+/** How long after its last match a tournament that looks over keeps asking to be finished. */
+const FINISH_PROMPT_DAYS = 14;
+
+/**
+ * Tournaments that look over but haven't been finished: every match has a
+ * result or was called off, and the last one was within the past fortnight -
+ * so one from last year doesn't suddenly start asking.
+ */
+export function tournamentsReadyToFinish(competitions: Competition[], matches: Match[], now: Date = new Date()): Competition[] {
+  const today = toISODate(now);
+  return competitions.filter((competition) => {
+    if (competition.type !== 'tournament' || competition.archived) return false;
+    const own = matches.filter((m) => m.competitionId === competition.id);
+    if (!own.some(isPlayed) || own.some((m) => m.status === 'scheduled')) return false;
+    const last = own.reduce((latest, m) => (m.date > latest ? m.date : latest), '');
+    return daysBetween(last, today) <= FINISH_PROMPT_DAYS;
+  });
+}
+
+/**
+ * The position group played most in these matches - the stats the player is
+ * judged on. A keeper who went outfield once is still judged as a keeper.
+ */
+export function mainPositionGroup(matches: Match[], fallback: PositionGroup): PositionGroup {
+  const counts = new Map<PositionGroup, number>();
+  for (const m of matches) {
+    if (m.result?.didPlay) counts.set(m.result.positionGroup, (counts.get(m.result.positionGroup) ?? 0) + 1);
+  }
+  let best = fallback;
+  let bestCount = 0;
+  for (const [group, count] of counts) {
+    if (count > bestCount) {
+      best = group;
+      bestCount = count;
+    }
+  }
+  return best;
 }
 
 export interface VenueBreakdown extends Record_ {

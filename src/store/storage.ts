@@ -1,8 +1,9 @@
 import {
   DEFAULT_MATCH_LENGTH, DEFAULT_PROFILE, DEFAULT_SETTINGS, TEAM_COLORS, groupForPosition,
-  type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Team,
+  type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Profile, type Team,
   type TrainingSession,
 } from '../types';
+import { seasonLabel } from '../lib/date';
 
 export const STORAGE_KEY = 'matchday.data.v1';
 export const DATA_VERSION = 5;
@@ -98,7 +99,24 @@ function normaliseTeam(t: Team): Team {
 }
 
 function normaliseCompetition(c: Competition): Competition {
-  return { ...c, updatedAt: c.updatedAt ?? c.createdAt ?? '', deletedAt: c.deletedAt ?? null };
+  return {
+    ...c,
+    ageGroup: c.ageGroup ?? '',
+    archived: c.archived ?? false,
+    placing: c.placing ?? '',
+    updatedAt: c.updatedAt ?? c.createdAt ?? '',
+    deletedAt: c.deletedAt ?? null,
+  };
+}
+
+/**
+ * Profiles from before the new-season question count their age group as picked
+ * when they were set up. One set up last season is asked straight away; one set
+ * up this season isn't asked until the next.
+ */
+function settledSeason(onboardedAt: string | null): string {
+  const at = onboardedAt ? new Date(onboardedAt) : null;
+  return at && !Number.isNaN(at.getTime()) ? seasonLabel(at) : '';
 }
 
 function normaliseTraining(t: TrainingSession): TrainingSession {
@@ -145,8 +163,12 @@ export function parseData(raw: string | null): AppData {
       matches = matches.map((m) => (m.teamId ? m : { ...m, teamId: team.id }));
     }
 
-    const profile = parsed.profile
-      ? { ...base.profile, ...parsed.profile }
+    const profile: Profile = parsed.profile
+      ? {
+          ...base.profile,
+          ...parsed.profile,
+          ageGroupSeason: parsed.profile.ageGroupSeason ?? settledSeason(parsed.profile.onboardedAt ?? null),
+        }
       : {
           ...base.profile,
           name: legacySettings.playerName ?? '',
