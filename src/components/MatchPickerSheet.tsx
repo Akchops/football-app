@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { fixtureContext } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import { formatDateShort, formatTime, kickoffAt } from '../lib/date';
@@ -46,8 +47,8 @@ export function MatchPickerSheet({
     if (!q) return ordered;
     return ordered.filter((m) => {
       const team = teamOf(m)?.name ?? '';
-      const competition = competitionOf(m)?.name ?? '';
-      return [m.opponent, team, competition, m.date].join(' ').toLowerCase().includes(q);
+      const context = fixtureContext(competitionOf(m), m);
+      return [m.opponent, team, context, m.date].join(' ').toLowerCase().includes(q);
     });
   }, [ordered, query, teamOf, competitionOf]);
 
@@ -69,7 +70,7 @@ export function MatchPickerSheet({
           <span className="picker-meta">
             {formatDateShort(match.date)} · {formatTime(match.time)}
             {teams.length > 1 && team ? ` · ${team.name}` : ''}
-            {competition ? ` · ${competition.name}` : ''}
+            {fixtureContext(competition, match) ? ` · ${fixtureContext(competition, match)}` : ''}
           </span>
         </span>
         {match.result && (

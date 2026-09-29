@@ -370,6 +370,23 @@ async function checkWorker() {
     report('worker', label, correct, workerDetail(result, `read ${list.length}/${EXPECT_FIXTURES}`));
   }
 
+  // A tournament order of play: three Group B games, two semi-finals and a
+  // final. Every game has to come back, each with its stage.
+  const tournament = await callWorker('/fixtures', {
+    prompt: fixturesPrompt,
+    media: [{ mimeType: 'image/jpeg', data: sample('schedule-tournament.jpg') }],
+  });
+  const games = Array.isArray(tournament.body.result?.fixtures) ? tournament.body.result.fixtures : [];
+  const stages = games.map((game) => `${game.stage ?? '?'}${game.stageDetail ? `:${game.stageDetail}` : ''}`);
+  const count = (stage) => games.filter((game) => game.stage === stage).length;
+  const groupB = games.filter((game) => game.stage === 'group' && /\bB\b/i.test(String(game.stageDetail ?? ''))).length;
+  report(
+    'worker',
+    'Import tournament stages (/fixtures)',
+    tournament.status === 200 && games.length === 6 && groupB === 3 && count('semi') === 2 && count('final') === 1,
+    workerDetail(tournament, `read ${games.length}/6 · ${stages.join(', ')}`),
+  );
+
   if (IMPORT_ONLY) return;
 
   const clipPrompt = (shown) => [player, '', 'Which player they are: the goalkeeper in yellow', '', shown].join('\n');

@@ -255,6 +255,37 @@ export function statsByCompetition(matches: Match[], competitions: Competition[]
   return out.sort((a, b) => b.played - a.played);
 }
 
+export interface StageBreakdown extends Record_ {
+  stage: 'group' | 'knockout';
+  cleanSheets: number;
+  shootoutsWon: number;
+  shootoutsLost: number;
+}
+
+/**
+ * Group games against knockout games. Only matches that were given a stage
+ * count - a league game is neither. A shootout counts as the draw it was, as
+ * everywhere else, with who won it kept alongside.
+ */
+export function statsByStage(matches: Match[]): StageBreakdown[] {
+  const row = (stage: StageBreakdown['stage']): StageBreakdown => ({
+    ...emptyRecord(), stage, cleanSheets: 0, shootoutsWon: 0, shootoutsLost: 0,
+  });
+  const group = row('group');
+  const knockout = row('knockout');
+
+  for (const match of playedMatches(matches)) {
+    if (!match.stage) continue;
+    const entry = match.stage === 'group' ? group : knockout;
+    addToRecord(entry, match.result);
+    if (match.result.goalsAgainst === 0) entry.cleanSheets += 1;
+    const shootout = shootoutWinner(match.result);
+    if (shootout === 'us') entry.shootoutsWon += 1;
+    if (shootout === 'them') entry.shootoutsLost += 1;
+  }
+  return [group, knockout].filter((entry) => entry.played > 0);
+}
+
 export interface VenueBreakdown extends Record_ {
   venue: Venue;
 }
@@ -324,7 +355,10 @@ export interface OpponentBreakdown extends Record_ {
 export function statsByOpponent(matches: Match[], limit = 5): OpponentBreakdown[] {
   const byName = new Map<string, OpponentBreakdown>();
   for (const match of playedMatches(matches)) {
-    const name = match.opponent.trim() || 'Unknown';
+    const name = match.opponent.trim();
+    // Knockout games are set up before anyone knows who is in them; a result
+    // logged before the opponent was filled in says nothing about "TBC".
+    if (name === '' || name.toLowerCase() === 'tbc') continue;
     let entry = byName.get(name.toLowerCase());
     if (!entry) {
       entry = { opponent: name, ...emptyRecord() };

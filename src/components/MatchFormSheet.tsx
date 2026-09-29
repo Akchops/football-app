@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { MATCH_LENGTHS, type Match, type Venue } from '../types';
+import { MATCH_LENGTHS, type Match, type MatchStage, type Venue } from '../types';
 import { todayISO } from '../lib/date';
+import { STAGES, STAGE_LABEL, detailPrompt, toStage } from '../lib/stage';
 import { DurationPicker, Field, Segmented, Sheet } from './ui';
 
 export interface MatchFormTarget {
@@ -38,6 +39,8 @@ export function MatchFormSheet({
   const [durationMinutes, setDurationMinutes] = useState(settings.defaultMatchLength);
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [stage, setStage] = useState<MatchStage | null>(null);
+  const [stageDetail, setStageDetail] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -54,6 +57,8 @@ export function MatchFormSheet({
       setDurationMinutes(m.durationMinutes);
       setLocation(m.location);
       setNotes(m.notes);
+      setStage(m.stage);
+      setStageDetail(m.stageDetail);
     } else {
       setOpponent('');
       setDate(target.dateISO ?? todayISO());
@@ -66,10 +71,17 @@ export function MatchFormSheet({
       setDurationMinutes(settings.defaultMatchLength);
       setLocation('');
       setNotes('');
+      setStage(null);
+      setStageDetail('');
     }
   }, [target, settings.defaultKickoff, competitions, teams]);
 
   if (!target) return null;
+
+  // Stages belong to cups and tournaments; a league game never asks. A match
+  // that already has one keeps the field, so it can be changed or cleared.
+  const competition = competitions.find((c) => c.id === competitionId) ?? null;
+  const showStage = stage !== null || competition?.type === 'cup' || competition?.type === 'tournament';
 
   const submit = () => {
     if (!opponent.trim()) {
@@ -90,6 +102,8 @@ export function MatchFormSheet({
       durationMinutes,
       location: location.trim(),
       notes: notes.trim(),
+      stage,
+      stageDetail: stage ? stageDetail.trim() : '',
     };
     if (editing) {
       updateMatch(editing.id, payload);
@@ -171,6 +185,35 @@ export function MatchFormSheet({
           ))}
         </select>
       </Field>
+
+      {showStage && (
+        <div className="row two">
+          <Field label="Stage">
+            <select
+              className="input"
+              value={stage ?? ''}
+              onChange={(e) => setStage(toStage(e.target.value))}
+            >
+              <option value="">None</option>
+              {STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {STAGE_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {stage && (
+            <Field label={detailPrompt(stage).label} hint="Optional">
+              <input
+                className="input"
+                value={stageDetail}
+                onChange={(e) => setStageDetail(e.target.value)}
+                placeholder={detailPrompt(stage).placeholder}
+              />
+            </Field>
+          )}
+        </div>
+      )}
 
       <Field
         label="Match length"

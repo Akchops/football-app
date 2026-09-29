@@ -3,9 +3,10 @@ import {
   type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Team,
   type TrainingSession,
 } from '../types';
+import { toStage } from '../lib/stage';
 
 export const STORAGE_KEY = 'matchday.data.v1';
-export const DATA_VERSION = 5;
+export const DATA_VERSION = 6;
 
 export function emptyData(): AppData {
   return {
@@ -74,6 +75,9 @@ export function normaliseMatch(m: Match): Match {
     result: migrateResult(m.result ?? null),
     remindAfter: m.remindAfter ?? null,
     status: m.status ?? 'scheduled',
+    // v5 and earlier had no stages: every match was just a match.
+    stage: toStage(m.stage),
+    stageDetail: typeof m.stageDetail === 'string' ? m.stageDetail : '',
   };
 }
 

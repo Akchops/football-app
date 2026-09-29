@@ -4,7 +4,8 @@ import { todayISO } from '../lib/date';
 import { describeError, lastModelUsed, readFixtures, scheduleProblem } from '../lib/ai';
 import { buildRows, importable, matchCompetition, toMatchInput, type ReviewRow } from '../lib/fixtures';
 import { Field, Sheet } from './ui';
-import type { Venue } from '../types';
+import type { MatchStage, Venue } from '../types';
+import { STAGES, STAGE_LABEL, stageName } from '../lib/stage';
 
 type Stage = 'idle' | 'reading' | 'review';
 
@@ -262,7 +263,14 @@ export function ImportFixturesSheet({
                           {row.date}
                           {row.time ? ` · ${row.time}` : ''}
                         </span>
-                        <span className="import-who">{row.opponent || '—'}</span>
+                        <span className="import-who">
+                          {row.opponent || (row.stage ? 'TBC' : '—')}
+                          {row.stage && (
+                            <span className={row.stage === 'final' ? 'meta-chip stage final' : 'meta-chip stage'}>
+                              {stageName(row.stage, row.stageDetail)}
+                            </span>
+                          )}
+                        </span>
                         <span className="import-venue">{VENUE_LABEL[row.venue]}</span>
                       </label>
 
@@ -306,6 +314,24 @@ export function ImportFixturesSheet({
                               value={row.opponent}
                               onChange={(e) => patch(row.key, { opponent: e.target.value })}
                             />
+                          </Field>
+                          <Field label="Stage">
+                            <select
+                              value={row.stage ?? ''}
+                              onChange={(e) =>
+                                patch(row.key, {
+                                  stage: (e.target.value || null) as MatchStage | null,
+                                  stageDetail: e.target.value ? row.stageDetail : '',
+                                })
+                              }
+                            >
+                              <option value="">None</option>
+                              {STAGES.map((stage) => (
+                                <option key={stage} value={stage}>
+                                  {STAGE_LABEL[stage]}
+                                </option>
+                              ))}
+                            </select>
                           </Field>
                           <Field label="Venue">
                             <div className="chips">

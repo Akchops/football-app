@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 import type {
-  AppData, Competition, Match, MatchResult, Profile, Settings, Team, TrainingSession,
+  AppData, Competition, Match, MatchResult, MatchStage, Profile, Settings, Team, TrainingSession,
 } from '../types';
 import { createId, emptyData, live, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
@@ -135,6 +135,9 @@ export interface NewMatchInput {
   venue: Match['venue'];
   location: string;
   notes: string;
+  /** Left out for anything that is not a group game or knockout round. */
+  stage?: MatchStage | null;
+  stageDetail?: string;
 }
 
 export interface NewCompetitionInput {
@@ -169,6 +172,8 @@ export interface TournamentFixture {
   opponent: string;
   date: string;
   time: string;
+  stage?: MatchStage | null;
+  stageDetail?: string;
 }
 
 export interface NewTournamentInput extends NewCompetitionInput {
@@ -177,6 +182,57 @@ export interface NewTournamentInput extends NewCompetitionInput {
   /** Tournament games are usually short - applied to every fixture. */
   durationMinutes: number;
   fixtures: TournamentFixture[];
+}
+
+/** A new fixture, not yet played. A stage's detail only means something with a stage. */
+export function buildMatch(input: NewMatchInput, at: string): Match {
+  return {
+    id: createId('match'),
+    ...input,
+    stage: input.stage ?? null,
+    stageDetail: input.stage ? (input.stageDetail ?? '').trim() : '',
+    status: 'scheduled',
+    result: null,
+    remindAfter: null,
+    createdAt: at,
+    updatedAt: at,
+    deletedAt: null,
+  };
+}
+
+/** The tournament and every fixture in it, each with the stage it was set up as. */
+export function buildTournament(input: NewTournamentInput, at: string): { competition: Competition; matches: Match[] } {
+  const { fixtures, teamId, location, durationMinutes, ...competitionInput } = input;
+  const competition: Competition = {
+    id: createId('comp'),
+    ...competitionInput,
+    type: 'tournament',
+    archived: false,
+    createdAt: at,
+    updatedAt: at,
+    deletedAt: null,
+  };
+  const matches = fixtures
+    .filter((f) => f.date)
+    .map((fixture) =>
+      buildMatch(
+        {
+          competitionId: competition.id,
+          teamId,
+          opponent: fixture.opponent.trim() || 'TBC',
+          date: fixture.date,
+          time: fixture.time || '00:00',
+          venue: 'neutral',
+          location,
+          durationMinutes,
+          notes: '',
+          stage: fixture.stage,
+          stageDetail: fixture.stageDetail,
+        },
+        at,
+      ),
+    );
+  return { competition, matches };
 }
 
 interface StoreValue {
@@ -254,16 +310,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       training,
 
       addMatch(input) {
-        const match: Match = {
-          id: createId('match'),
-          ...input,
-          status: 'scheduled',
-          result: null,
-          remindAfter: null,
-          createdAt: now(),
-          updatedAt: now(),
-          deletedAt: null,
-        };
+        const match = buildMatch(input, now());
         dispatch({ type: 'match/add', match });
         return match;
       },
@@ -319,38 +366,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       },
 
       addTournament(input) {
-        const { fixtures, teamId, location, durationMinutes: _duration, ...competitionInput } = input;
-        const competition: Competition = {
-          id: createId('comp'),
-          ...competitionInput,
-          type: 'tournament',
-          archived: false,
-          createdAt: now(),
-          updatedAt: now(),
-          deletedAt: null,
-        };
+        const { competition, matches: created } = buildTournament(input, now());
         dispatch({ type: 'competition/add', competition });
-
-        const created = fixtures
-          .filter((f) => f.date)
-          .map<Match>((fixture) => ({
-            id: createId('match'),
-            competitionId: competition.id,
-            teamId,
-            opponent: fixture.opponent.trim() || 'TBC',
-            date: fixture.date,
-            time: fixture.time || '00:00',
-            venue: 'neutral',
-            location,
-            durationMinutes: input.durationMinutes,
-            status: 'scheduled',
-            result: null,
-            notes: '',
-            remindAfter: null,
-            createdAt: now(),
-            updatedAt: now(),
-            deletedAt: null,
-          }));
         if (created.length) dispatch({ type: 'match/addMany', matches: created });
         return competition;
       },

@@ -200,7 +200,7 @@ function match(opponent: string, over: Partial<Match> = {}): Match {
   return {
     id: `match_${seq}`, competitionId: null, teamId: null, opponent, date: '2026-10-03', time: '10:30',
     venue: 'home', location: '', durationMinutes: 70, status: 'scheduled', result: null, notes: '',
-    remindAfter: null, createdAt: at, updatedAt: at, deletedAt: null, ...over,
+    remindAfter: null, stage: null, stageDetail: '', createdAt: at, updatedAt: at, deletedAt: null, ...over,
   };
 }
 

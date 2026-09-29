@@ -138,6 +138,13 @@ export type MetricTotals = Partial<Record<MetricId, number>>;
 export type MatchStatus = 'scheduled' | 'played' | 'cancelled';
 export type Venue = 'home' | 'away' | 'neutral';
 
+/**
+ * Where a match sits in a cup or tournament: a group game, or one of the
+ * knockout rounds that follow. 'round' is a numbered early cup round (Round 2).
+ * Labels and ordering live in lib/stage.ts.
+ */
+export type MatchStage = 'group' | 'round' | 'last16' | 'quarter' | 'semi' | 'third' | 'final';
+
 /** How the match finished, once a result has been entered. */
 export interface MatchResult {
   goalsFor: number;
@@ -176,6 +183,10 @@ export interface Match {
   durationMinutes: number;
   status: MatchStatus;
   result: MatchResult | null;
+  /** Group game, semi-final... Null for anything outside a stage, like a league game. */
+  stage: MatchStage | null;
+  /** The group ("B"), the round number ("2") or the bracket ("Plate"). Usually empty. */
+  stageDetail: string;
   notes: string;
   /** Set when the user says "not now" to the result prompt; ISO timestamp to stop asking until. */
   remindAfter: string | null;

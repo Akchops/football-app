@@ -1,6 +1,7 @@
 import {
   METRIC_BY_ID, type Competition, type Match, type MatchResult, type MetricId, type Profile, type Team,
 } from '../types';
+import { fixtureContext } from './stage';
 import { formatDateLong } from './date';
 import { matchScore, scoreBand, scoreVerdict } from './score';
 import { outcomeOf, scoreline } from './stats';
@@ -142,9 +143,10 @@ export async function renderShareCard({ match, team, competition, profile }: Sha
   ctx.fillStyle = MUTED;
   ctx.font = '600 30px -apple-system, "Segoe UI", Roboto, sans-serif';
   ctx.fillText(formatDateLong(match.date).toUpperCase(), pad, y);
-  if (competition) {
-    ctx.fillStyle = competition.color;
-    ctx.fillText(competition.name.toUpperCase(), pad, y + 44);
+  const context = fixtureContext(competition, match);
+  if (context) {
+    ctx.fillStyle = competition?.color ?? MUTED;
+    ctx.fillText(context.toUpperCase(), pad, y + 44);
   }
 
   y = 400;

@@ -1,4 +1,5 @@
 import { useStore } from '../store/AppStore';
+import { fixtureContext } from '../lib/stage';
 import type { Match } from '../types';
 import { formatDateShort, formatTime, relativeDayLabel } from '../lib/date';
 import { Sheet } from './ui';
@@ -69,8 +70,7 @@ export function ResultPrompt({
                   {m.venue === 'away' ? '@' : 'vs'} {m.opponent || 'TBC'}
                 </div>
                 <div className="prompt-meta">
-                  {formatDateShort(m.date)} · {formatTime(m.time)}
-                  {competition ? ` · ${competition.name}` : ''}
+                  {[formatDateShort(m.date), formatTime(m.time), fixtureContext(competition, m)].filter(Boolean).join(' · ')}
                 </div>
               </div>
               <div className="prompt-actions">

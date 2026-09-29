@@ -329,6 +329,8 @@ p { margin: 0; }
   text-overflow: ellipsis;
 }
 .meta-chip.subtle { color: var(--muted); background: transparent; padding: 2px 0; }
+.meta-chip.stage { color: var(--text); border: 1px solid var(--line); background: transparent; }
+.meta-chip.stage.final { color: #fbbf24; border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.1); }
 
 .match-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
 .countdown { font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -1126,11 +1128,23 @@ select.input { background-image: none; }
 /* ---------- tournament fixtures ---------- */
 .fixtures { display: flex; flex-direction: column; gap: 8px; }
 .fixtures h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.fixture-row { display: grid; grid-template-columns: 104px 1fr auto; gap: 6px; align-items: center; }
-.fixture-row.three { grid-template-columns: 96px 1fr auto; grid-auto-flow: row; }
-.fixture-row.three .input:nth-child(2) { grid-column: 2 / 3; }
-.fixture-row.three .input:nth-child(3) { grid-column: 1 / 3; }
-.fixture-row .input { padding: 9px 10px; }
+.fixture-row {
+  display: grid;
+  grid-template-columns: 74px 96px minmax(0, 1fr) auto;
+  grid-template-areas: "stage time opp remove";
+  gap: 6px;
+  align-items: center;
+}
+.fixture-row.three { grid-template-areas: "stage time date remove" "opp opp opp opp"; }
+.fixture-row .input { padding: 9px 10px; min-width: 0; }
+.fixture-row .f-stage { grid-area: stage; padding-right: 4px; }
+.fixture-row .f-time { grid-area: time; }
+.fixture-row .f-date { grid-area: date; }
+.fixture-row .f-opp { grid-area: opp; }
+.fixture-row .f-remove { grid-area: remove; }
+
+.tournament-format { display: flex; flex-direction: column; gap: 10px; }
+.tournament-format h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 
 .duration-picker { display: flex; flex-direction: column; gap: 8px; }
 .duration-custom { display: flex; align-items: center; gap: 8px; }
@@ -1554,6 +1568,7 @@ select.input { background-image: none; }
 .import-row-head input[type='checkbox'] { width: 22px; height: 22px; margin: 11px 0; flex: none; accent-color: var(--accent); }
 .import-when { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .import-who { flex: 1; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-who .meta-chip { margin-left: 6px; vertical-align: 1px; }
 .import-venue {
   flex: none;
   width: 22px;

@@ -11,7 +11,7 @@ const match: Match = {
   id: 'm1', competitionId: null, teamId: 't1', opponent: 'Riverside FC',
   date: '2026-04-12', time: '16:30', venue: 'away', location: 'Central Fields, Pitch 3',
   durationMinutes: 80, status: 'scheduled', result: null, notes: 'Meet at 3pm',
-  remindAfter: null, createdAt: '', updatedAt: '', deletedAt: null,
+  remindAfter: null, stage: null, stageDetail: '', createdAt: '', updatedAt: '', deletedAt: null,
 };
 
 describe('matchToICS', () => {
@@ -45,6 +45,17 @@ describe('matchToICS', () => {
 
   it('escapes commas in the location so the file stays valid', () => {
     expect(ics).toContain('LOCATION:Central Fields\\, Pitch 3');
+  });
+
+  it('says which stage a knockout game is, in the title and the description', () => {
+    const semi = { ...match, venue: 'neutral' as const, opponent: 'TBC', stage: 'semi' as const, stageDetail: 'Plate' };
+    const comp = {
+      id: 'c1', name: 'Easter 7s', type: 'tournament' as const, season: '', color: '#f59e0b', notes: '',
+      archived: false, createdAt: '', updatedAt: '', deletedAt: null,
+    };
+    const out = matchToICS(semi, team, comp, 60);
+    expect(out).toContain('SUMMARY:Wanderers FC vs TBC · Plate semi-final');
+    expect(out).toContain('DESCRIPTION:Easter 7s · Plate semi-final');
   });
 
   it('works for a played match too', () => {

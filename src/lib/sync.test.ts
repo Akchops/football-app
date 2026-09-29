@@ -11,7 +11,7 @@ function match(id: string, over: Partial<Match> = {}): Match {
   return {
     id, competitionId: null, teamId: null, opponent: 'Riverside FC', date: '2026-04-10',
     time: '16:30', venue: 'home', location: '', durationMinutes: 90, status: 'scheduled',
-    result: null, notes: '', remindAfter: null,
+    result: null, notes: '', remindAfter: null, stage: null, stageDetail: '',
     createdAt: T1, updatedAt: T1, deletedAt: null, ...over,
   };
 }

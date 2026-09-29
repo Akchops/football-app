@@ -77,6 +77,27 @@ describe('worker', () => {
     expect(seen).toEqual(['gemini-2.5-flash']);
   });
 
+  it('asks for the stage of every fixture and hands it back as read', async () => {
+    let sent: Record<string, unknown> = {};
+    google((_model, body) => {
+      sent = body as Record<string, unknown>;
+      return answerWith({
+        summary: 'Easter 7s order of play',
+        fixtures: [{ date: '2026-04-04', time: '14:00', opponent: 'TBC', stage: 'semi', stageDetail: 'Plate' }],
+      });
+    });
+    const response = await worker.fetch(post('/fixtures', schedule), makeEnv());
+    const body = (await response.json()) as { result: { fixtures: Record<string, unknown>[] } };
+
+    expect(response.status).toBe(200);
+    const row = (sent.generationConfig as { responseJsonSchema: { properties: { fixtures: { items: { required: string[]; properties: { stage: { enum: string[] } } } } } } })
+      .responseJsonSchema.properties.fixtures.items;
+    expect(row.required).toEqual(expect.arrayContaining(['stage', 'stageDetail']));
+    expect(row.properties.stage.enum).toEqual(['none', 'group', 'round', 'last16', 'quarter', 'semi', 'third', 'final']);
+    expect(JSON.stringify(sent.systemInstruction)).toContain('knockout');
+    expect(body.result.fixtures[0]).toMatchObject({ stage: 'semi', stageDetail: 'Plate' });
+  });
+
   it('reads a schedule on the lite model', async () => {
     const seen = google(() => answerWith({ fixtures: [] }));
     const response = await worker.fetch(post('/fixtures', schedule), makeEnv());

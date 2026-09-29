@@ -23,6 +23,8 @@ function match(date: string, over: MatchOver = {}): Match {
     status: 'played',
     notes: '',
     remindAfter: null,
+    stage: null,
+    stageDetail: '',
     createdAt: '',
     updatedAt: '',
     deletedAt: null,

@@ -4,6 +4,7 @@ import { VENUE_LABEL } from '../types';
 import { countdown, formatDateShort, formatTime, kickoffAt } from '../lib/date';
 import { outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { matchScore, scoreBand } from '../lib/score';
+import { stageName } from '../lib/stage';
 
 export function ResultBadge({ match }: { match: Match }) {
   if (match.status === 'cancelled') return <span className="badge cancelled">Called off</span>;
@@ -55,6 +56,11 @@ export function MatchCard({
             {teams.length > 1 && team && (
               <span className="meta-chip" style={{ color: team.color }}>
                 {team.name}
+              </span>
+            )}
+            {match.stage && (
+              <span className={match.stage === 'final' ? 'meta-chip stage final' : 'meta-chip stage'}>
+                {stageName(match.stage, match.stageDetail)}
               </span>
             )}
             {competition && <span className="meta-chip">{competition.name}</span>}

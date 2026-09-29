@@ -1,4 +1,5 @@
-import type { Match, Venue } from '../types';
+import type { Match, MatchStage, Venue } from '../types';
+import { isKnockout, toStage } from './stage';
 
 /** One fixture as read off a schedule image or PDF, before anyone has checked it. */
 export interface ParsedFixture {
@@ -14,6 +15,13 @@ export interface ParsedFixture {
   /** Only when the sheet actually says, e.g. "2 x 30 mins". Never guessed. */
   durationMinutes: number | null;
   confidence: 'high' | 'medium' | 'low';
+  /**
+   * Group game or knockout round as the reader saw it: a MatchStage, or 'none'.
+   * Missing from replies made before stages existed, so never trusted as is.
+   */
+  stage?: string | null;
+  /** The group, round number or bracket as printed ("A", "2", "Plate"). */
+  stageDetail?: string;
 }
 
 export interface FixtureRead {
@@ -42,8 +50,17 @@ export const FIXTURES_SCHEMA = {
           location: { type: 'string', description: 'Ground or pitch if given, or empty string' },
           durationMinutes: { type: 'integer', description: 'Total minutes only if the sheet states it. 0 when it does not - never guess' },
           confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'How clearly this row could be read' },
+          stage: {
+            type: 'string',
+            enum: ['none', 'group', 'round', 'last16', 'quarter', 'semi', 'third', 'final'],
+            description: 'Which stage of a cup or tournament this game is, when the sheet says: group (Group A, Grp B, Pool 1), round (a numbered early cup round, Round 2, R3), last16, quarter (QF), semi (SF), third (3rd/4th place play-off) or final. none for league games and whenever the sheet does not say',
+          },
+          stageDetail: {
+            type: 'string',
+            description: 'The group letter or number ("A"), the round number ("2"), or the bracket ("Cup", "Plate", "Shield") as printed, or empty string',
+          },
         },
-        required: ['date', 'time', 'opponent', 'venue', 'competition', 'location', 'durationMinutes', 'confidence'],
+        required: ['date', 'time', 'opponent', 'venue', 'competition', 'location', 'durationMinutes', 'confidence', 'stage', 'stageDetail'],
         additionalProperties: false,
       },
     },
@@ -61,6 +78,8 @@ export const FIXTURES_SYSTEM = [
   'H and A, or (H) and (A), mean home and away. So do "vs" for home and "@" or "at" for away. Neutral only when the sheet says so.',
   'The opponent is the other team, never the player\'s own. If the row reads "Riverside FC v Oakwood United" and the sheet belongs to Riverside, the opponent is Oakwood United.',
   'Only set durationMinutes when the sheet states a length. Otherwise return 0.',
+  'Tournament and cup sheets usually say which stage each game is: group games ("Group A", "Grp B", "Pool 1") and knockout rounds ("QF", "Semi Final", "3rd/4th play-off", "Final"). Put that in stage, and the group, round number or bracket name ("Cup", "Plate") in stageDetail. Use none when the sheet does not say.',
+  'A knockout game whose opponent is not known yet is still a fixture - keep it. Use the pairing as printed for the opponent (e.g. "Winner Group A v Runner-up Group B"), or "TBC" when there is none.',
   'If the image is not a fixture list at all, say so in the summary and return no fixtures.',
 ].join(' ');
 
@@ -76,7 +95,9 @@ export function fixturesPrompt(today: string, teamNames: string[]): string {
 }
 
 /** A parsed fixture once it has been checked against the calendar already there. */
-export interface ReviewRow extends ParsedFixture {
+export interface ReviewRow extends Omit<ParsedFixture, 'stage' | 'stageDetail'> {
+  stage: MatchStage | null;
+  stageDetail: string;
   key: string;
   include: boolean;
   /** Id of the match this appears to duplicate, if any. */
@@ -108,7 +129,8 @@ function daysBetween(from: string, to: string): number {
 export function problemWith(fixture: ParsedFixture, today: string): string {
   if (!isRealDate(fixture.date)) return 'The date could not be read';
   if (fixture.time !== '' && !TIME_PATTERN.test(fixture.time)) return 'The kickoff time could not be read';
-  if (fixture.opponent.trim() === '') return 'No opponent on this row';
+  // A knockout game is on the sheet before anyone knows who is in it.
+  if (fixture.opponent.trim() === '' && !isKnockout(toStage(fixture.stage))) return 'No opponent on this row';
   const away = daysBetween(today, fixture.date);
   if (away < -370) return 'That date is over a year ago';
   if (away > 730) return 'That date is more than two years away';
@@ -129,12 +151,22 @@ export function normaliseOpponent(name: string): string {
     .trim();
 }
 
-/** Same day, same opponent - almost certainly the fixture already in the calendar. */
+/**
+ * Same day, same opponent - almost certainly the fixture already in the
+ * calendar. Unless both have a stage and they differ: a semi-final and a final
+ * against "TBC" on one tournament day are two games, not one.
+ */
 export function findDuplicate(fixture: ParsedFixture, matches: Match[]): Match | null {
-  const opponent = normaliseOpponent(fixture.opponent);
+  const opponent = normaliseOpponent(fixture.opponent || 'TBC');
   if (opponent === '') return null;
+  const stage = toStage(fixture.stage);
   return (
-    matches.find((match) => match.date === fixture.date && normaliseOpponent(match.opponent) === opponent) ?? null
+    matches.find(
+      (match) =>
+        match.date === fixture.date &&
+        normaliseOpponent(match.opponent) === opponent &&
+        (stage === null || match.stage === null || match.stage === stage),
+    ) ?? null
   );
 }
 
@@ -148,8 +180,11 @@ export function buildRows(fixtures: ParsedFixture[], matches: Match[], today: st
   return fixtures.map((fixture, index) => {
     const problem = problemWith(fixture, today);
     const duplicate = problem === '' ? findDuplicate(fixture, matches) : null;
+    const stage = toStage(fixture.stage);
     return {
       ...fixture,
+      stage,
+      stageDetail: stage && typeof fixture.stageDetail === 'string' ? fixture.stageDetail.trim() : '',
       key: `row-${index}`,
       problem,
       duplicateOf: duplicate?.id ?? null,
@@ -190,12 +225,14 @@ export function toMatchInput(
   return {
     competitionId: options.competitionId,
     teamId: options.teamId,
-    opponent: row.opponent.trim(),
+    opponent: row.opponent.trim() || 'TBC',
     date: row.date,
     time: row.time || options.defaultTime,
     venue: row.venue,
     location: row.location.trim(),
     durationMinutes: row.durationMinutes && row.durationMinutes > 0 ? row.durationMinutes : options.defaultLength,
     notes: '',
+    stage: row.stage,
+    stageDetail: row.stageDetail,
   };
 }

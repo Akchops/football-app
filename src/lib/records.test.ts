@@ -31,6 +31,8 @@ function played(over: PlayedOver = {}): Match {
     status: 'played',
     notes: '',
     remindAfter: null,
+    stage: null,
+    stageDetail: '',
     createdAt: '',
     updatedAt: '',
     deletedAt: null,
