@@ -91,7 +91,7 @@ const FIXTURES_SYSTEM =
   'H and A, or (H) and (A), mean home and away. So do "vs" for home and "@" or "at" for away. Neutral only when the sheet says so. ' +
   'The opponent is the other team, never the player\'s own. If the row reads "Riverside FC v Oakwood United" and the sheet belongs to Riverside, the opponent is Oakwood United. ' +
   'Only set durationMinutes when the sheet states a length. Otherwise return 0. ' +
-  'Tournament and cup sheets usually say which stage each game is: group games ("Group A", "Grp B", "Pool 1") and knockout rounds ("QF", "Semi Final", "3rd/4th play-off", "Final"). Put that in stage, and the group, round number or bracket name ("Cup", "Plate") in stageDetail. Use none when the sheet does not say. ' +
+  'Tournament and cup sheets usually say which stage each game is: group games ("Group A", "Grp B", "Pool 1") and knockout rounds ("QF", "Semi Final", "3rd/4th play-off", "Final"). Put that in stage, and only the group, round number or bracket name ("Cup", "Plate") in stageDetail - never the round itself, so a plain "Semi-final 1" or "FINAL" has an empty stageDetail. Use none when the sheet does not say. ' +
   'A knockout game whose opponent is not known yet is still a fixture - keep it. Use the pairing as printed for the opponent (e.g. "Winner Group A v Runner-up Group B"), or "TBC" when there is none. ' +
   'If the image is not a fixture list at all, say so in the summary and return no fixtures.';
 
@@ -120,7 +120,7 @@ const FIXTURES_SCHEMA = {
           },
           stageDetail: {
             type: 'string',
-            description: 'The group letter or number ("A"), the round number ("2"), or the bracket ("Cup", "Plate", "Shield") as printed, or empty string',
+            description: 'Only the group letter or number ("A"), the round number ("2"), or the bracket name ("Cup", "Plate", "Shield"). Empty for a plain knockout round - never the round itself ("Semi-final 1", "Final")',
           },
         },
         required: ['date', 'time', 'opponent', 'venue', 'competition', 'location', 'durationMinutes', 'confidence', 'stage', 'stageDetail'],

@@ -42,10 +42,37 @@ export function toStage(raw: unknown): MatchStage | null {
   return typeof raw === 'string' && (STAGES as string[]).includes(raw) ? (raw as MatchStage) : null;
 }
 
+/** Words that name a knockout round rather than a bracket. */
+const ROUND_WORDS =
+  /\b(semi[\s-]*finals?|semis?|quarter[\s-]*finals?|quarters?|finals?|(?:qf|sf)\d*|3rd|4th|third|fourth|place|play[\s-]*offs?|last[\s-]*(?:16|sixteen)|round[\s-]*of[\s-]*(?:16|sixteen)|r16|knock[\s-]*outs?|match|game|tie)\b/gi;
+
+/**
+ * The bracket in a knockout round's detail - "Plate" from "Plate SF" - or
+ * empty when the detail only names the round again: a sheet's "Semi-final 1"
+ * or "FINAL" says nothing the stage does not.
+ */
+export function bracketOf(detail: string): string {
+  const rest = detail.replace(ROUND_WORDS, ' ').replace(/[^A-Za-z0-9]+/g, ' ').trim();
+  if (/^\d*$/.test(rest)) return '';
+  // "PLATE" off a printed sheet reads as "Plate".
+  return rest
+    .split(' ')
+    .map((word) => (word.length > 1 && word === word.toUpperCase() ? word[0] + word.slice(1).toLowerCase() : word))
+    .join(' ');
+}
+
+/** A detail as it is worth keeping: for a knockout round, only its bracket. */
+export function cleanDetail(stage: MatchStage | null, detail: string): string {
+  if (!stage) return '';
+  const text = detail.trim();
+  return stage === 'group' || stage === 'round' ? text : bracketOf(text);
+}
+
 /**
  * What to call it: "Group B", "Round 2", "Plate semi-final", "Final". Empty
  * when there is no stage. The detail is typed by people and read off sheets,
- * so "Group B" and "B" both come out as "Group B".
+ * so "Group B" and "B" both come out as "Group B", and "Semi-final 1" as
+ * "Semi-final".
  */
 export function stageName(stage: MatchStage | null | undefined, detail = ''): string {
   if (!stage) return '';
@@ -56,10 +83,13 @@ export function stageName(stage: MatchStage | null | undefined, detail = ''): st
     return extra ? `Group ${extra}` : STAGE_LABEL.group;
   }
   if (stage === 'round') {
-    extra = extra.replace(/^(round|rd|r)\.?\s*/i, '');
+    const number = /\d+/.exec(extra)?.[0];
+    if (number) return `Round ${number}`;
+    if (/\bround\b/i.test(extra)) return extra.charAt(0).toUpperCase() + extra.slice(1);
     return extra ? `Round ${extra}` : STAGE_LABEL.round;
   }
-  return extra ? `${extra} ${STAGE_LABEL[stage].toLowerCase()}` : STAGE_LABEL[stage];
+  const bracket = bracketOf(extra);
+  return bracket ? `${bracket} ${STAGE_LABEL[stage].toLowerCase()}` : STAGE_LABEL[stage];
 }
 
 /** "Easter 7s · Semi-final" - the competition and the stage, whichever there are. */

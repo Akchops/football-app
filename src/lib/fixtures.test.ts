@@ -255,6 +255,8 @@ describe('stages on imported fixtures', () => {
         fixture({ stage: 'none', stageDetail: 'B', date: '2026-09-13' }),
         fixture({ stage: 'Semi-final', date: '2026-09-14' }),
         fixture({ date: '2026-09-15' }), // a reply from before stages: no field at all
+        fixture({ stage: 'semi', stageDetail: 'Semi-final 1', date: '2026-09-16' }), // as the live reader sent it
+        fixture({ stage: 'final', stageDetail: 'PLATE FINAL', date: '2026-09-17' }),
       ],
       [],
       TODAY,
@@ -264,6 +266,8 @@ describe('stages on imported fixtures', () => {
       [null, ''],
       [null, ''],
       [null, ''],
+      ['semi', ''],
+      ['final', 'Plate'],
     ]);
   });
 
