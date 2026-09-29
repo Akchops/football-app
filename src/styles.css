@@ -672,7 +672,8 @@ select.input { background-image: none; }
   background: none;
   border: 0;
   border-radius: 9px;
-  padding: 8px 6px;
+  /* Tight at the sides: Matches has four of these, counts and all, on a 360px phone. */
+  padding: 8px 4px;
   font-size: 13px;
   font-weight: 700;
   color: var(--muted);
@@ -1607,25 +1608,6 @@ select.input { background-image: none; }
 button:disabled { opacity: 0.45; }
 button:disabled:active { transform: none; }
 
-/* ---------- nudges ---------- */
-/* Something worth doing now - a new season's age group, a tournament that looks
-   over. Gold rather than green so it doesn't read as a result. */
-.nudge {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background: var(--surface);
-  border: 1px solid rgba(245, 196, 81, 0.35);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-}
-.nudge.nudge-row { flex-direction: row; align-items: center; }
-.nudge-icon { font-size: 24px; line-height: 1; flex: none; }
-.nudge-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.nudge-text strong { font-size: 15px; }
-.nudge-text span { font-size: 13px; color: var(--muted); }
-.nudge-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
 /* ---------- competition sheet ---------- */
 .placing-hero {
   display: flex;
@@ -1639,13 +1621,36 @@ button:disabled:active { transform: none; }
 .placing-hero strong { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--gold); }
 .placing-hero span { font-size: 13px; color: var(--muted); }
 
-/* A table row that opens something: the same look, with a button's behaviour. */
-.table-row.table-link {
-  width: 100%;
+/* ---------- tournament list ---------- */
+/* Looks like a stats table, but each row opens its tournament and can carry a
+   Finish button of its own - so the row is a div, not one big button. */
+.tourney-list {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.tourney-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.tourney-row:last-child { border-bottom: 0; }
+.tourney-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: none;
   border: 0;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 11px 2px 11px 14px;
   text-align: left;
 }
-.table-row.table-link:last-child { border-bottom: 0; }
-.table-row.table-link:active { background: var(--surface-2); }
+.tourney-main:active { background: var(--surface-2); }
+.tourney-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tourney-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tourney-meta { font-size: 12px; color: var(--muted); }
+.tourney-record { font-weight: 700; font-size: 14px; flex: none; }

@@ -114,7 +114,7 @@ export function buildSampleData(now: Date = new Date()): AppData {
       photo: '',
       dateOfBirth: `${birthYear}-04-12`,
       ageGroup: 'U16',
-      ageGroupSeason: season,
+      ageGroupYear: now.getFullYear(),
       position: 'GK',
       positionGroup: 'goalkeeper',
       onboardedAt: stamp,

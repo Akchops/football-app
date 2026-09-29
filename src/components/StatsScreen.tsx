@@ -5,13 +5,14 @@ import { formatDateShort } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import {
-  computeStats, mainPositionGroup, placingLabel, recentScores, recordSummary, scoreline, statsByCompetition,
+  computeStats, mainPositionGroup, recentScores, recordSummary, scoreline, statsByCompetition,
   statsByMonth, statsByOpponent, statsByTeam, statsByTournament, statsByVenue,
 } from '../lib/stats';
 import { milestones, personalBests } from '../lib/records';
 import { TRAINING_TYPE_LABEL } from '../types';
 import { Avatar } from './Avatar';
 import { MissionBoard } from './MissionBoard';
+import { TournamentList } from './TournamentList';
 import { EmptyState, Section, StatTile } from './ui';
 
 export function StatsScreen({
@@ -21,7 +22,7 @@ export function StatsScreen({
 }: {
   now: Date;
   onGoToMatches: () => void;
-  onOpenCompetition: (id: string) => void;
+  onOpenCompetition: (id: string, step?: 'summary' | 'finish') => void;
 }) {
   const { matches, competitions, teams, profile, training } = useStore();
   const [competitionId, setCompetitionId] = useState<string>('all');
@@ -37,7 +38,11 @@ export function StatsScreen({
 
   const stats = useMemo(() => computeStats(scoped), [scoped]);
   const byComp = useMemo(() => statsByCompetition(matches, competitions), [matches, competitions]);
-  const byTournament = useMemo(() => statsByTournament(matches, competitions), [matches, competitions]);
+  // Only the ones there's something to show for - the Matches tab lists them all.
+  const withResults = useMemo(
+    () => statsByTournament(matches, competitions, now).filter((row) => row.played > 0),
+    [matches, competitions, now],
+  );
   const byTeam = useMemo(() => statsByTeam(matches, teams), [matches, teams]);
   const byMonth = useMemo(() => statsByMonth(scoped, 6, now), [scoped, now]);
   const byVenue = useMemo(() => statsByVenue(scoped), [scoped]);
@@ -60,9 +65,6 @@ export function StatsScreen({
   );
 
   const bests = useMemo(() => personalBests(scoped, group), [scoped, group]);
-  // Tournaments pile up over the years, so anything not from this one says which.
-  const dayLabel = (iso: string) =>
-    iso.startsWith(String(now.getFullYear())) ? formatDateShort(iso) : `${formatDateShort(iso)} ${iso.slice(0, 4)}`;
   const goals = useMemo(() => milestones(scoped, group), [scoped, group]);
 
   if (stats.played === 0) {
@@ -278,33 +280,14 @@ export function StatsScreen({
         </Section>
       )}
 
-      {byTournament.length > 0 && competitionId === 'all' && (
+      {withResults.length > 0 && competitionId === 'all' && (
         <Section title="Tournaments">
-          <div className="table">
-            {byTournament.map((row) => (
-              <button
-                key={row.competition.id}
-                type="button"
-                className="table-row table-link"
-                onClick={() => onOpenCompetition(row.competition.id)}
-              >
-                <span className="table-name">
-                  <span className="swatch" style={{ background: row.competition.color }} />
-                  {row.competition.name}
-                </span>
-                <span className="table-value">{recordSummary(row)}</span>
-                <span className="table-sub">
-                  {[
-                    row.competition.archived ? placingLabel(row.competition.placing) || 'Finished' : 'In progress',
-                    row.competition.ageGroup,
-                    row.from === row.to ? dayLabel(row.to) : `${dayLabel(row.from)} – ${dayLabel(row.to)}`,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </button>
-            ))}
-          </div>
+          <TournamentList
+            rows={withResults}
+            now={now}
+            onOpen={(id) => onOpenCompetition(id)}
+            onFinish={(id) => onOpenCompetition(id, 'finish')}
+          />
         </Section>
       )}
 

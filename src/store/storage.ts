@@ -3,7 +3,6 @@ import {
   type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Profile, type Team,
   type TrainingSession,
 } from '../types';
-import { seasonLabel } from '../lib/date';
 
 export const STORAGE_KEY = 'matchday.data.v1';
 export const DATA_VERSION = 5;
@@ -111,12 +110,12 @@ function normaliseCompetition(c: Competition): Competition {
 
 /**
  * Profiles from before the new-season question count their age group as picked
- * when they were set up. One set up last season is asked straight away; one set
- * up this season isn't asked until the next.
+ * when they were set up. One set up last year is asked straight away; one set up
+ * this year isn't asked until the next.
  */
-function settledSeason(onboardedAt: string | null): string {
+function settledYear(onboardedAt: string | null): number {
   const at = onboardedAt ? new Date(onboardedAt) : null;
-  return at && !Number.isNaN(at.getTime()) ? seasonLabel(at) : '';
+  return at && !Number.isNaN(at.getTime()) ? at.getFullYear() : 0;
 }
 
 function normaliseTraining(t: TrainingSession): TrainingSession {
@@ -167,7 +166,7 @@ export function parseData(raw: string | null): AppData {
       ? {
           ...base.profile,
           ...parsed.profile,
-          ageGroupSeason: parsed.profile.ageGroupSeason ?? settledSeason(parsed.profile.onboardedAt ?? null),
+          ageGroupYear: parsed.profile.ageGroupYear ?? settledYear(parsed.profile.onboardedAt ?? null),
         }
       : {
           ...base.profile,

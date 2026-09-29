@@ -5,7 +5,7 @@ import {
   type Competition, type PositionGroup, type Team,
 } from '../types';
 import { MATCH_LENGTHS, REMINDER_LEADS, TRAINING_LENGTHS } from '../types';
-import { currentAge, seasonLabel, suggestAgeGroup } from '../lib/date';
+import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats, placingLabel } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
 import { AccountSection } from './AccountSettings';
@@ -123,8 +123,8 @@ export function SetupScreen({
             <select
               className="input"
               value={profile.ageGroup}
-              // Picking it by hand answers this season's move-up question too.
-              onChange={(e) => updateProfile({ ageGroup: e.target.value, ageGroupSeason: seasonLabel() })}
+              // Picking it by hand answers this year's move-up question too.
+              onChange={(e) => updateProfile({ ageGroup: e.target.value, ageGroupYear: new Date().getFullYear() })}
             >
               <option value="">Not set</option>
               {AGE_GROUPS.map((g) => (

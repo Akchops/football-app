@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, emptyResult, type Competition, type Match, type MatchResult, type Settings } from '../types';
 import {
   computeStats, mainPositionGroup, outcomeOf, pendingResultMatches, placingLabel, scoreline, shootoutWinner,
-  statsByCompetition, statsByMonth, statsByTournament, statsByVenue, tournamentsReadyToFinish, upcomingMatches,
+  statsByCompetition, statsByMonth, statsByTournament, statsByVenue, upcomingMatches,
 } from './stats';
 
 let seq = 0;
@@ -231,67 +231,53 @@ describe('breakdowns', () => {
 });
 
 describe('tournaments', () => {
-  it('lists every tournament with a result, newest first, with its record and dates', () => {
+  const now = new Date(2026, 3, 12, 18, 0);
+
+  it('lists every tournament, most recent first, with where it is up to', () => {
     const rows = statsByTournament(
       [
         played(2, 0, { competitionId: 'spring', date: '2026-03-14' }),
         played(0, 1, { competitionId: 'spring', date: '2026-03-15' }),
         played(3, 1, { competitionId: 'easter', date: '2026-04-05' }),
-        // A league is not a tournament, and a tournament nobody has played yet has no record.
-        played(1, 1, { competitionId: 'league', date: '2026-04-20' }),
+        match({ competitionId: 'easter', date: '2026-04-19' }),
+        // A league is not a tournament.
+        played(1, 1, { competitionId: 'league', date: '2026-04-11' }),
         match({ competitionId: 'summer', date: '2026-06-01' }),
       ],
-      [comp('spring'), comp('easter'), comp('league', { type: 'league' }), comp('summer')],
+      [comp('spring', { archived: true, placing: 'Winners' }), comp('easter'), comp('league', { type: 'league' }), comp('summer')],
+      now,
     );
-    expect(rows.map((r) => r.competition.id)).toEqual(['easter', 'spring']);
-    expect(rows[1]).toMatchObject({ played: 2, wins: 1, losses: 1, from: '2026-03-14', to: '2026-03-15' });
+    expect(rows.map((r) => [r.competition.id, r.status])).toEqual([
+      ['summer', 'upcoming'],
+      ['easter', 'playing'],
+      ['spring', 'finished'],
+    ]);
+    expect(rows[2]).toMatchObject({ played: 2, wins: 1, losses: 1, fixtures: 2, from: '2026-03-14', to: '2026-03-15' });
+    expect(rows[1]).toMatchObject({ played: 1, fixtures: 2 });
+    expect(rows[0].played).toBe(0);
   });
 
-  describe('ready to finish', () => {
-    const now = new Date(2026, 3, 12, 18, 0);
+  it('is all played once every match has a result or was called off - the time to finish it', () => {
+    const [row] = statsByTournament(
+      [
+        played(1, 0, { competitionId: 't1', date: '2026-04-11' }),
+        match({ competitionId: 't1', date: '2026-04-11', status: 'cancelled' }),
+      ],
+      [comp('t1')],
+      now,
+    );
+    // A round called off is left out of the count, not counted as unplayed.
+    expect(row).toMatchObject({ status: 'played', fixtures: 1 });
+  });
 
-    it('asks once every match has a result', () => {
-      const ready = tournamentsReadyToFinish(
-        [comp('t1')],
-        [played(1, 0, { competitionId: 't1', date: '2026-04-11' }), played(0, 0, { competitionId: 't1', date: '2026-04-11' })],
-        now,
-      );
-      expect(ready.map((c) => c.id)).toEqual(['t1']);
-    });
+  it('is under way from the first kickoff, even before a score is logged', () => {
+    const [row] = statsByTournament([match({ competitionId: 't1', date: '2026-04-12', time: '09:30' })], [comp('t1')], now);
+    expect(row).toMatchObject({ status: 'playing', played: 0 });
+  });
 
-    it('counts a round called off as done', () => {
-      const ready = tournamentsReadyToFinish(
-        [comp('t1')],
-        [played(1, 0, { competitionId: 't1', date: '2026-04-11' }), match({ competitionId: 't1', date: '2026-04-11', status: 'cancelled' })],
-        now,
-      );
-      expect(ready).toHaveLength(1);
-    });
-
-    it('waits while any match still needs a result', () => {
-      const ready = tournamentsReadyToFinish(
-        [comp('t1')],
-        [played(1, 0, { competitionId: 't1', date: '2026-04-11' }), match({ competitionId: 't1', date: '2026-04-11' })],
-        now,
-      );
-      expect(ready).toEqual([]);
-    });
-
-    it('leaves alone anything finished, not a tournament, never played, or long gone', () => {
-      const matches = [
-        played(1, 0, { competitionId: 'done', date: '2026-04-11' }),
-        played(1, 0, { competitionId: 'league', date: '2026-04-11' }),
-        match({ competitionId: 'off', date: '2026-04-11', status: 'cancelled' }),
-        played(1, 0, { competitionId: 'old', date: '2026-03-01' }),
-      ];
-      const competitions = [
-        comp('done', { archived: true }),
-        comp('league', { type: 'league' }),
-        comp('off'),
-        comp('old'),
-      ];
-      expect(tournamentsReadyToFinish(competitions, matches, now)).toEqual([]);
-    });
+  it('copes with a tournament that has no matches', () => {
+    const [row] = statsByTournament([], [comp('t1')], now);
+    expect(row).toMatchObject({ status: 'upcoming', fixtures: 0, from: '', to: '' });
   });
 
   it('judges the player on the position they played most', () => {

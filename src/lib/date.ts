@@ -180,25 +180,25 @@ export function nextSeasonAgeGroup(current: string, dob: string, now: Date = new
 
 /** The new-season question: move up from `from` to `to`? */
 export interface AgeGroupCheck {
-  season: string;
+  year: number;
   from: string;
   to: string;
 }
 
 /**
  * The age group never moves by itself - the player might be playing up, or
- * staying down - so once each new season the app asks. Null when there is
- * nothing to ask: no group set, already answered this season, or no band above.
+ * staying down - so once a year, when the new season starts with the new year,
+ * the app asks. Null when there is nothing to ask: no group set, already
+ * answered this year, or no band above.
  */
 export function ageGroupCheck(
-  profile: Pick<Profile, 'ageGroup' | 'ageGroupSeason' | 'dateOfBirth' | 'onboardedAt'>,
+  profile: Pick<Profile, 'ageGroup' | 'ageGroupYear' | 'dateOfBirth' | 'onboardedAt'>,
   now: Date = new Date(),
 ): AgeGroupCheck | null {
   if (!profile.onboardedAt || !profile.ageGroup) return null;
-  const season = seasonLabel(now);
-  // Labels lead with the starting year, so they sort as text. A later season
-  // counts as answered too, so a phone with its clock wrong doesn't nag.
-  if (profile.ageGroupSeason >= season) return null;
+  const year = now.getFullYear();
+  // A later year counts as answered too, so a phone with its clock wrong doesn't nag.
+  if (profile.ageGroupYear >= year) return null;
   const to = nextSeasonAgeGroup(profile.ageGroup, profile.dateOfBirth, now);
-  return to ? { season, from: profile.ageGroup, to } : null;
+  return to ? { year, from: profile.ageGroup, to } : null;
 }

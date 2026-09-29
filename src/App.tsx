@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { useNow } from './useNow';
 import type { Match } from './types';
-import { kickoffAt } from './lib/date';
+import { ageGroupCheck, kickoffAt } from './lib/date';
 import { pendingResultMatches } from './lib/stats';
 import { CalendarScreen } from './components/CalendarScreen';
 import { MatchesScreen } from './components/MatchesScreen';
@@ -12,6 +12,7 @@ import { MatchFormSheet, type MatchFormTarget } from './components/MatchFormShee
 import { MatchDetailSheet } from './components/MatchDetailSheet';
 import { ResultSheet } from './components/ResultSheet';
 import { ResultPrompt } from './components/ResultPrompt';
+import { AgeGroupPrompt } from './components/AgeGroupPrompt';
 import { CompetitionFormSheet, type CompetitionFormTarget } from './components/CompetitionFormSheet';
 import { CompetitionSheet, type CompetitionView } from './components/CompetitionSheet';
 import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
@@ -53,6 +54,7 @@ function Shell() {
   const [imported, setImported] = useState(0);
   const [trainingForm, setTrainingForm] = useState<TrainingFormTarget | null>(null);
   const [promptHidden, setPromptHidden] = useState(false);
+  const [ageAskHidden, setAgeAskHidden] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
 
   // The scroll container is shared across tabs, so reset it or you land halfway
@@ -88,6 +90,14 @@ function Shell() {
   const viewing = competitionView && competitions.some((c) => c.id === competitionView.id) ? competitionView : null;
 
   const showPrompt = !promptHidden && pending.length > 0 && !resultMatch && !matchForm && !viewing;
+
+  // Once a year, and never on top of something else - results come first.
+  const newSeason = ageGroupCheck(profile, now);
+  const sheetOpen = Boolean(
+    matchForm || detailMatch || resultMatch || competitionForm || viewing || teamForm || tournamentOpen || importOpen ||
+      trainingForm,
+  );
+  const showAgeAsk = newSeason !== null && !ageAskHidden && !showPrompt && !sheetOpen;
 
   // First run: collect the player's details before showing the app proper.
   if (!profile.onboardedAt) return <OnboardingScreen />;
@@ -133,8 +143,6 @@ function Shell() {
               if (session) setTrainingForm({ mode: 'edit', session });
             }}
             onEnterResult={openResult}
-            onOpenCompetition={openCompetition}
-            onOpenSetup={() => setTab('setup')}
           />
         )}
         {tab === 'matches' && (
@@ -143,6 +151,8 @@ function Shell() {
             onOpenMatch={setDetailMatch}
             onAddMatch={(dateISO) => setMatchForm({ mode: 'create', dateISO })}
             onEnterResult={openResult}
+            onAddTournament={() => setTournamentOpen(true)}
+            onOpenCompetition={openCompetition}
           />
         )}
         {tab === 'media' && <MediaScreen onOpenMatch={setDetailMatch} />}
@@ -152,7 +162,7 @@ function Shell() {
           </Suspense>
         )}
         {tab === 'stats' && (
-          <StatsScreen now={now} onGoToMatches={() => setTab('matches')} onOpenCompetition={(id) => openCompetition(id)} />
+          <StatsScreen now={now} onGoToMatches={() => setTab('matches')} onOpenCompetition={openCompetition} />
         )}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
       </main>
@@ -175,6 +185,17 @@ function Shell() {
 
       {showPrompt && (
         <ResultPrompt pending={pending} onEnterResult={openResult} onDismiss={() => setPromptHidden(true)} />
+      )}
+
+      {showAgeAsk && newSeason && (
+        <AgeGroupPrompt
+          check={newSeason}
+          onDismiss={() => setAgeAskHidden(true)}
+          onOpenSetup={() => {
+            setAgeAskHidden(true);
+            setTab('setup');
+          }}
+        />
       )}
 
       <MatchFormSheet

@@ -1,5 +1,5 @@
 import type { Competition, Match, MatchResult, MetricTotals, PositionGroup, Settings, Team, Venue } from '../types';
-import { MONTH_NAMES, daysBetween, fromISODate, kickoffAt, toISODate } from './date';
+import { MONTH_NAMES, fromISODate, kickoffAt, toISODate } from './date';
 import { addMetrics } from './metrics';
 import { matchScore } from './score';
 
@@ -262,44 +262,54 @@ export function statsByCompetition(matches: Match[], competitions: Competition[]
   return out.sort((a, b) => b.played - a.played);
 }
 
+/**
+ * Where a tournament is up to. "played" means every match has a result (or was
+ * called off) but nobody has said it's over yet - the time to finish it.
+ */
+export type TournamentStatus = 'upcoming' | 'playing' | 'played' | 'finished';
+
 export interface TournamentBreakdown extends Record_ {
   competition: Competition;
-  /** First and last dates it was played on, 'YYYY-MM-DD'. */
+  status: TournamentStatus;
+  /** Matches that are on - everything except rounds called off. */
+  fixtures: number;
+  /** First and last dates of those matches, 'YYYY-MM-DD' - '' when there are none. */
   from: string;
   to: string;
 }
 
-/** Every tournament with a result in it, most recent first. */
-export function statsByTournament(matches: Match[], competitions: Competition[]): TournamentBreakdown[] {
+/** Every tournament, where it's up to and how it went - most recent first. */
+export function statsByTournament(
+  matches: Match[],
+  competitions: Competition[],
+  now: Date = new Date(),
+): TournamentBreakdown[] {
   const out: TournamentBreakdown[] = [];
   for (const competition of competitions) {
     if (competition.type !== 'tournament') continue;
-    const played = playedMatches(matches.filter((m) => m.competitionId === competition.id)); // newest first
-    if (played.length === 0) continue;
+    const on = matches.filter((m) => m.competitionId === competition.id && m.status !== 'cancelled');
     const rec = emptyRecord();
-    for (const match of played) addToRecord(rec, match.result);
-    out.push({ competition, ...rec, from: played[played.length - 1].date, to: played[0].date });
+    for (const match of on) if (isPlayed(match)) addToRecord(rec, match.result);
+    const dates = on.map((m) => m.date).sort();
+    // Under way from the first kickoff, even before any score is logged.
+    const started = on.some((m) => isPlayed(m) || kickoffAt(m.date, m.time).getTime() <= now.getTime());
+    const status: TournamentStatus = competition.archived
+      ? 'finished'
+      : !started
+        ? 'upcoming'
+        : on.some((m) => m.status === 'scheduled')
+          ? 'playing'
+          : 'played';
+    out.push({
+      competition,
+      ...rec,
+      status,
+      fixtures: on.length,
+      from: dates[0] ?? '',
+      to: dates[dates.length - 1] ?? '',
+    });
   }
   return out.sort((a, b) => (a.to < b.to ? 1 : a.to > b.to ? -1 : 0));
-}
-
-/** How long after its last match a tournament that looks over keeps asking to be finished. */
-const FINISH_PROMPT_DAYS = 14;
-
-/**
- * Tournaments that look over but haven't been finished: every match has a
- * result or was called off, and the last one was within the past fortnight -
- * so one from last year doesn't suddenly start asking.
- */
-export function tournamentsReadyToFinish(competitions: Competition[], matches: Match[], now: Date = new Date()): Competition[] {
-  const today = toISODate(now);
-  return competitions.filter((competition) => {
-    if (competition.type !== 'tournament' || competition.archived) return false;
-    const own = matches.filter((m) => m.competitionId === competition.id);
-    if (!own.some(isPlayed) || own.some((m) => m.status === 'scheduled')) return false;
-    const last = own.reduce((latest, m) => (m.date > latest ? m.date : latest), '');
-    return daysBetween(last, today) <= FINISH_PROMPT_DAYS;
-  });
 }
 
 /**

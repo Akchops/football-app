@@ -232,9 +232,10 @@ export interface Profile {
   dateOfBirth: string;
   /** Age group they currently play in, e.g. 'U16'. */
   ageGroup: string;
-  /** Season the age group was last picked or confirmed for, e.g. '2026/27'. When a
-      new season starts the app asks, once, whether to move up. */
-  ageGroupSeason: string;
+  /** Year the age group was last picked or confirmed in, e.g. 2026, or 0 if never.
+      The new season starts with the new year, and the app asks, once, whether to
+      move up. */
+  ageGroupYear: number;
   position: string;
   positionGroup: PositionGroup;
   /** null until the setup screen has been completed. */
@@ -341,7 +342,7 @@ export const DEFAULT_PROFILE: Profile = {
   photo: '',
   dateOfBirth: '',
   ageGroup: '',
-  ageGroupSeason: '',
+  ageGroupYear: 0,
   position: 'GK',
   positionGroup: 'goalkeeper',
   onboardedAt: null,

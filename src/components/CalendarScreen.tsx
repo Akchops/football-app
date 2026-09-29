@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import {
-  MONTH_NAMES, addMonths, ageGroupCheck, countdown, formatDateLong, kickoffAt, monthGrid, startOfMonth,
+  MONTH_NAMES, addMonths, countdown, formatDateLong, kickoffAt, monthGrid, startOfMonth,
   toISODate, todayISO, weekdayLabels,
 } from '../lib/date';
-import { matchesOnDate, tournamentsReadyToFinish, upcomingMatches } from '../lib/stats';
+import { matchesOnDate, upcomingMatches } from '../lib/stats';
 import { MatchCard } from './MatchCard';
 import { Avatar } from './Avatar';
 import { StarBadge } from './MissionBoard';
@@ -23,8 +23,6 @@ export function CalendarScreen({
   onAddTraining,
   onOpenTraining,
   onEnterResult,
-  onOpenCompetition,
-  onOpenSetup,
 }: {
   now: Date;
   onOpenMatch: (match: Match) => void;
@@ -34,11 +32,8 @@ export function CalendarScreen({
   onAddTraining: (dateISO: string) => void;
   onOpenTraining: (id: string) => void;
   onEnterResult: (match: Match) => void;
-  onOpenCompetition: (id: string, step: 'summary' | 'finish') => void;
-  onOpenSetup: () => void;
 }) {
-  const { matches, settings, colorOf, teams, competitions, updateSettings, profile, training, confirmAgeGroup } =
-    useStore();
+  const { matches, settings, colorOf, teams, competitions, updateSettings, profile, training } = useStore();
   const [cursor, setCursor] = useState(() => startOfMonth(now));
   const [selected, setSelected] = useState(() => todayISO(now));
 
@@ -78,9 +73,6 @@ export function CalendarScreen({
   const selectedMatches = matchesOnDate(matches, selected);
   const next = upcomingMatches(matches, now)[0] ?? null;
   const todayIso = todayISO(now);
-  const readyToFinish = useMemo(() => tournamentsReadyToFinish(competitions, matches, now), [competitions, matches, now]);
-  const newSeason = ageGroupCheck(profile, now);
-  const movingTeams = newSeason ? teams.filter((t) => t.ageGroup === newSeason.from) : [];
 
   const goToday = () => {
     setCursor(startOfMonth(now));
@@ -149,47 +141,6 @@ export function CalendarScreen({
           </button>
         )}
       </div>
-
-      {newSeason && (
-        <div className="nudge">
-          <div className="nudge-text">
-            <strong>
-              New season {newSeason.season}: moving up to {newSeason.to}?
-            </strong>
-            <span>
-              You're down as {newSeason.from}.
-              {movingTeams.length > 0 &&
-                ` ${movingTeams.map((t) => t.name).join(' and ')} ${movingTeams.length === 1 ? 'moves' : 'move'} up with you.`}
-            </span>
-          </div>
-          <div className="nudge-actions">
-            <button className="primary-btn small" onClick={() => confirmAgeGroup(newSeason.to, newSeason.season)}>
-              Move up to {newSeason.to}
-            </button>
-            <button className="ghost-btn" onClick={() => confirmAgeGroup(newSeason.from, newSeason.season)}>
-              Stay {newSeason.from}
-            </button>
-          </div>
-          <button className="link-btn" onClick={onOpenSetup}>
-            Playing in a different age group? Pick it in Setup
-          </button>
-        </div>
-      )}
-
-      {readyToFinish.map((c) => (
-        <div key={c.id} className="nudge nudge-row">
-          <span className="nudge-icon" aria-hidden="true">
-            🏆
-          </span>
-          <div className="nudge-text">
-            <strong>{c.name}: every match has a result</strong>
-            <span>All done? Finish it to save how far you got.</span>
-          </div>
-          <button className="primary-btn small" onClick={() => onOpenCompetition(c.id, 'finish')}>
-            Finish
-          </button>
-        </div>
-      ))}
 
       <div className="cal-grid" role="grid">
         {weekdayLabels(settings.weekStartsOn).map((d) => (

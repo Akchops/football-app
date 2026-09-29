@@ -11,7 +11,7 @@ import { Field, Section, Sheet, StatTile } from './ui';
 
 export interface CompetitionView {
   id: string;
-  /** 'finish' opens straight on finishing it - the calendar's nudge does this. */
+  /** 'finish' opens straight on finishing it - the Finish button on a tournament's row. */
   step: 'summary' | 'finish';
 }
 

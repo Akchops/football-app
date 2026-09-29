@@ -17,9 +17,9 @@ server, nothing uploaded.
   and the age group you play in — suggested from your date of birth using the
   31 August cutoff
 - The age group doesn't move by itself, because you might be playing up a
-  year. When a new season starts (1 July) the home screen asks once: "Moving up
-  to U15?" Move up, and teams in your old age group move with you; or stay where
-  you are
+  year. The new season starts with the new year, so the first time you open the
+  app after New Year it asks once: "Moving up to U15?" Move up, and teams in
+  your old age group move with you; or stay where you are
 - A profile photo, which appears above the calendar, on the stats page and on
   shared match cards. Stored on the device, shrunk to a few kilobytes
 - Position: goalkeeper, defender, midfielder or forward. This decides which
@@ -52,11 +52,14 @@ server, nothing uploaded.
   Runners-up, Semi-finals, Group stage, or anything you type), confirm its age
   group and add a note. Rounds you never reached, still sitting there as TBC,
   are marked called off rather than deleted
-- Once every match has a result, the home screen offers to finish it
+- **Matches → Tournaments** lists every tournament: still going, coming up and
+  finished. One still going has a Finish button on its row, which stands out
+  once every match has a result
 - Each tournament has its own page: how far you got, W/D/L, your average match
-  score and position stats, your best moments and every match. Reach it from any
-  of its matches, or from Stats → Tournaments. The stats come from the matches
-  themselves, so they're kept for good and stay right if you fix a score later
+  score and position stats, your best moments and every match. Reach it from
+  that list, from any of its matches, or from Stats → Tournaments. The stats come
+  from the matches themselves, so they're kept for good and stay right if you
+  fix a score later
 
 **Result prompt**
 - A match kicks off at 16:30. Open the app after that and it pops up asking for
@@ -146,7 +149,7 @@ server, nothing uploaded.
 - **Personal bests**: most saves in a match, longest clean sheet run, longest
   unbeaten run, best match score — each showing where it happened
 - **Tournaments**: every tournament you've played in, with how far you got, its
-  age group and record — tap one for its page
+  age group and record. Tap one for its page, or finish one from its row
 - **Milestones**: appearances, wins, clean sheets, saves, goals, assists and
   man-of-the-match awards, with progress to the next tier and a star for each
   one already banked

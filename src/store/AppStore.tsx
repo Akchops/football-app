@@ -13,7 +13,7 @@ type Action =
   | { type: 'team/update'; id: string; patch: Partial<Team> }
   | { type: 'team/delete'; id: string }
   | { type: 'match/addMany'; matches: Match[] }
-  | { type: 'profile/confirmAgeGroup'; ageGroup: string; season: string }
+  | { type: 'profile/confirmAgeGroup'; ageGroup: string; year: number }
   | { type: 'competition/add'; competition: Competition }
   | { type: 'competition/update'; id: string; patch: Partial<Competition> }
   | { type: 'competition/delete'; id: string }
@@ -60,7 +60,7 @@ export function reducer(state: AppData, action: Action): AppData {
       const moving = from !== '' && action.ageGroup !== from;
       return {
         ...state,
-        profile: touch({ ...state.profile, ageGroup: action.ageGroup, ageGroupSeason: action.season }),
+        profile: touch({ ...state.profile, ageGroup: action.ageGroup, ageGroupYear: action.year }),
         teams: moving
           ? state.teams.map((t) =>
               t.deletedAt === null && t.ageGroup === from ? touch({ ...t, ageGroup: action.ageGroup }) : t,
@@ -256,7 +256,7 @@ interface StoreValue {
   updateSettings(patch: Partial<Settings>): void;
   updateProfile(patch: Partial<Profile>): void;
   /** Answers the new-season question: move to `ageGroup`, or pass the current one to stay. */
-  confirmAgeGroup(ageGroup: string, season: string): void;
+  confirmAgeGroup(ageGroup: string, year: number): void;
   competitionOf(match: Match): Competition | null;
   teamOf(match: Match): Team | null;
   /** Calendar dot colour, following the colour-by setting. */
@@ -451,8 +451,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'profile/update', patch });
       },
 
-      confirmAgeGroup(ageGroup, season) {
-        dispatch({ type: 'profile/confirmAgeGroup', ageGroup, season });
+      confirmAgeGroup(ageGroup, year) {
+        dispatch({ type: 'profile/confirmAgeGroup', ageGroup, year });
       },
 
       competitionOf(match) {

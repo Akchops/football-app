@@ -94,12 +94,13 @@ describe('age helpers', () => {
 
 /**
  * The age group never moves by itself - a player might be playing up a year -
- * so a new season asks once. These pin down what it offers and when it asks.
+ * so each new year the app asks once. These pin down what it offers and when.
  */
 describe('new-season age group', () => {
-  // 28 September 2026: the 2026/27 season started on 1 July.
   const now = new Date(2026, 8, 28);
-  const profile = { ageGroup: 'U13', ageGroupSeason: '2025/26', dateOfBirth: '2013-05-01', onboardedAt: '2025-09-01' };
+  // The first days of 2027: a new season.
+  const newYear = new Date(2027, 0, 3);
+  const profile = { ageGroup: 'U13', ageGroupYear: 2026, dateOfBirth: '2013-05-01', onboardedAt: '2026-02-01' };
 
   it('offers the next youth band up, whatever the date of birth says', () => {
     expect(nextSeasonAgeGroup('U13', '2013-05-01', now)).toBe('U14');
@@ -124,23 +125,27 @@ describe('new-season age group', () => {
     expect(nextSeasonAgeGroup('U21', '2014-05-01', now)).toBeNull();
   });
 
-  it('asks once a new season has started', () => {
-    expect(ageGroupCheck(profile, now)).toEqual({ season: '2026/27', from: 'U13', to: 'U14' });
+  it('asks once the new year has started', () => {
+    expect(ageGroupCheck(profile, newYear)).toEqual({ year: 2027, from: 'U13', to: 'U14' });
   });
 
-  it('does not ask again once answered this season', () => {
-    expect(ageGroupCheck({ ...profile, ageGroupSeason: '2026/27' }, now)).toBeNull();
-    // A season ahead - a phone with its clock wrong - counts as answered, not as a reason to nag.
-    expect(ageGroupCheck({ ...profile, ageGroupSeason: '2027/28' }, now)).toBeNull();
+  it('does not ask in the same year - the season starts in January, not July', () => {
+    expect(ageGroupCheck({ ...profile, ageGroupYear: 2026 }, new Date(2026, 8, 28))).toBeNull();
+  });
+
+  it('does not ask again once answered this year', () => {
+    expect(ageGroupCheck({ ...profile, ageGroupYear: 2027 }, newYear)).toBeNull();
+    // A year ahead - a phone with its clock wrong - counts as answered, not as a reason to nag.
+    expect(ageGroupCheck({ ...profile, ageGroupYear: 2028 }, newYear)).toBeNull();
   });
 
   it('asks nothing before setup, with no group set, or with no band above', () => {
-    expect(ageGroupCheck({ ...profile, onboardedAt: null }, now)).toBeNull();
-    expect(ageGroupCheck({ ...profile, ageGroup: '' }, now)).toBeNull();
-    expect(ageGroupCheck({ ...profile, ageGroup: 'Open age', dateOfBirth: '' }, now)).toBeNull();
+    expect(ageGroupCheck({ ...profile, onboardedAt: null }, newYear)).toBeNull();
+    expect(ageGroupCheck({ ...profile, ageGroup: '' }, newYear)).toBeNull();
+    expect(ageGroupCheck({ ...profile, ageGroup: 'Open age', dateOfBirth: '' }, newYear)).toBeNull();
   });
 
   it('asks a profile that has never been asked', () => {
-    expect(ageGroupCheck({ ...profile, ageGroupSeason: '' }, now)?.to).toBe('U14');
+    expect(ageGroupCheck({ ...profile, ageGroupYear: 0 }, newYear)?.to).toBe('U14');
   });
 });

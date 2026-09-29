@@ -178,7 +178,7 @@ describe('edits move the edit time', () => {
 describe('answering the new-season question', () => {
   const before = () =>
     dataWith({
-      profile: { ...emptyData().profile, ageGroup: 'U13', ageGroupSeason: '2025/26', updatedAt: STAMP },
+      profile: { ...emptyData().profile, ageGroup: 'U13', ageGroupYear: 2026, updatedAt: STAMP },
       teams: [
         { ...team('club'), ageGroup: 'U13' },
         { ...team('sunday'), ageGroup: 'Open age' },
@@ -188,9 +188,9 @@ describe('answering the new-season question', () => {
 
   it('moves up, taking the teams in the old age group along', () => {
     const start = before();
-    const after = reducer(start, { type: 'profile/confirmAgeGroup', ageGroup: 'U14', season: '2026/27' });
+    const after = reducer(start, { type: 'profile/confirmAgeGroup', ageGroup: 'U14', year: 2027 });
 
-    expect(after.profile).toMatchObject({ ageGroup: 'U14', ageGroupSeason: '2026/27' });
+    expect(after.profile).toMatchObject({ ageGroup: 'U14', ageGroupYear: 2027 });
     expect(after.profile.updatedAt).not.toBe(STAMP);
     expect(after.teams[0].ageGroup).toBe('U14');
     expect(after.teams[0].updatedAt).not.toBe(STAMP);
@@ -201,9 +201,9 @@ describe('answering the new-season question', () => {
 
   it('staying put just records the answer', () => {
     const start = before();
-    const after = reducer(start, { type: 'profile/confirmAgeGroup', ageGroup: 'U13', season: '2026/27' });
+    const after = reducer(start, { type: 'profile/confirmAgeGroup', ageGroup: 'U13', year: 2027 });
 
-    expect(after.profile).toMatchObject({ ageGroup: 'U13', ageGroupSeason: '2026/27' });
+    expect(after.profile).toMatchObject({ ageGroup: 'U13', ageGroupYear: 2027 });
     expect(after.teams).toBe(start.teams);
   });
 });

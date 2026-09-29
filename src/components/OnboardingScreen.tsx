@@ -4,7 +4,7 @@ import {
   AGE_GROUPS, POSITIONS_BY_GROUP, POSITION_GROUP_BLURB, POSITION_GROUP_LABEL, TEAM_COLORS,
   type PositionGroup,
 } from '../types';
-import { currentAge, seasonLabel, suggestAgeGroup } from '../lib/date';
+import { currentAge, suggestAgeGroup } from '../lib/date';
 import { Field } from './ui';
 
 interface DraftTeam {
@@ -79,7 +79,7 @@ export function OnboardingScreen() {
       name: name.trim(),
       dateOfBirth: dob,
       ageGroup: effectiveAgeGroup,
-      ageGroupSeason: seasonLabel(),
+      ageGroupYear: new Date().getFullYear(),
       position,
       positionGroup: group,
       onboardedAt: new Date().toISOString(),
