@@ -13,6 +13,7 @@ function match(over: Partial<Match> = {}): Match {
     competitionId: null,
     teamId: null,
     opponent: 'Opponent',
+    stage: '',
     date: '2026-04-10',
     time: '16:30',
     venue: 'home',

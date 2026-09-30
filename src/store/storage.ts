@@ -67,6 +67,8 @@ function normaliseMatch(m: Match): Match {
     deletedAt: m.deletedAt ?? null,
     competitionId: m.competitionId ?? null,
     teamId: m.teamId ?? null,
+    // Matches from before rounds were kept apart from the opponent have none.
+    stage: m.stage ?? '',
     location: m.location ?? '',
     // v2 and earlier assumed every match was 90 minutes.
     durationMinutes: m.durationMinutes ?? DEFAULT_MATCH_LENGTH,

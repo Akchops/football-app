@@ -15,6 +15,7 @@ function match(date: string, over: MatchOver = {}): Match {
     competitionId: null,
     teamId: null,
     opponent: `Team ${seq}`,
+    stage: '',
     date,
     time: '16:30',
     venue: 'home',

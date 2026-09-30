@@ -23,6 +23,7 @@ function played(over: PlayedOver = {}): Match {
     competitionId: null,
     teamId: null,
     opponent: `Team ${seq}`,
+    stage: '',
     date: nthDate(seq),
     time: '16:30',
     venue: 'home',

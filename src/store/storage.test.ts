@@ -95,6 +95,12 @@ describe('parseData', () => {
     expect(round2.matches[0].deletedAt).toBe('2026-05-01T00:00:00.000Z');
   });
 
+  it('gives matches from before stages existed no stage, leaving the opponent as it was', () => {
+    const [match] = parseData(V1_BACKUP).matches;
+    expect(match.stage).toBe('');
+    expect(match.opponent).toBe('Riverside FC');
+  });
+
   it('gives competitions from before finishing an open, unplaced, ungrouped start', () => {
     const [competition] = parseData(V1_BACKUP).competitions;
     expect(competition).toMatchObject({ archived: false, placing: '', ageGroup: '' });

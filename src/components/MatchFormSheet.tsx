@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { MATCH_LENGTHS, type Match, type Venue } from '../types';
+import { MATCH_LENGTHS, STAGES, type Match, type Venue } from '../types';
 import { todayISO } from '../lib/date';
 import { DurationPicker, Field, Segmented, Sheet } from './ui';
 
@@ -30,6 +30,7 @@ export function MatchFormSheet({
   const editing = target?.mode === 'edit' ? target.match ?? null : null;
 
   const [opponent, setOpponent] = useState('');
+  const [stage, setStage] = useState('');
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(settings.defaultKickoff);
   const [competitionId, setCompetitionId] = useState<string>('');
@@ -46,6 +47,7 @@ export function MatchFormSheet({
     if (target.match) {
       const m = target.match;
       setOpponent(m.opponent);
+      setStage(m.stage);
       setDate(m.date);
       setTime(m.time);
       setCompetitionId(m.competitionId ?? '');
@@ -56,6 +58,7 @@ export function MatchFormSheet({
       setNotes(m.notes);
     } else {
       setOpponent('');
+      setStage('');
       setDate(target.dateISO ?? todayISO());
       setTime(settings.defaultKickoff);
       // Default to the only competition still running when there is just one - one less tap.
@@ -72,6 +75,10 @@ export function MatchFormSheet({
 
   if (!target) return null;
 
+  // Rounds only mean something in a tournament or cup.
+  const chosen = competitions.find((c) => c.id === competitionId);
+  const knockout = chosen?.type === 'tournament' || chosen?.type === 'cup';
+
   const submit = () => {
     if (!opponent.trim()) {
       setError('Who are you playing? Add an opponent.');
@@ -83,6 +90,7 @@ export function MatchFormSheet({
     }
     const payload = {
       opponent: opponent.trim(),
+      stage,
       date,
       time: time || '00:00',
       competitionId: competitionId || null,
@@ -175,6 +183,19 @@ export function MatchFormSheet({
             ))}
         </select>
       </Field>
+
+      {(knockout || stage) && (
+        <Field label="Stage" hint="Which round of the tournament this is.">
+          <select className="input" value={stage} onChange={(e) => setStage(e.target.value)}>
+            <option value="">No stage</option>
+            {STAGES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
 
       <Field
         label="Match length"

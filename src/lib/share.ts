@@ -145,7 +145,7 @@ export async function renderShareCard({ match, team, competition, profile }: Sha
   ctx.fillText(formatDateLong(match.date).toUpperCase(), pad, y);
   if (competition) {
     ctx.fillStyle = competition.color;
-    ctx.fillText(competition.name.toUpperCase(), pad, y + 44);
+    ctx.fillText([competition.name, match.stage].filter(Boolean).join(' · ').toUpperCase(), pad, y + 44);
   }
 
   y = 400;

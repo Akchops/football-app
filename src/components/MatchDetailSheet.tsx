@@ -200,6 +200,12 @@ export function MatchDetailSheet({
             )}
           </dd>
         </div>
+        {match.stage && (
+          <div>
+            <dt>Stage</dt>
+            <dd>{match.stage}</dd>
+          </div>
+        )}
         <div>
           <dt>Status</dt>
           <dd className="cap">{match.status}</dd>

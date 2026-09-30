@@ -172,6 +172,9 @@ export interface Match {
   competitionId: string | null;
   teamId: string | null;
   opponent: string;
+  /** Round of a tournament or cup, e.g. "Semi-final", or '' for an ordinary match. Kept
+      apart from the opponent, so a TBC can be filled in later without losing the round. */
+  stage: string;
   /** Local calendar date, 'YYYY-MM-DD'. */
   date: string;
   /** Local kickoff time, 'HH:mm'. */
@@ -279,6 +282,24 @@ export const COMPETITION_TYPE_LABEL: Record<CompetitionType, string> = {
   friendly: 'Friendly',
   other: 'Other',
 };
+
+/** The rounds a tournament or cup match can be, in the order they're played. */
+export const STAGES = ['Group stage', 'Round of 16', 'Quarter-final', 'Semi-final', '3rd place play-off', 'Final'];
+
+const NEXT_STAGE: Record<string, string> = {
+  'Round of 16': 'Quarter-final',
+  'Quarter-final': 'Semi-final',
+  'Semi-final': 'Final',
+  '3rd place play-off': 'Final',
+};
+
+/**
+ * A sensible stage for the match added after one in `previous`: more group games
+ * follow a group game, and after a knockout round comes the next one.
+ */
+export function nextStage(previous: string): string {
+  return NEXT_STAGE[previous] ?? previous;
+}
 
 /** Quick picks for how far a competition went. Anything else can be typed. */
 export const PLACINGS = ['Winners', 'Runners-up', 'Third place', 'Semi-finals', 'Quarter-finals', 'Group stage'];

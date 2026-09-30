@@ -21,7 +21,7 @@ function competition(id: string): Competition {
 
 function match(id: string, over: Partial<Match> = {}): Match {
   return {
-    id, competitionId: null, teamId: null, opponent: 'Riverside FC', date: '2026-04-10',
+    id, competitionId: null, teamId: null, opponent: 'Riverside FC', stage: '', date: '2026-04-10',
     time: '16:30', venue: 'home', location: '', durationMinutes: 90, status: 'scheduled',
     result: null, notes: '', remindAfter: null,
     createdAt: STAMP, updatedAt: STAMP, deletedAt: null, ...over,

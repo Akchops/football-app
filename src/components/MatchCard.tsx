@@ -58,6 +58,7 @@ export function MatchCard({
               </span>
             )}
             {competition && <span className="meta-chip">{competition.name}</span>}
+            {match.stage && <span className="meta-chip">{match.stage}</span>}
             <span className="meta-chip subtle">{VENUE_LABEL[match.venue]}</span>
             {match.location && <span className="meta-chip subtle">{match.location}</span>}
           </span>

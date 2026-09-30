@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { AGE_GROUPS, COMPETITION_COLORS, MATCH_LENGTHS } from '../types';
+import { AGE_GROUPS, COMPETITION_COLORS, MATCH_LENGTHS, STAGES, nextStage } from '../types';
 import { seasonLabel, todayISO } from '../lib/date';
 import { DurationPicker, Field, Sheet } from './ui';
 
 interface FixtureDraft {
+  stage: string;
   opponent: string;
   time: string;
   date: string;
@@ -49,7 +50,8 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     setMultiDay(false);
     // Tournament games are nearly always shorter than a league fixture.
     setDurationMinutes(Math.min(settings.defaultMatchLength, 40));
-    setFixtures(START_TIMES.map((time) => ({ opponent: '', time, date: today })));
+    // Most tournaments open with a few group games.
+    setFixtures(START_TIMES.map((time) => ({ stage: 'Group stage', opponent: '', time, date: today })));
     setError('');
   }, [open, teams, competitions.length, settings.defaultMatchLength, profile.ageGroup]);
 
@@ -64,7 +66,13 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     const nextHour = Math.min(23, (h ?? 9) + 1);
     setFixtures((list) => [
       ...list,
-      { opponent: '', time: `${String(nextHour).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`, date: last?.date ?? date },
+      {
+        // Another group game after a group game; after a knockout round, the next one.
+        stage: nextStage(last?.stage ?? 'Group stage'),
+        opponent: '',
+        time: `${String(nextHour).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`,
+        date: last?.date ?? date,
+      },
     ]);
   };
 
@@ -89,6 +97,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
       location: location.trim(),
       durationMinutes,
       fixtures: used.map((f) => ({
+        stage: f.stage,
         opponent: f.opponent.trim() || 'TBC',
         time: f.time,
         date: multiDay ? f.date || date : date,
@@ -203,22 +212,44 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
       </label>
 
       <div className="fixtures">
-        <div className="section-head">
-          <h3>Matches</h3>
-          <button className="ghost-btn" onClick={addRow}>
-            + Add
-          </button>
-        </div>
+        <h3>Matches</h3>
 
         {fixtures.map((fixture, i) => (
-          <div key={i} className={multiDay ? 'fixture-row three' : 'fixture-row'}>
-            <input
-              className="input"
-              type="time"
-              value={fixture.time}
-              onChange={(e) => setFixture(i, { time: e.target.value })}
-              aria-label={`Match ${i + 1} kickoff`}
-            />
+          <div key={i} className="fixture-card">
+            <div className="fixture-head">
+              <span className="fixture-title">Match {i + 1}</span>
+              {fixtures.length > 1 && (
+                <button
+                  className="icon-btn"
+                  onClick={() => setFixtures((list) => list.filter((_, idx) => idx !== i))}
+                  aria-label={`Remove match ${i + 1}`}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            <div className="fixture-when">
+              <select
+                className="input"
+                value={fixture.stage}
+                onChange={(e) => setFixture(i, { stage: e.target.value })}
+                aria-label={`Match ${i + 1} stage`}
+              >
+                {STAGES.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {stage}
+                  </option>
+                ))}
+                <option value="">No stage</option>
+              </select>
+              <input
+                className="input"
+                type="time"
+                value={fixture.time}
+                onChange={(e) => setFixture(i, { time: e.target.value })}
+                aria-label={`Match ${i + 1} kickoff`}
+              />
+            </div>
             {multiDay && (
               <input
                 className="input"
@@ -232,22 +263,18 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
               className="input"
               value={fixture.opponent}
               onChange={(e) => setFixture(i, { opponent: e.target.value })}
-              placeholder={i === 0 ? 'Group A: Vale FC' : 'Opponent or round'}
+              placeholder="Opponent — blank if you don't know yet"
               aria-label={`Match ${i + 1} opponent`}
             />
-            {fixtures.length > 1 && (
-              <button
-                className="icon-btn"
-                onClick={() => setFixtures((list) => list.filter((_, idx) => idx !== i))}
-                aria-label={`Remove match ${i + 1}`}
-              >
-                ✕
-              </button>
-            )}
           </div>
         ))}
+
+        <button className="ghost-btn" onClick={addRow}>
+          + Add another match
+        </button>
         <p className="muted small">
-          Leave an opponent blank for rounds you don't know yet — it'll show as TBC and you can rename it later.
+          Don't know who you'll play in a round yet? Leave the opponent blank — it shows as TBC, and you can fill it in
+          later.
         </p>
       </div>
     </Sheet>

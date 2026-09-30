@@ -34,6 +34,7 @@ function match(over: Partial<Match> = {}): Match {
     competitionId: null,
     teamId: null,
     opponent: 'Oakwood United',
+    stage: '',
     date: '2026-09-12',
     time: '16:30',
     venue: 'away',

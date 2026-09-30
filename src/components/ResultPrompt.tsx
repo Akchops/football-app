@@ -71,6 +71,7 @@ export function ResultPrompt({
                 <div className="prompt-meta">
                   {formatDateShort(m.date)} · {formatTime(m.time)}
                   {competition ? ` · ${competition.name}` : ''}
+                  {m.stage ? ` · ${m.stage}` : ''}
                 </div>
               </div>
               <div className="prompt-actions">

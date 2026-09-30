@@ -54,7 +54,9 @@ export function matchToICS(
   competition: Competition | null,
   reminderLeadMinutes: number,
 ): string {
-  const title = `${team ? `${team.name} ` : ''}${match.venue === 'away' ? 'away at' : 'vs'} ${match.opponent || 'TBC'}`;
+  const title = `${team ? `${team.name} ` : ''}${match.venue === 'away' ? 'away at' : 'vs'} ${match.opponent || 'TBC'}${
+    match.stage ? ` (${match.stage})` : ''
+  }`;
   return wrap(
     event({
       uid: match.id,

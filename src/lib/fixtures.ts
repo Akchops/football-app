@@ -191,6 +191,7 @@ export function toMatchInput(
     competitionId: options.competitionId,
     teamId: options.teamId,
     opponent: row.opponent.trim(),
+    stage: '',
     date: row.date,
     time: row.time || options.defaultTime,
     venue: row.venue,

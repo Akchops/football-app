@@ -44,7 +44,11 @@ server, nothing uploaded.
 - "+ Tournament" on the home screen creates the tournament *and* all of its
   fixtures in one go — the usual case of several matches on one day
 - Optionally spans more than one day, and applies one venue to every match
-- Leave an opponent blank for rounds you don't know yet; it shows as TBC
+- Each match is its own card: pick its stage (Group stage, Quarter-final,
+  Semi-final, Final…), its kick-off, and the opponent if you know it. Leave the
+  opponent blank for rounds you don't know yet; it shows as TBC, and filling it
+  in later keeps the stage. Adding a match after a knockout round starts it on
+  the next one
 - Each tournament has its own age group, starting from the team's. Playing up
   a year at one tournament and in your own age group at the next is fine, and a
   tournament keeps its age group after you move up

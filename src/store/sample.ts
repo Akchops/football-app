@@ -53,7 +53,7 @@ export function buildSampleData(now: Date = new Date()): AppData {
   });
 
   const make = (over: Partial<Match>): Match => ({
-    id: createId('match'), competitionId: league.id, teamId: club.id, opponent: 'TBC', date: iso(0),
+    id: createId('match'), competitionId: league.id, teamId: club.id, opponent: 'TBC', stage: '', date: iso(0),
     time: '16:30', venue: 'home', location: '', durationMinutes: 80, status: 'scheduled', result: null, notes: '',
     remindAfter: null, createdAt: stamp, updatedAt: stamp, deletedAt: null, ...over,
   });
@@ -63,13 +63,13 @@ export function buildSampleData(now: Date = new Date()): AppData {
       durationMinutes: 30, status: 'played', ...over });
 
   const matches: Match[] = [
-    spring({ opponent: 'Group B: Oakfield', time: '10:00',
+    spring({ stage: 'Group stage', opponent: 'Oakfield', time: '10:00',
       result: result({ goalsFor: 2, goalsAgainst: 0, minutes: 30, rating: 8,
         metrics: { saves: 4, conceded: 0, claims: 2 } }) }),
-    spring({ opponent: 'Semi-final: Hillcrest', time: '12:30',
+    spring({ stage: 'Semi-final', opponent: 'Hillcrest', time: '12:30',
       result: result({ goalsFor: 1, goalsAgainst: 1, penaltiesFor: 3, penaltiesAgainst: 2, minutes: 30, rating: 9,
         motm: true, metrics: { saves: 5, conceded: 1, penaltiesSaved: 2 } }) }),
-    spring({ opponent: 'Final: Vale FC', time: '15:00',
+    spring({ stage: 'Final', opponent: 'Vale FC', time: '15:00',
       result: result({ goalsFor: 0, goalsAgainst: 1, minutes: 30, rating: 7,
         metrics: { saves: 6, conceded: 1, claims: 1 } }) }),
     make({ opponent: 'Riverside FC', date: iso(-28), time: '14:00', venue: 'away', status: 'played',
@@ -78,7 +78,7 @@ export function buildSampleData(now: Date = new Date()): AppData {
     make({ opponent: 'Kingsway United', date: iso(-21), time: '16:30', venue: 'home', status: 'played',
       result: result({ goalsFor: 0, goalsAgainst: 3, rating: 5,
         metrics: { saves: 2, conceded: 3, claims: 1 } }) }),
-    make({ opponent: 'Barton Athletic', date: iso(-14), time: '11:00', venue: 'home', competitionId: cup.id,
+    make({ opponent: 'Barton Athletic', stage: 'Round of 16', date: iso(-14), time: '11:00', venue: 'home', competitionId: cup.id,
       status: 'played', result: result({ goalsFor: 1, goalsAgainst: 1, penaltiesFor: 4, penaltiesAgainst: 3, rating: 7,
         metrics: { saves: 4, conceded: 1, penaltiesSaved: 2, claims: 2 } }) }),
     // A Sunday-league outing for the second club.
@@ -95,13 +95,13 @@ export function buildSampleData(now: Date = new Date()): AppData {
     // Kicked off yesterday and never logged - this is what triggers the result prompt.
     make({ opponent: 'Eastfield Town', date: iso(-1), time: '16:30', venue: 'away' }),
     // Tournament day - three matches on one date, in the tournament's colour.
-    make({ opponent: 'Group A: Vale FC', date: iso(3), time: '09:30', venue: 'neutral', competitionId: tournament.id, location: 'Central Playing Fields', durationMinutes: 30 }),
-    make({ opponent: 'Group A: Hillcrest', date: iso(3), time: '11:15', venue: 'neutral', competitionId: tournament.id, location: 'Central Playing Fields', durationMinutes: 30 }),
-    make({ opponent: 'Semi-final', date: iso(3), time: '14:00', venue: 'neutral', competitionId: tournament.id, location: 'Central Playing Fields', durationMinutes: 30 }),
+    make({ stage: 'Group stage', opponent: 'Vale FC', date: iso(3), time: '09:30', venue: 'neutral', competitionId: tournament.id, location: 'Central Playing Fields', durationMinutes: 30 }),
+    make({ stage: 'Group stage', opponent: 'Hillcrest', date: iso(3), time: '11:15', venue: 'neutral', competitionId: tournament.id, location: 'Central Playing Fields', durationMinutes: 30 }),
+    make({ stage: 'Semi-final', opponent: 'TBC', date: iso(3), time: '14:00', venue: 'neutral', competitionId: tournament.id, location: 'Central Playing Fields', durationMinutes: 30 }),
     make({ opponent: 'Harbour Wanderers', date: iso(6), time: '10:30', venue: 'home', teamId: sundaySide.id, competitionId: null, durationMinutes: 90 }),
     make({ opponent: 'Kingsway United', date: iso(9), time: '16:30', venue: 'away' }),
     make({ opponent: 'Riverside FC', date: iso(16), time: '16:30', venue: 'home' }),
-    make({ opponent: 'Quarter-final', date: iso(23), time: '13:00', venue: 'neutral', competitionId: cup.id }),
+    make({ stage: 'Quarter-final', opponent: 'TBC', date: iso(23), time: '13:00', venue: 'neutral', competitionId: cup.id }),
   ];
 
   const birthYear = now.getFullYear() - 16;

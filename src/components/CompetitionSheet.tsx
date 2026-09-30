@@ -177,6 +177,7 @@ export function CompetitionSheet({
                       {m.venue === 'away' ? '@' : 'vs'} {m.opponent || 'TBC'}
                     </div>
                     <div className="prompt-meta">
+                      {m.stage ? `${m.stage} · ` : ''}
                       {formatDateShort(m.date)} · {formatTime(m.time)}
                     </div>
                   </div>

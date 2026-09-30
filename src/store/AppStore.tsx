@@ -164,6 +164,7 @@ export interface NewMatchInput {
   competitionId: string | null;
   teamId: string | null;
   opponent: string;
+  stage: string;
   durationMinutes: number;
   date: string;
   time: string;
@@ -210,6 +211,7 @@ export interface NewTeamInput {
 /** One fixture inside a tournament being created in a single go. */
 export interface TournamentFixture {
   opponent: string;
+  stage: string;
   date: string;
   time: string;
 }
@@ -384,6 +386,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
             competitionId: competition.id,
             teamId,
             opponent: fixture.opponent.trim() || 'TBC',
+            stage: fixture.stage,
             date: fixture.date,
             time: fixture.time || '00:00',
             venue: 'neutral',
