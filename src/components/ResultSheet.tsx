@@ -133,7 +133,7 @@ export function ResultSheet({
 
       {result.didPlay && (
         <>
-          <Field label="Position played" hint="Changes which stats are tracked below">
+          <Field group label="Position played" hint="Changes which stats are tracked below">
             <div className="chip-wrap">
               {(Object.keys(POSITIONS_BY_GROUP) as PositionGroup[]).map((g) => (
                 <button

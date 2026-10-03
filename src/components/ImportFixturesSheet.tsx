@@ -333,7 +333,7 @@ export function ImportFixturesSheet({
                               ))}
                             </select>
                           </Field>
-                          <Field label="Venue">
+                          <Field group label="Venue">
                             <div className="chips">
                               {VENUE_ORDER.map((venue) => (
                                 <button

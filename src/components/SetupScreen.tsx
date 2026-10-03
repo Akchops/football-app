@@ -150,7 +150,7 @@ export function SetupScreen({
           ))}
         </div>
         {POSITIONS_BY_GROUP[profile.positionGroup].length > 1 && (
-          <Field label="More specifically">
+          <Field group label="More specifically">
             <div className="chip-wrap">
               {POSITIONS_BY_GROUP[profile.positionGroup].map((p) => (
                 <button
@@ -279,7 +279,7 @@ export function SetupScreen({
             ))}
           </select>
         </Field>
-        <Field label="Default training length">
+        <Field group label="Default training length">
           <DurationPicker
             value={settings.defaultTrainingLength}
             onChange={(minutes) => updateSettings({ defaultTrainingLength: minutes })}
@@ -296,7 +296,7 @@ export function SetupScreen({
             <option value="team">Team</option>
           </select>
         </Field>
-        <Field label="Default match length" hint="Starting point for a new match — each match can override it.">
+        <Field group label="Default match length" hint="Starting point for a new match — each match can override it.">
           <DurationPicker
             value={settings.defaultMatchLength}
             onChange={(minutes) => updateSettings({ defaultMatchLength: minutes })}

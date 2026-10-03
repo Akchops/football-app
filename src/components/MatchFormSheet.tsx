@@ -167,7 +167,7 @@ export function MatchFormSheet({
         </Field>
       )}
 
-      <Field label="Home or away">
+      <Field group label="Home or away">
         <Segmented options={VENUE_OPTIONS} value={venue} onChange={setVenue} />
       </Field>
 

@@ -209,7 +209,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
         />
       </Field>
 
-      <Field label="Colour" hint="How its matches show on the calendar">
+      <Field group label="Colour" hint="How its matches show on the calendar">
         <div className="color-row">
           {COMPETITION_COLORS.map((c) => (
             <button
@@ -224,7 +224,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
         </div>
       </Field>
 
-      <Field label="Match length" hint="Applied to every match in this tournament">
+      <Field group label="Match length" hint="Applied to every match in this tournament">
         <DurationPicker value={durationMinutes} onChange={setDurationMinutes} presets={MATCH_LENGTHS} />
       </Field>
 

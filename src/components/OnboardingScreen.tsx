@@ -179,7 +179,7 @@ export function OnboardingScreen() {
             </div>
 
             {POSITIONS_BY_GROUP[group].length > 1 && (
-              <Field label="More specifically">
+              <Field group label="More specifically">
                 <div className="chip-wrap">
                   {POSITIONS_BY_GROUP[group].map((p) => (
                     <button

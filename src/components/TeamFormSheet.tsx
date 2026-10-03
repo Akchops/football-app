@@ -95,7 +95,7 @@ export function TeamFormSheet({ target, onClose }: { target: TeamFormTarget | nu
         </Field>
       </div>
 
-      <Field label="Colour" hint="Used for this team's matches on the calendar">
+      <Field group label="Colour" hint="Used for this team's matches on the calendar">
         <div className="color-row">
           {TEAM_COLORS.map((c) => (
             <button
