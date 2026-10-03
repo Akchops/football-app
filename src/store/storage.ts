@@ -105,6 +105,10 @@ function normaliseCompetition(c: Competition): Competition {
     ageGroup: c.ageGroup ?? '',
     archived: c.archived ?? false,
     placing: c.placing ?? '',
+    startDate: c.startDate ?? '',
+    teamId: c.teamId ?? null,
+    location: c.location ?? '',
+    matchLength: c.matchLength ?? 0,
     updatedAt: c.updatedAt ?? c.createdAt ?? '',
     deletedAt: c.deletedAt ?? null,
   };

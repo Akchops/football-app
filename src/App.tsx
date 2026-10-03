@@ -2,7 +2,8 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { useNow } from './useNow';
 import type { Match } from './types';
-import { ageGroupCheck, kickoffAt } from './lib/date';
+import { ageGroupCheck, kickoffAt, todayISO } from './lib/date';
+import { nextMatchFor } from './lib/competitions';
 import { pendingResultMatches } from './lib/stats';
 import { CalendarScreen } from './components/CalendarScreen';
 import { MatchesScreen } from './components/MatchesScreen';
@@ -39,7 +40,7 @@ const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
 ];
 
 function Shell() {
-  const { matches, settings, profile, training, competitions } = useStore();
+  const { matches, settings, profile, training, competitions, teams } = useStore();
   const now = useNow();
 
   const [tab, setTab] = useState<Tab>('calendar');
@@ -48,6 +49,9 @@ function Shell() {
   const [resultMatch, setResultMatch] = useState<Match | null>(null);
   const [competitionForm, setCompetitionForm] = useState<CompetitionFormTarget | null>(null);
   const [competitionView, setCompetitionView] = useState<CompetitionView | null>(null);
+  // A match being added from a competition's page goes back there afterwards, so
+  // the next fixture is one tap away.
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const [teamForm, setTeamForm] = useState<TeamFormTarget | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -200,11 +204,15 @@ function Shell() {
 
       <MatchFormSheet
         target={matchForm}
-        onClose={() => setMatchForm(null)}
+        onClose={() => {
+          setMatchForm(null);
+          if (returnTo) setCompetitionView({ id: returnTo, step: 'summary' });
+          setReturnTo(null);
+        }}
         onCreated={(created) => {
           // Backfilling a match that has already been played - ask for the score now
           // rather than letting the prompt ambush them a moment later.
-          if (kickoffAt(created.date, created.time).getTime() <= Date.now()) setResultMatch(created);
+          if (kickoffAt(created.date, created.time).getTime() <= Date.now()) openResult(created);
         }}
       />
 
@@ -233,6 +241,14 @@ function Shell() {
           setDetailMatch(m);
         }}
         onEnterResult={openResult}
+        onAddMatch={(competition) => {
+          setCompetitionView(null);
+          setReturnTo(competition.id);
+          setMatchForm({
+            mode: 'create',
+            preset: nextMatchFor(competition, matches, teams, settings, todayISO(now)),
+          });
+        }}
       />
 
       <ResultSheet

@@ -41,8 +41,13 @@ server, nothing uploaded.
   a live countdown
 
 **Tournaments**
-- "+ Tournament" on the home screen creates the tournament *and* all of its
-  fixtures in one go — the usual case of several matches on one day
+- "+ Tournament" on the home screen creates the tournament, and its matches
+  too if the fixtures are out — a whole day's worth in one go
+- Or create it with no matches when the fixtures come in one at a time. Its
+  day, team, ground and match length are kept, and "+ Add match" on its page
+  starts each new match from them — on the same day an hour after the last,
+  in the next round — so a fixture that has just come in only needs its
+  opponent and kick-off
 - Optionally spans more than one day, and applies one venue to every match
 - Each match is its own card: pick its stage (Group stage, Quarter-final,
   Semi-final, Final…), its kick-off, and the opponent if you know it. Leave the

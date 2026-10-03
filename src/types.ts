@@ -15,6 +15,13 @@ export interface Competition {
   archived: boolean;
   /** How far the team got, e.g. "Winners" - '' until it's finished and said. */
   placing: string;
+  /** What a tournament was set up with - its first day, team, ground and match
+      length - so matches added one at a time later, as the fixtures come in,
+      start from them. Empty (and 0) for anything else. */
+  startDate: string;
+  teamId: string | null;
+  location: string;
+  matchLength: number;
   createdAt: string;
   /** Bumped on every edit; when two devices disagree, the newest one wins. */
   updatedAt: string;

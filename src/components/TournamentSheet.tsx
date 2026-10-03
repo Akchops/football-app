@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { AGE_GROUPS, COMPETITION_COLORS, MATCH_LENGTHS, STAGES, nextStage } from '../types';
 import { seasonLabel, todayISO } from '../lib/date';
+import { hourAfter } from '../lib/competitions';
 import { DurationPicker, Field, Sheet } from './ui';
 
 interface FixtureDraft {
@@ -11,11 +12,11 @@ interface FixtureDraft {
   date: string;
 }
 
-const START_TIMES = ['09:30', '11:00', '12:30'];
-
 /**
- * Tournaments are usually several matches in one day, so this creates the
- * competition and all of its fixtures in one go rather than one at a time.
+ * Creates a tournament - and its matches too, when the fixtures are already
+ * known, which saves adding a day's worth one at a time. When they come in one
+ * at a time instead, it can start with none: its day, team, ground and match
+ * length are kept, and each match added from its page later starts from them.
  */
 export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { addTournament, teams, competitions, settings, profile } = useStore();
@@ -50,8 +51,8 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     setMultiDay(false);
     // Tournament games are nearly always shorter than a league fixture.
     setDurationMinutes(Math.min(settings.defaultMatchLength, 40));
-    // Most tournaments open with a few group games.
-    setFixtures(START_TIMES.map((time) => ({ stage: 'Group stage', opponent: '', time, date: today })));
+    // None until asked for: the fixtures often aren't out yet.
+    setFixtures([]);
     setError('');
   }, [open, teams, competitions.length, settings.defaultMatchLength, profile.ageGroup]);
 
@@ -62,30 +63,25 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
 
   const addRow = () => {
     const last = fixtures[fixtures.length - 1];
-    const [h, m] = (last?.time ?? '09:00').split(':').map(Number);
-    const nextHour = Math.min(23, (h ?? 9) + 1);
     setFixtures((list) => [
       ...list,
-      {
-        // Another group game after a group game; after a knockout round, the next one.
-        stage: nextStage(last?.stage ?? 'Group stage'),
-        opponent: '',
-        time: `${String(nextHour).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`,
-        date: last?.date ?? date,
-      },
+      last
+        ? // Another group game after a group game; after a knockout round, the next one.
+          { stage: nextStage(last.stage), opponent: '', time: hourAfter(last.time), date: last.date }
+        : // Tournaments mostly open with group games, first thing.
+          { stage: 'Group stage', opponent: '', time: '09:30', date },
     ]);
   };
+
+  const count = fixtures.filter((f) => f.opponent.trim() || f.time).length;
 
   const submit = () => {
     if (!name.trim()) {
       setError('Give the tournament a name, e.g. "Easter 7s".');
       return;
     }
+    // No matches is fine: they can be added from the tournament as the fixtures come in.
     const used = fixtures.filter((f) => f.opponent.trim() || f.time);
-    if (used.length === 0) {
-      setError('Add at least one match.');
-      return;
-    }
     addTournament({
       name: name.trim(),
       type: 'tournament',
@@ -93,6 +89,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
       ageGroup,
       color,
       notes: '',
+      startDate: date,
       teamId: teamId || null,
       location: location.trim(),
       durationMinutes,
@@ -110,7 +107,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     <Sheet
       open
       title="Add a tournament"
-      subtitle="Creates the tournament and all of its matches at once."
+      subtitle="Add its matches now, or later as the fixtures come in."
       onClose={onClose}
       footer={
         <>
@@ -118,7 +115,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
             Cancel
           </button>
           <button className="primary-btn wide" onClick={submit}>
-            Add {fixtures.filter((f) => f.opponent.trim() || f.time).length} matches
+            {count === 0 ? 'Create tournament' : `Create with ${count} match${count === 1 ? '' : 'es'}`}
           </button>
         </>
       }
@@ -206,10 +203,13 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
         <DurationPicker value={durationMinutes} onChange={setDurationMinutes} presets={MATCH_LENGTHS} />
       </Field>
 
-      <label className="toggle-row">
-        <input type="checkbox" checked={multiDay} onChange={(e) => setMultiDay(e.target.checked)} />
-        <span>Runs over more than one day</span>
-      </label>
+      {/* Only says anything about the matches below, so only there with them. */}
+      {fixtures.length > 0 && (
+        <label className="toggle-row">
+          <input type="checkbox" checked={multiDay} onChange={(e) => setMultiDay(e.target.checked)} />
+          <span>Runs over more than one day</span>
+        </label>
+      )}
 
       <div className="fixtures">
         <h3>Matches</h3>
@@ -218,15 +218,13 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
           <div key={i} className="fixture-card">
             <div className="fixture-head">
               <span className="fixture-title">Match {i + 1}</span>
-              {fixtures.length > 1 && (
-                <button
-                  className="icon-btn"
-                  onClick={() => setFixtures((list) => list.filter((_, idx) => idx !== i))}
-                  aria-label={`Remove match ${i + 1}`}
-                >
-                  ✕
-                </button>
-              )}
+              <button
+                className="icon-btn"
+                onClick={() => setFixtures((list) => list.filter((_, idx) => idx !== i))}
+                aria-label={`Remove match ${i + 1}`}
+              >
+                ✕
+              </button>
             </div>
             <div className="fixture-when">
               <select
@@ -269,13 +267,22 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
           </div>
         ))}
 
+        {fixtures.length === 0 && (
+          <p className="muted small">
+            Got the fixtures? Add them now. If they're coming in one at a time, just create the tournament and add each
+            match from its page as it arrives.
+          </p>
+        )}
+
         <button className="ghost-btn" onClick={addRow}>
-          + Add another match
+          {fixtures.length === 0 ? '+ Add a match' : '+ Add another match'}
         </button>
-        <p className="muted small">
-          Don't know who you'll play in a round yet? Leave the opponent blank — it shows as TBC, and you can fill it in
-          later.
-        </p>
+        {fixtures.length > 0 && (
+          <p className="muted small">
+            Don't know who you'll play in a round yet? Leave the opponent blank — it shows as TBC, and you can fill it in
+            later.
+          </p>
+        )}
       </div>
     </Sheet>
   );

@@ -217,6 +217,8 @@ export interface TournamentFixture {
 }
 
 export interface NewTournamentInput extends NewCompetitionInput {
+  /** Its first day - kept even when no matches are known yet. */
+  startDate: string;
   teamId: string | null;
   location: string;
   /** Tournament games are usually short - applied to every fixture. */
@@ -349,6 +351,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           ...input,
           archived: false,
           placing: '',
+          startDate: '',
+          teamId: null,
+          location: '',
+          matchLength: 0,
           createdAt: now(),
           updatedAt: now(),
           deletedAt: null,
@@ -366,13 +372,17 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       },
 
       addTournament(input) {
-        const { fixtures, teamId, location, durationMinutes: _duration, ...competitionInput } = input;
+        const { fixtures, teamId, location, startDate, durationMinutes: _duration, ...competitionInput } = input;
         const competition: Competition = {
           id: createId('comp'),
           ...competitionInput,
           type: 'tournament',
           archived: false,
           placing: '',
+          startDate,
+          teamId,
+          location,
+          matchLength: input.durationMinutes,
           createdAt: now(),
           updatedAt: now(),
           deletedAt: null,

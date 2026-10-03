@@ -273,7 +273,7 @@ export interface TournamentBreakdown extends Record_ {
   status: TournamentStatus;
   /** Matches that are on - everything except rounds called off. */
   fixtures: number;
-  /** First and last dates of those matches, 'YYYY-MM-DD' - '' when there are none. */
+  /** First and last dates of those matches, 'YYYY-MM-DD' - its own day, or '', when there are none. */
   from: string;
   to: string;
 }
@@ -305,8 +305,9 @@ export function statsByTournament(
       ...rec,
       status,
       fixtures: on.length,
-      from: dates[0] ?? '',
-      to: dates[dates.length - 1] ?? '',
+      // Before any matches are in, the day it was set up for.
+      from: dates[0] ?? competition.startDate,
+      to: dates[dates.length - 1] ?? competition.startDate,
     });
   }
   return out.sort((a, b) => (a.to < b.to ? 1 : a.to > b.to ? -1 : 0));

@@ -15,7 +15,8 @@ function team(id: string): Team {
 function competition(id: string): Competition {
   return {
     id, name: `Comp ${id}`, type: 'league', season: '25/26', ageGroup: '', color: '#22c55e', notes: '',
-    archived: false, placing: '', createdAt: STAMP, updatedAt: STAMP, deletedAt: null,
+    archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
+    createdAt: STAMP, updatedAt: STAMP, deletedAt: null,
   };
 }
 

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { AGE_GROUPS, COMPETITION_TYPE_LABEL, PLACINGS, POSITION_GROUP_LABEL, type Match } from '../types';
+import { AGE_GROUPS, COMPETITION_TYPE_LABEL, PLACINGS, POSITION_GROUP_LABEL, type Competition, type Match } from '../types';
 import { formatDateShort, formatTime, kickoffAt } from '../lib/date';
 import { positionStatCards } from '../lib/metrics';
 import { personalBests } from '../lib/records';
@@ -27,12 +27,15 @@ export function CompetitionSheet({
   onClose,
   onOpenMatch,
   onEnterResult,
+  onAddMatch,
 }: {
   view: CompetitionView | null;
   now: Date;
   onClose: () => void;
   onOpenMatch: (match: Match) => void;
   onEnterResult: (match: Match) => void;
+  /** A fixture that has just come in - started from this competition's own details. */
+  onAddMatch: (competition: Competition) => void;
 }) {
   const { competitions, matches, teams, profile, colorOf, finishCompetition, reopenCompetition } = useStore();
   const competition = view ? competitions.find((c) => c.id === view.id) ?? null : null;
@@ -91,7 +94,11 @@ export function CompetitionSheet({
   const calledOff = own.length - fixtures.length;
   const first = own[0]?.date ?? '';
   const last = own[own.length - 1]?.date ?? '';
-  const when = !first ? '' : first === last ? formatDateShort(first) : `${formatDateShort(first)} – ${formatDateShort(last)}`;
+  const when = !first
+    ? competition.startDate && formatDateShort(competition.startDate)
+    : first === last
+      ? formatDateShort(first)
+      : `${formatDateShort(first)} – ${formatDateShort(last)}`;
   const subtitle = [COMPETITION_TYPE_LABEL[competition.type], competition.ageGroup, competition.season, when, team?.name]
     .filter(Boolean)
     .join(' · ');
@@ -224,19 +231,25 @@ export function CompetitionSheet({
               Done
             </button>
           </>
-        ) : finishable ? (
+        ) : finishable && stats.played > 0 ? (
           <>
-            <button className="ghost-btn wide" onClick={onClose}>
-              Close
+            <button className="ghost-btn wide" onClick={() => onAddMatch(competition)}>
+              + Add match
             </button>
             <button className="primary-btn wide" onClick={startFinish}>
               Finish {noun}
             </button>
           </>
         ) : (
-          <button className="primary-btn wide" onClick={onClose}>
-            Done
-          </button>
+          // Nothing played yet - adding the fixtures as they come in is the thing to do.
+          <>
+            <button className="ghost-btn wide" onClick={onClose}>
+              Close
+            </button>
+            <button className="primary-btn wide" onClick={() => onAddMatch(competition)}>
+              + Add match
+            </button>
+          </>
         )
       }
     >
@@ -251,7 +264,9 @@ export function CompetitionSheet({
         </div>
       ) : (
         <p className="muted small">
-          {fixtures.length === 0 ? 'No matches yet.' : `In progress · ${stats.played} of ${fixtures.length} played`}
+          {fixtures.length === 0
+            ? 'No matches yet. Add each one here as its fixture comes in.'
+            : `${stats.played > 0 ? 'In progress' : 'Coming up'} · ${stats.played} of ${fixtures.length} played`}
         </p>
       )}
 

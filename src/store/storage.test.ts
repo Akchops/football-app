@@ -104,6 +104,8 @@ describe('parseData', () => {
   it('gives competitions from before finishing an open, unplaced, ungrouped start', () => {
     const [competition] = parseData(V1_BACKUP).competitions;
     expect(competition).toMatchObject({ archived: false, placing: '', ageGroup: '' });
+    // Nor anything set up for matches added later.
+    expect(competition).toMatchObject({ startDate: '', teamId: null, location: '', matchLength: 0 });
   });
 
   it("counts an old profile's age group as picked in the year it was set up", () => {

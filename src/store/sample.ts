@@ -27,22 +27,25 @@ export function buildSampleData(now: Date = new Date()): AppData {
 
   const league: Competition = {
     id: createId('comp'), name: 'Sunday League', type: 'league', season, ageGroup: 'U16',
-    color: COMPETITION_COLORS[0], notes: 'Division 2', archived: false, placing: '', createdAt: stamp, updatedAt: stamp,
-    deletedAt: null,
+    color: COMPETITION_COLORS[0], notes: 'Division 2', archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
+    createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const cup: Competition = {
     id: createId('comp'), name: 'County Cup', type: 'cup', season, ageGroup: 'U16',
-    color: COMPETITION_COLORS[2], notes: '', archived: false, placing: '', createdAt: stamp, updatedAt: stamp, deletedAt: null,
+    color: COMPETITION_COLORS[2], notes: '', archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
+    createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const tournament: Competition = {
     id: createId('comp'), name: 'Easter 7s', type: 'tournament', season, ageGroup: 'U16',
     color: COMPETITION_COLORS[3], notes: 'Group stage + knockouts, all in one day', archived: false, placing: '',
+    startDate: iso(3), teamId: club.id, location: 'Central Playing Fields', matchLength: 30,
     createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   // Already finished - played a year up - so the demo shows a tournament kept with its stats.
   const springSevens: Competition = {
     id: createId('comp'), name: 'Spring 7s', type: 'tournament', season, ageGroup: 'U17',
     color: COMPETITION_COLORS[5], notes: 'Played up a year', archived: true, placing: 'Runners-up',
+    startDate: iso(-35), teamId: club.id, location: 'Riverside Park', matchLength: 30,
     createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
 
