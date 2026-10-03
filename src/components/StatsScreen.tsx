@@ -5,8 +5,8 @@ import { formatDateShort } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import {
-  computeStats, mainPositionGroup, recentScores, recordSummary, scoreline, statsByCompetition,
-  statsByMonth, statsByOpponent, statsByTeam, statsByTournament, statsByVenue,
+  computeStats, mainPositionGroup, recentScores, recordSummary, scoreline, statsByCompetition, statsByMonth,
+  statsByOpponent, statsByStage, statsByTeam, statsByTournament, statsByVenue, type StageBreakdown,
 } from '../lib/stats';
 import { milestones, personalBests } from '../lib/records';
 import { TRAINING_TYPE_LABEL } from '../types';
@@ -46,6 +46,7 @@ export function StatsScreen({
   const byTeam = useMemo(() => statsByTeam(matches, teams), [matches, teams]);
   const byMonth = useMemo(() => statsByMonth(scoped, 6, now), [scoped, now]);
   const byVenue = useMemo(() => statsByVenue(scoped), [scoped]);
+  const byStage = useMemo(() => statsByStage(scoped), [scoped]);
   const byOpponent = useMemo(() => statsByOpponent(scoped), [scoped]);
   const trend = useMemo(() => recentScores(scoped, 5), [scoped]);
   const trainingSummary = useMemo(() => {
@@ -388,6 +389,20 @@ export function StatsScreen({
         </Section>
       )}
 
+      {byStage.length > 0 && (
+        <Section title="Group stage vs knockouts">
+          <div className="table">
+            {byStage.map((row) => (
+              <div key={row.stage} className="table-row">
+                <span className="table-name">{row.stage === 'group' ? 'Group stage' : 'Knockouts'}</span>
+                <span className="table-value">{recordSummary(row)}</span>
+                <span className="table-sub">{stageLine(row)}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {byVenue.length > 0 && (
         <Section title="Home & away">
           <div className="table">
@@ -451,4 +466,12 @@ export function StatsScreen({
       )}
     </div>
   );
+}
+
+/** "3 pl · 5:2 · 1 clean sheet · shootouts 1-0" - only the parts there are. */
+function stageLine(row: StageBreakdown): string {
+  const parts = [`${row.played} pl`, `${row.goalsFor}:${row.goalsAgainst}`];
+  if (row.cleanSheets > 0) parts.push(`${row.cleanSheets} clean sheet${row.cleanSheets === 1 ? '' : 's'}`);
+  if (row.shootoutsWon + row.shootoutsLost > 0) parts.push(`shootouts ${row.shootoutsWon}-${row.shootoutsLost}`);
+  return parts.join(' · ');
 }

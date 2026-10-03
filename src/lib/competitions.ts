@@ -1,5 +1,6 @@
-import { nextStage, type Competition, type Match, type Settings, type Team } from '../types';
+import type { Competition, Match, Settings, Team } from '../types';
 import { kickoffAt } from './date';
+import { nextStage } from './stage';
 
 /** A match as the add-match form starts it: everything except what saving it adds. */
 export type MatchDraft = Omit<Match, 'id' | 'status' | 'result' | 'remindAfter' | 'createdAt' | 'updatedAt' | 'deletedAt'>;
@@ -33,13 +34,16 @@ export function nextMatchFor(
   const live = (id: string | null) => (id && teams.some((t) => t.id === id) ? id : null);
 
   const sameDay = latest !== null && latest.date >= today;
+  const stage = latest ? nextStage(latest.stage) : tournament ? 'group' : null;
   const date = sameDay ? latest.date : competition.startDate && competition.startDate >= today ? competition.startDate : today;
 
   return {
     competitionId: competition.id,
     teamId: live(latest?.teamId ?? null) ?? live(competition.teamId),
     opponent: '',
-    stage: latest ? nextStage(latest.stage) : tournament ? 'Group stage' : '',
+    stage,
+    // The group or bracket carries on: another Group B game, the Plate final after the Plate semi.
+    stageDetail: stage && latest ? latest.stageDetail : '',
     date,
     time: sameDay ? hourAfter(latest.time) : settings.defaultKickoff,
     venue: latest?.venue ?? (tournament ? 'neutral' : 'home'),

@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 import type {
-  AppData, Competition, Match, MatchResult, Profile, Settings, Team, TrainingSession,
+  AppData, Competition, Match, MatchResult, MatchStage, Profile, Settings, Team, TrainingSession,
 } from '../types';
 import { createId, emptyData, live, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
+import { mergeRemote, type RemoteChanges } from '../lib/sync';
 
 type Action =
   | { type: 'data/replace'; data: AppData }
+  | { type: 'data/merge'; changes: RemoteChanges }
   | { type: 'settings/update'; patch: Partial<Settings> }
   | { type: 'profile/update'; patch: Partial<Profile> }
   | { type: 'team/add'; team: Team }
@@ -44,6 +46,12 @@ export function reducer(state: AppData, action: Action): AppData {
   switch (action.type) {
     case 'data/replace':
       return action.data;
+
+    // Records from the server are merged against whatever is here at this
+    // moment, in one step - so an edit made while a sync was on its way is
+    // never overwritten by what the sync saw before it.
+    case 'data/merge':
+      return mergeRemote(state, action.changes);
 
     // Settings and the profile are single records rather than lists, so they
     // carry their own edit time and merge whole.
@@ -164,13 +172,15 @@ export interface NewMatchInput {
   competitionId: string | null;
   teamId: string | null;
   opponent: string;
-  stage: string;
   durationMinutes: number;
   date: string;
   time: string;
   venue: Match['venue'];
   location: string;
   notes: string;
+  /** Left out for anything that is not a group game or knockout round. */
+  stage?: MatchStage | null;
+  stageDetail?: string;
 }
 
 export interface NewCompetitionInput {
@@ -211,9 +221,10 @@ export interface NewTeamInput {
 /** One fixture inside a tournament being created in a single go. */
 export interface TournamentFixture {
   opponent: string;
-  stage: string;
   date: string;
   time: string;
+  stage?: MatchStage | null;
+  stageDetail?: string;
 }
 
 export interface NewTournamentInput extends NewCompetitionInput {
@@ -224,6 +235,64 @@ export interface NewTournamentInput extends NewCompetitionInput {
   /** Tournament games are usually short - applied to every fixture. */
   durationMinutes: number;
   fixtures: TournamentFixture[];
+}
+
+/** A new fixture, not yet played. A stage's detail only means something with a stage. */
+export function buildMatch(input: NewMatchInput, at: string): Match {
+  return {
+    id: createId('match'),
+    ...input,
+    stage: input.stage ?? null,
+    stageDetail: input.stage ? (input.stageDetail ?? '').trim() : '',
+    status: 'scheduled',
+    result: null,
+    remindAfter: null,
+    createdAt: at,
+    updatedAt: at,
+    deletedAt: null,
+  };
+}
+
+/** The tournament and every fixture in it, each with the stage it was set up as. */
+export function buildTournament(input: NewTournamentInput, at: string): { competition: Competition; matches: Match[] } {
+  const { fixtures, teamId, location, startDate, durationMinutes, ...competitionInput } = input;
+  const competition: Competition = {
+    id: createId('comp'),
+    ...competitionInput,
+    type: 'tournament',
+    archived: false,
+    placing: '',
+    // Kept on the tournament itself, so matches added one at a time later -
+    // when there were no fixtures to make with it - start from them.
+    startDate,
+    teamId,
+    location,
+    matchLength: durationMinutes,
+    createdAt: at,
+    updatedAt: at,
+    deletedAt: null,
+  };
+  const matches = fixtures
+    .filter((f) => f.date)
+    .map((fixture) =>
+      buildMatch(
+        {
+          competitionId: competition.id,
+          teamId,
+          opponent: fixture.opponent.trim() || 'TBC',
+          date: fixture.date,
+          time: fixture.time || '00:00',
+          venue: 'neutral',
+          location,
+          durationMinutes,
+          notes: '',
+          stage: fixture.stage,
+          stageDetail: fixture.stageDetail,
+        },
+        at,
+      ),
+    );
+  return { competition, matches };
 }
 
 interface StoreValue {
@@ -269,6 +338,10 @@ interface StoreValue {
   clearAllData(): void;
   importData(json: string): { ok: true } | { ok: false; error: string };
   exportData(): string;
+  /** Records from the server, merged in record by record. */
+  applyRemote(changes: RemoteChanges): void;
+  /** Everything replaced at once - only for "use the family's only" when joining. */
+  replaceData(data: AppData): void;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -302,16 +375,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       training,
 
       addMatch(input) {
-        const match: Match = {
-          id: createId('match'),
-          ...input,
-          status: 'scheduled',
-          result: null,
-          remindAfter: null,
-          createdAt: now(),
-          updatedAt: now(),
-          deletedAt: null,
-        };
+        const match = buildMatch(input, now());
         dispatch({ type: 'match/add', match });
         return match;
       },
@@ -372,44 +436,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       },
 
       addTournament(input) {
-        const { fixtures, teamId, location, startDate, durationMinutes: _duration, ...competitionInput } = input;
-        const competition: Competition = {
-          id: createId('comp'),
-          ...competitionInput,
-          type: 'tournament',
-          archived: false,
-          placing: '',
-          startDate,
-          teamId,
-          location,
-          matchLength: input.durationMinutes,
-          createdAt: now(),
-          updatedAt: now(),
-          deletedAt: null,
-        };
+        const { competition, matches: created } = buildTournament(input, now());
         dispatch({ type: 'competition/add', competition });
-
-        const created = fixtures
-          .filter((f) => f.date)
-          .map<Match>((fixture) => ({
-            id: createId('match'),
-            competitionId: competition.id,
-            teamId,
-            opponent: fixture.opponent.trim() || 'TBC',
-            stage: fixture.stage,
-            date: fixture.date,
-            time: fixture.time || '00:00',
-            venue: 'neutral',
-            location,
-            durationMinutes: input.durationMinutes,
-            status: 'scheduled',
-            result: null,
-            notes: '',
-            remindAfter: null,
-            createdAt: now(),
-            updatedAt: now(),
-            deletedAt: null,
-          }));
         if (created.length) dispatch({ type: 'match/addMany', matches: created });
         return competition;
       },
@@ -489,6 +517,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       clearAllData() {
         dispatch({ type: 'data/replace', data: emptyData() });
+      },
+
+      applyRemote(changes) {
+        dispatch({ type: 'data/merge', changes });
+      },
+
+      replaceData(next) {
+        dispatch({ type: 'data/replace', data: next });
       },
 
       exportData() {

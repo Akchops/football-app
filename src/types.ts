@@ -151,6 +151,13 @@ export type MetricTotals = Partial<Record<MetricId, number>>;
 export type MatchStatus = 'scheduled' | 'played' | 'cancelled';
 export type Venue = 'home' | 'away' | 'neutral';
 
+/**
+ * Where a match sits in a cup or tournament: a group game, or one of the
+ * knockout rounds that follow. 'round' is a numbered early cup round (Round 2).
+ * Labels and ordering live in lib/stage.ts.
+ */
+export type MatchStage = 'group' | 'round' | 'last16' | 'quarter' | 'semi' | 'third' | 'final';
+
 /** How the match finished, once a result has been entered. */
 export interface MatchResult {
   goalsFor: number;
@@ -179,9 +186,6 @@ export interface Match {
   competitionId: string | null;
   teamId: string | null;
   opponent: string;
-  /** Round of a tournament or cup, e.g. "Semi-final", or '' for an ordinary match. Kept
-      apart from the opponent, so a TBC can be filled in later without losing the round. */
-  stage: string;
   /** Local calendar date, 'YYYY-MM-DD'. */
   date: string;
   /** Local kickoff time, 'HH:mm'. */
@@ -192,6 +196,10 @@ export interface Match {
   durationMinutes: number;
   status: MatchStatus;
   result: MatchResult | null;
+  /** Group game, semi-final... Null for anything outside a stage, like a league game. */
+  stage: MatchStage | null;
+  /** The group ("B"), the round number ("2") or the bracket ("Plate"). Usually empty. */
+  stageDetail: string;
   notes: string;
   /** Set when the user says "not now" to the result prompt; ISO timestamp to stop asking until. */
   remindAfter: string | null;
@@ -289,24 +297,6 @@ export const COMPETITION_TYPE_LABEL: Record<CompetitionType, string> = {
   friendly: 'Friendly',
   other: 'Other',
 };
-
-/** The rounds a tournament or cup match can be, in the order they're played. */
-export const STAGES = ['Group stage', 'Round of 16', 'Quarter-final', 'Semi-final', '3rd place play-off', 'Final'];
-
-const NEXT_STAGE: Record<string, string> = {
-  'Round of 16': 'Quarter-final',
-  'Quarter-final': 'Semi-final',
-  'Semi-final': 'Final',
-  '3rd place play-off': 'Final',
-};
-
-/**
- * A sensible stage for the match added after one in `previous`: more group games
- * follow a group game, and after a knockout round comes the next one.
- */
-export function nextStage(previous: string): string {
-  return NEXT_STAGE[previous] ?? previous;
-}
 
 /** Quick picks for how far a competition went. Anything else can be typed. */
 export const PLACINGS = ['Winners', 'Runners-up', 'Third place', 'Semi-finals', 'Quarter-finals', 'Group stage'];

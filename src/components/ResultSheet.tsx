@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { fixtureContext } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import {
   ALL_POSITIONS, POSITIONS_BY_GROUP, POSITION_GROUP_LABEL, emptyResult, groupForPosition,
@@ -98,7 +99,14 @@ export function ResultSheet({
     <Sheet
       open
       title={headline ?? 'Match result'}
-      subtitle={`${match.venue === 'away' ? '@' : 'vs'} ${them} · ${formatDateShort(match.date)} · ${formatTime(match.time)}${competition ? ` · ${competition.name}` : ''}`}
+      subtitle={[
+        `${match.venue === 'away' ? '@' : 'vs'} ${them}`,
+        formatDateShort(match.date),
+        formatTime(match.time),
+        fixtureContext(competition, match),
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       onClose={onClose}
       footer={
         <>
@@ -125,7 +133,7 @@ export function ResultSheet({
 
       {result.didPlay && (
         <>
-          <Field label="Position played" hint="Changes which stats are tracked below">
+          <Field group label="Position played" hint="Changes which stats are tracked below">
             <div className="chip-wrap">
               {(Object.keys(POSITIONS_BY_GROUP) as PositionGroup[]).map((g) => (
                 <button

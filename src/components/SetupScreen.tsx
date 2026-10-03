@@ -9,6 +9,7 @@ import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats, placingLabel } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
 import { AccountSection } from './AccountSettings';
+import { useSync } from '../store/SyncProvider';
 import { AiSection } from './AiSettings';
 import { DurationPicker, EmptyState, Field, Section } from './ui';
 import { AvatarPicker } from './Avatar';
@@ -34,6 +35,7 @@ export function SetupScreen({
   const store = useStore();
   const { settings, profile, competitions, teams, matches, updateSettings, updateProfile, deleteCompetition, deleteTeam } =
     store;
+  const signedIn = Boolean(useSync().account);
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
   const [mediaUsage, setMediaUsage] = useState<{ count: number; bytes: number } | null>(null);
@@ -153,7 +155,7 @@ export function SetupScreen({
           ))}
         </div>
         {POSITIONS_BY_GROUP[profile.positionGroup].length > 1 && (
-          <Field label="More specifically">
+          <Field group label="More specifically">
             <div className="chip-wrap">
               {POSITIONS_BY_GROUP[profile.positionGroup].map((p) => (
                 <button
@@ -284,7 +286,7 @@ export function SetupScreen({
             ))}
           </select>
         </Field>
-        <Field label="Default training length">
+        <Field group label="Default training length">
           <DurationPicker
             value={settings.defaultTrainingLength}
             onChange={(minutes) => updateSettings({ defaultTrainingLength: minutes })}
@@ -301,7 +303,7 @@ export function SetupScreen({
             <option value="team">Team</option>
           </select>
         </Field>
-        <Field label="Default match length" hint="Starting point for a new match — each match can override it.">
+        <Field group label="Default match length" hint="Starting point for a new match — each match can override it.">
           <DurationPicker
             value={settings.defaultMatchLength}
             onChange={(minutes) => updateSettings({ defaultMatchLength: minutes })}
@@ -334,7 +336,9 @@ export function SetupScreen({
 
       <Section title="Your data">
         <p className="muted small">
-          Everything is stored on this device only — nothing is uploaded. Back it up before changing phones.
+          {signedIn
+            ? "Matches, training and the profile are kept in your family's account as well as on this phone, so a new phone gets them by signing in. Match photos and clips are only on this phone."
+            : 'Everything is stored on this device only — nothing is uploaded. Back it up before changing phones.'}
           {mediaUsage && mediaUsage.count > 0
             ? ` Videos and photos use ${formatBytes(mediaUsage.bytes)} across ${mediaUsage.count} file${mediaUsage.count === 1 ? '' : 's'}.`
             : ''}

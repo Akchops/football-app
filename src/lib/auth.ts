@@ -1,4 +1,4 @@
-import { configured, returnAddress, supabase } from './supabase';
+import { authSettings, configured, returnAddress, supabase } from './supabase';
 
 /** Somebody signed in. Not the player - the person holding the phone. */
 export interface Account {
@@ -41,6 +41,34 @@ export async function currentAccount(): Promise<Account | null> {
     // same as being signed out, but there is nothing better to report.
     return null;
   }
+}
+
+/**
+ * Emails a six-digit code. The main way in, because it works everywhere -
+ * including the iPhone home-screen app, where sign-in that leaves for another
+ * page and comes back finishes in Safari instead, and the app itself never
+ * becomes signed in. The first code to an address makes the account.
+ */
+export async function sendCode(email: string): Promise<void> {
+  const { error } = await (await supabase()).auth.signInWithOtp({
+    email: email.trim(),
+    options: { shouldCreateUser: true, emailRedirectTo: returnAddress() },
+  });
+  if (error) throw new Error(describeAuthError(error.message));
+}
+
+export async function verifyCode(email: string, code: string): Promise<void> {
+  const { error } = await (await supabase()).auth.verifyOtp({
+    email: email.trim(),
+    token: code.replace(/\s+/g, ''),
+    type: 'email',
+  });
+  if (error) throw new Error(describeAuthError(error.message));
+}
+
+/** Whether Google sign-in has been switched on for this project. */
+export async function googleAvailable(): Promise<boolean> {
+  return (await authSettings()).external?.google === true;
 }
 
 /**
@@ -98,6 +126,23 @@ export function describeAuthError(message: string): string {
   const text = message.toLowerCase();
   if (text.includes('failed to fetch') || text.includes('network')) {
     return 'Could not reach the account server. Everything is still saved on this phone.';
+  }
+  // Supabase's built-in email only reaches the project's own team; everyone
+  // else needs the project's email sending set up (supabase/README.md).
+  if (text.includes('not authorized')) {
+    return "Matchday can't email that address yet - its email sending isn't fully set up. Ask whoever set up Matchday to finish it.";
+  }
+  if (text.includes('signups not allowed')) {
+    return "New sign-ins are switched off for Matchday's account server. Ask whoever set it up to switch them on.";
+  }
+  if (text.includes('token has expired') || text.includes('invalid otp') || text.includes('otp')) {
+    return 'That code did not work. Check it, or send a new one - each code only lasts a few minutes.';
+  }
+  if (text.includes('rate limit') || text.includes('only request this after')) {
+    return 'Too many codes asked for. Wait a minute and try again - if it keeps saying this, wait an hour.';
+  }
+  if (text.includes('invalid format') || text.includes('validate email')) {
+    return 'That does not look like an email address.';
   }
   if (text.includes('provider is not enabled')) {
     return 'Google sign-in has not been switched on for this project yet.';

@@ -39,6 +39,19 @@ describe('parseData', () => {
     expect(parseData(V1_BACKUP).version).toBe(DATA_VERSION);
   });
 
+  it('loads matches from before stages as having none', () => {
+    const [match] = parseData(V1_BACKUP).matches;
+    expect(match.stage).toBeNull();
+    expect(match.stageDetail).toBe('');
+  });
+
+  it('keeps a real stage and drops a made-up one', () => {
+    const saved = (stage: unknown) =>
+      JSON.stringify({ version: 6, matches: [{ id: 'm', date: '2026-04-10', stage, stageDetail: 'Plate' }] });
+    expect(parseData(saved('semi')).matches[0]).toMatchObject({ stage: 'semi', stageDetail: 'Plate' });
+    expect(parseData(saved('semis')).matches[0].stage).toBeNull();
+  });
+
   it('turns the old single team name into the player\'s first team', () => {
     const data = parseData(V1_BACKUP);
     expect(data.teams).toHaveLength(1);
@@ -93,12 +106,6 @@ describe('parseData', () => {
     data.matches[0].deletedAt = '2026-05-01T00:00:00.000Z';
     const round2 = parseData(JSON.stringify(data));
     expect(round2.matches[0].deletedAt).toBe('2026-05-01T00:00:00.000Z');
-  });
-
-  it('gives matches from before stages existed no stage, leaving the opponent as it was', () => {
-    const [match] = parseData(V1_BACKUP).matches;
-    expect(match.stage).toBe('');
-    expect(match.opponent).toBe('Riverside FC');
   });
 
   it('gives competitions from before finishing an open, unplaced, ungrouped start', () => {

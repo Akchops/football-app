@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { AppStoreProvider, useStore } from './store/AppStore';
+import { SyncProvider } from './store/SyncProvider';
 import { useNow } from './useNow';
 import type { Match } from './types';
 import { ageGroupCheck, kickoffAt, todayISO } from './lib/date';
@@ -286,7 +287,9 @@ export default function App() {
     <AppStoreProvider>
       {/* Sits outside Shell so the service worker registers during onboarding too. */}
       <UpdatePrompt />
-      <Shell />
+      <SyncProvider>
+        <Shell />
+      </SyncProvider>
     </AppStoreProvider>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { stageName } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import { METRIC_BY_ID, VENUE_LABEL, type Competition, type Match, type MetricId } from '../types';
 import { formatDateLong, formatTime, kickoffAt, relativeDayLabel } from '../lib/date';
@@ -79,7 +80,9 @@ export function MatchDetailSheet({
     <Sheet
       open
       title={`${match.venue === 'away' ? '@' : 'vs'} ${match.opponent || 'TBC'}`}
-      subtitle={`${formatDateLong(match.date)} · ${formatTime(match.time)}`}
+      subtitle={[stageName(match.stage, match.stageDetail), formatDateLong(match.date), formatTime(match.time)]
+        .filter(Boolean)
+        .join(' · ')}
       onClose={onClose}
       footer={
         <>
@@ -203,7 +206,7 @@ export function MatchDetailSheet({
         {match.stage && (
           <div>
             <dt>Stage</dt>
-            <dd>{match.stage}</dd>
+            <dd>{stageName(match.stage, match.stageDetail)}</dd>
           </div>
         )}
         <div>

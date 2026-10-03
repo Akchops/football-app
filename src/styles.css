@@ -329,6 +329,8 @@ p { margin: 0; }
   text-overflow: ellipsis;
 }
 .meta-chip.subtle { color: var(--muted); background: transparent; padding: 2px 0; }
+.meta-chip.stage { color: var(--text); border: 1px solid var(--line); background: transparent; }
+.meta-chip.stage.final { color: #fbbf24; border-color: rgba(251, 191, 36, 0.55); background: rgba(251, 191, 36, 0.1); }
 
 .match-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
 .countdown { font-size: 12px; color: var(--muted); font-weight: 600; }
@@ -1576,6 +1578,7 @@ select.input {
 .import-row-head input[type='checkbox'] { width: 22px; height: 22px; margin: 11px 0; flex: none; accent-color: var(--accent); }
 .import-when { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .import-who { flex: 1; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-who .meta-chip { margin-left: 6px; vertical-align: 1px; }
 .import-venue {
   flex: none;
   width: 22px;
@@ -1673,3 +1676,12 @@ button:disabled:active { transform: none; }
 .tourney-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tourney-meta { font-size: 12px; color: var(--muted); }
 .tourney-record { font-weight: 700; font-size: 14px; flex: none; }
+
+/* Who shares this household, in Setup. */
+.family-list { list-style: none; margin: 4px 0 12px; padding: 0; }
+.family-list li {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px;
+}
+.family-list li > span:first-child { overflow-wrap: anywhere; }
+.family-list .link-btn { padding: 0; font-size: inherit; }

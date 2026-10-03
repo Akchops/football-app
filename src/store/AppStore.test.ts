@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reducer } from './AppStore';
+import { buildMatch, buildTournament, reducer } from './AppStore';
 import { emptyData, live } from './storage';
 import { emptyResult, type AppData, type Competition, type Match, type Team, type TrainingSession } from '../types';
 
@@ -22,9 +22,9 @@ function competition(id: string): Competition {
 
 function match(id: string, over: Partial<Match> = {}): Match {
   return {
-    id, competitionId: null, teamId: null, opponent: 'Riverside FC', stage: '', date: '2026-04-10',
+    id, competitionId: null, teamId: null, opponent: 'Riverside FC', date: '2026-04-10',
     time: '16:30', venue: 'home', location: '', durationMinutes: 90, status: 'scheduled',
-    result: null, notes: '', remindAfter: null,
+    result: null, notes: '', remindAfter: null, stage: null, stageDetail: '',
     createdAt: STAMP, updatedAt: STAMP, deletedAt: null, ...over,
   };
 }
@@ -206,5 +206,60 @@ describe('answering the new-season question', () => {
 
     expect(after.profile).toMatchObject({ ageGroup: 'U13', ageGroupYear: 2027 });
     expect(after.teams).toBe(start.teams);
+  });
+});
+
+describe('building a tournament', () => {
+  const input = {
+    name: 'Easter 7s', type: 'tournament' as const, season: '25/26', ageGroup: 'U13', color: '#f59e0b', notes: '',
+    startDate: '2026-04-04', teamId: 't1', location: 'Central Playing Fields', durationMinutes: 30,
+    fixtures: [
+      { opponent: 'Vale FC', date: '2026-04-04', time: '09:30', stage: 'group' as const, stageDetail: ' B ' },
+      { opponent: 'Hillcrest', date: '2026-04-04', time: '11:00', stage: 'group' as const, stageDetail: 'B' },
+      { opponent: '', date: '2026-04-04', time: '14:00', stage: 'semi' as const, stageDetail: '' },
+      { opponent: '', date: '2026-04-04', time: '15:30', stage: 'final' as const },
+    ],
+  };
+
+  it('gives every fixture the stage it was set up as', () => {
+    const { competition, matches } = buildTournament(input, STAMP);
+    expect(competition.type).toBe('tournament');
+    expect(matches.map((m) => [m.stage, m.stageDetail, m.opponent])).toEqual([
+      ['group', 'B', 'Vale FC'],
+      ['group', 'B', 'Hillcrest'],
+      ['semi', '', 'TBC'],
+      ['final', '', 'TBC'],
+    ]);
+    expect(matches.every((m) => m.competitionId === competition.id && m.venue === 'neutral' && m.durationMinutes === 30)).toBe(true);
+  });
+
+  it('keeps what it was set up with, for matches added to it later', () => {
+    const { competition } = buildTournament({ ...input, fixtures: [] }, STAMP);
+    expect(competition).toMatchObject({
+      startDate: '2026-04-04', teamId: 't1', location: 'Central Playing Fields', matchLength: 30,
+      ageGroup: 'U13', archived: false, placing: '',
+    });
+  });
+
+  it('still makes plain fixtures when no stages were chosen', () => {
+    const { matches } = buildTournament({ ...input, fixtures: [{ opponent: 'Vale FC', date: '2026-04-04', time: '09:30' }] }, STAMP);
+    expect(matches[0].stage).toBeNull();
+    expect(matches[0].stageDetail).toBe('');
+  });
+});
+
+describe('building a match', () => {
+  const base = {
+    competitionId: null, teamId: null, opponent: 'Riverside FC', durationMinutes: 70, date: '2026-04-10',
+    time: '10:30', venue: 'home' as const, location: '', notes: '',
+  };
+
+  it('has no stage unless given one', () => {
+    expect(buildMatch(base, STAMP)).toMatchObject({ stage: null, stageDetail: '' });
+  });
+
+  it('drops a detail that has no stage to go with it', () => {
+    expect(buildMatch({ ...base, stage: null, stageDetail: 'Plate' }, STAMP).stageDetail).toBe('');
+    expect(buildMatch({ ...base, stage: 'semi', stageDetail: ' Plate ' }, STAMP)).toMatchObject({ stage: 'semi', stageDetail: 'Plate' });
   });
 });

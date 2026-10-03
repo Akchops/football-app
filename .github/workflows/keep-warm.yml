@@ -1,0 +1,34 @@
+name: Keep accounts awake
+
+# Supabase pauses a free project after about a week with no traffic, which
+# would stop sign-in and syncing until someone restores it by hand - most
+# likely over the summer break. A tiny request every few days prevents that.
+# Does nothing until the project is set up (supabase/README.md).
+
+on:
+  schedule:
+    - cron: '23 7 */3 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the project
+        env:
+          URL: ${{ vars.VITE_SUPABASE_URL }}
+          KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then
+            echo "Accounts are not set up yet - nothing to keep awake."
+            exit 0
+          fi
+          # Asks the database which schema version it has: a real query, and
+          # one that is open to anyone, so it needs no signed-in user.
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -X POST "${URL%/}/rest/v1/rpc/schema_version" \
+            -H "apikey: $KEY" -H "content-type: application/json" -d '{}'
+          echo

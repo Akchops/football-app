@@ -1,4 +1,5 @@
 import type { Competition, Match, Team, TrainingSession } from '../types';
+import { fixtureContext, stageName } from './stage';
 import { TRAINING_TYPE_LABEL } from '../types';
 import { kickoffAt, pad } from './date';
 
@@ -54,16 +55,15 @@ export function matchToICS(
   competition: Competition | null,
   reminderLeadMinutes: number,
 ): string {
-  const title = `${team ? `${team.name} ` : ''}${match.venue === 'away' ? 'away at' : 'vs'} ${match.opponent || 'TBC'}${
-    match.stage ? ` (${match.stage})` : ''
-  }`;
+  const stage = stageName(match.stage, match.stageDetail);
+  const title = `${team ? `${team.name} ` : ''}${match.venue === 'away' ? 'away at' : 'vs'} ${match.opponent || 'TBC'}${stage ? ` · ${stage}` : ''}`;
   return wrap(
     event({
       uid: match.id,
       start: kickoffAt(match.date, match.time),
       durationMinutes: match.durationMinutes,
       title,
-      description: [competition?.name, match.notes].filter(Boolean).join(' — '),
+      description: [fixtureContext(competition, match), match.notes].filter(Boolean).join(' — '),
       location: match.location,
       reminderLeadMinutes,
     }),

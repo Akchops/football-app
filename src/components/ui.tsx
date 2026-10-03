@@ -54,13 +54,35 @@ export function Sheet({
   );
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <label className="field">
+/**
+ * A labelled form field. `group` is for a row of buttons rather than one
+ * input: a <label> passes a tap anywhere on its text to the first button
+ * inside it, so a group gets a plain labelled container instead.
+ */
+export function Field({
+  label,
+  hint,
+  group = false,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  group?: boolean;
+  children: ReactNode;
+}) {
+  const body = (
+    <>
       <span className="field-label">{label}</span>
       {children}
       {hint && <span className="field-hint">{hint}</span>}
-    </label>
+    </>
+  );
+  return group ? (
+    <div className="field" role="group" aria-label={label}>
+      {body}
+    </div>
+  ) : (
+    <label className="field">{body}</label>
   );
 }
 

@@ -3,9 +3,10 @@ import {
   type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Profile, type Team,
   type TrainingSession,
 } from '../types';
+import { toStage } from '../lib/stage';
 
 export const STORAGE_KEY = 'matchday.data.v1';
-export const DATA_VERSION = 5;
+export const DATA_VERSION = 6;
 
 export function emptyData(): AppData {
   return {
@@ -61,14 +62,12 @@ function migrateResult(raw: MatchResult | null): MatchResult | null {
 }
 
 /** Fill in fields added after a match was first saved. */
-function normaliseMatch(m: Match): Match {
+export function normaliseMatch(m: Match): Match {
   return {
     ...m,
     deletedAt: m.deletedAt ?? null,
     competitionId: m.competitionId ?? null,
     teamId: m.teamId ?? null,
-    // Matches from before rounds were kept apart from the opponent have none.
-    stage: m.stage ?? '',
     location: m.location ?? '',
     // v2 and earlier assumed every match was 90 minutes.
     durationMinutes: m.durationMinutes ?? DEFAULT_MATCH_LENGTH,
@@ -76,6 +75,9 @@ function normaliseMatch(m: Match): Match {
     result: migrateResult(m.result ?? null),
     remindAfter: m.remindAfter ?? null,
     status: m.status ?? 'scheduled',
+    // v5 and earlier had no stages: every match was just a match.
+    stage: toStage(m.stage),
+    stageDetail: typeof m.stageDetail === 'string' ? m.stageDetail : '',
   };
 }
 
@@ -95,11 +97,11 @@ interface LegacySettings {
  * were created. That means an untouched record loses to one that has actually
  * been edited since, which is the right way round.
  */
-function normaliseTeam(t: Team): Team {
+export function normaliseTeam(t: Team): Team {
   return { ...t, updatedAt: t.updatedAt ?? t.createdAt ?? '', deletedAt: t.deletedAt ?? null };
 }
 
-function normaliseCompetition(c: Competition): Competition {
+export function normaliseCompetition(c: Competition): Competition {
   return {
     ...c,
     ageGroup: c.ageGroup ?? '',
@@ -117,14 +119,15 @@ function normaliseCompetition(c: Competition): Competition {
 /**
  * Profiles from before the new-season question count their age group as picked
  * when they were set up. One set up last year is asked straight away; one set up
- * this year isn't asked until the next.
+ * this year isn't asked until the next. Also used for a profile arriving from a
+ * phone that hasn't updated yet.
  */
-function settledYear(onboardedAt: string | null): number {
+export function settledYear(onboardedAt: string | null): number {
   const at = onboardedAt ? new Date(onboardedAt) : null;
   return at && !Number.isNaN(at.getTime()) ? at.getFullYear() : 0;
 }
 
-function normaliseTraining(t: TrainingSession): TrainingSession {
+export function normaliseTraining(t: TrainingSession): TrainingSession {
   return { ...t, updatedAt: t.updatedAt ?? t.createdAt ?? '', deletedAt: t.deletedAt ?? null };
 }
 

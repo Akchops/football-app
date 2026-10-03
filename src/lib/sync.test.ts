@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasContent, mergeData, mergeList } from './sync';
+import { fingerprint, hasContent, mergeData, mergeList, mergeRemote, outgoing } from './sync';
 import { emptyData } from '../store/storage';
 import { emptyResult, type AppData, type Match, type TrainingSession } from '../types';
 
@@ -9,9 +9,9 @@ const T3 = '2026-04-03T10:00:00.000Z';
 
 function match(id: string, over: Partial<Match> = {}): Match {
   return {
-    id, competitionId: null, teamId: null, opponent: 'Riverside FC', stage: '', date: '2026-04-10',
+    id, competitionId: null, teamId: null, opponent: 'Riverside FC', date: '2026-04-10',
     time: '16:30', venue: 'home', location: '', durationMinutes: 90, status: 'scheduled',
-    result: null, notes: '', remindAfter: null,
+    result: null, notes: '', remindAfter: null, stage: null, stageDetail: '',
     createdAt: T1, updatedAt: T1, deletedAt: null, ...over,
   };
 }
@@ -200,5 +200,50 @@ describe('hasContent', () => {
     expect(hasContent(dataWith({ matches: [match('m1')] }))).toBe(true);
     expect(hasContent(dataWith({ training: [session('t1')] }))).toBe(true);
     expect(hasContent(dataWith({ profile: { ...emptyData().profile, onboardedAt: T1 } }))).toBe(true);
+  });
+});
+
+describe('mergeRemote', () => {
+  it('returns the very same data when the server sent back only what the phone already has', () => {
+    // Pulls overlap, so this is the common case; a new object here would
+    // redraw the screen and trigger another sync, again and again.
+    const local = dataWith({ matches: [match('m1', { updatedAt: T2 })] });
+    expect(mergeRemote(local, { matches: [match('m1', { updatedAt: T2 })] })).toBe(local);
+    expect(mergeRemote(local, { matches: [match('m1', { updatedAt: T1 })] })).toBe(local);
+    expect(mergeRemote(local, {})).toBe(local);
+  });
+
+  it('takes a newer or new record from the server', () => {
+    const local = dataWith({ matches: [match('m1', { updatedAt: T1 })] });
+    const merged = mergeRemote(local, { matches: [match('m1', { updatedAt: T2, notes: 'newer' }), match('m2')] });
+    expect(merged).not.toBe(local);
+    expect(merged.matches.map((m) => m.id)).toEqual(['m1', 'm2']);
+    expect(merged.matches[0].notes).toBe('newer');
+  });
+
+  it('leaves lists the server said nothing about exactly as they were', () => {
+    const local = dataWith({ matches: [match('m1')], training: [session('t1')] });
+    const merged = mergeRemote(local, { matches: [match('m2')] });
+    expect(merged.training).toBe(local.training);
+  });
+});
+
+describe('outgoing', () => {
+  it('sends only what differs from the server\'s last confirmed version', () => {
+    const a = match('m1');
+    const b = match('m2');
+    const local = dataWith({ matches: [a, b] });
+    const confirmed = { 'matches:m1': fingerprint(a), profile: fingerprint(local.profile), settings: fingerprint(local.settings) };
+    const out = outgoing(local, confirmed);
+    expect(out.rows.matches.map((m) => m.id)).toEqual(['m2']);
+    expect(out.profile).toBeUndefined();
+    expect(out.settings).toBeUndefined();
+  });
+
+  it('sends a tombstone, since a delete has to travel', () => {
+    const a = match('m1');
+    const confirmed = { 'matches:m1': fingerprint(a) };
+    const out = outgoing(dataWith({ matches: [{ ...a, deletedAt: T3, updatedAt: T3 }] }), confirmed);
+    expect(out.rows.matches[0].deletedAt).toBe(T3);
   });
 });

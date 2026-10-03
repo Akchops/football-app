@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fixtureContext } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import { formatDateShort, kickoffAt } from '../lib/date';
@@ -153,7 +154,7 @@ export function MediaScreen({ onOpenMatch }: { onOpenMatch: (match: Match) => vo
                     <span className="media-group-meta">
                       {formatDateShort(match.date)}
                       {teams.length > 1 && team ? ` · ${team.name}` : ''}
-                      {competition ? ` · ${competition.name}` : ''}
+                      {fixtureContext(competition, match) ? ` · ${fixtureContext(competition, match)}` : ''}
                       {match.result ? ` · ${scoreline(match.result)}` : ''}
                     </span>
                     {match.result && (

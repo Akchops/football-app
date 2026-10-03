@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, emptyResult, type Competition, type Match, type MatchResult, type Settings } from '../types';
 import {
   computeStats, mainPositionGroup, outcomeOf, pendingResultMatches, placingLabel, scoreline, shootoutWinner,
-  statsByCompetition, statsByMonth, statsByTournament, statsByVenue, upcomingMatches,
+  statsByCompetition, statsByMonth, statsByOpponent, statsByStage, statsByTournament, statsByVenue, upcomingMatches,
 } from './stats';
 
 let seq = 0;
@@ -13,7 +13,6 @@ function match(over: Partial<Match> = {}): Match {
     competitionId: null,
     teamId: null,
     opponent: 'Opponent',
-    stage: '',
     date: '2026-04-10',
     time: '16:30',
     venue: 'home',
@@ -23,6 +22,8 @@ function match(over: Partial<Match> = {}): Match {
     result: null,
     notes: '',
     remindAfter: null,
+    stage: null,
+    stageDetail: '',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     deletedAt: null,
@@ -299,5 +300,50 @@ describe('tournaments', () => {
     expect(placingLabel('Runners-up')).toBe('🥈 Runners-up');
     expect(placingLabel('Group stage')).toBe('Group stage');
     expect(placingLabel('')).toBe('');
+  });
+});
+
+describe('statsByStage', () => {
+  const at = (stage: Match['stage'], m: Match): Match => ({ ...m, stage });
+
+  it('splits group games from knockouts, and leaves league games out', () => {
+    const rows = statsByStage([
+      at('group', played(2, 0)),
+      at('group', played(1, 1)),
+      at('group', played(0, 2)),
+      at('semi', played(1, 1, { penaltiesFor: 4, penaltiesAgainst: 3 })),
+      at('final', played(0, 1)),
+      played(5, 0), // a league game: neither
+    ]);
+
+    expect(rows.map((r) => r.stage)).toEqual(['group', 'knockout']);
+    const [group, knockout] = rows;
+    expect([group.wins, group.draws, group.losses]).toEqual([1, 1, 1]);
+    expect(group.cleanSheets).toBe(1);
+    expect([knockout.wins, knockout.draws, knockout.losses]).toEqual([0, 1, 1]);
+    expect([knockout.shootoutsWon, knockout.shootoutsLost]).toEqual([1, 0]);
+    expect(knockout.goalsFor).toBe(1);
+  });
+
+  it('counts every knockout round, early cup rounds included, as a knockout', () => {
+    const rows = statsByStage([at('round', played(3, 1)), at('quarter', played(2, 0)), at('third', played(0, 0))]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ stage: 'knockout', played: 3, wins: 2, draws: 1, cleanSheets: 2 });
+  });
+
+  it('shows nothing until a match with a stage has been played', () => {
+    expect(statsByStage([played(1, 0), at('semi', match())])).toEqual([]);
+  });
+});
+
+describe('statsByOpponent', () => {
+  it('leaves out games whose opponent was never filled in', () => {
+    const rows = statsByOpponent([
+      played(1, 0, { opponent: 'Vale FC' }),
+      played(2, 1, { opponent: 'vale fc' }),
+      played(1, 1, { opponent: 'TBC' }),
+      played(0, 1, { opponent: '' }),
+    ]);
+    expect(rows.map((r) => [r.opponent, r.played])).toEqual([['Vale FC', 2]]);
   });
 });

@@ -6,6 +6,9 @@ import {
 } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
 import { Field } from './ui';
+import { accountsAvailable } from '../lib/auth';
+import { useSync } from '../store/SyncProvider';
+import { JoinQuestionCard, SignInForm } from './AccountSettings';
 
 interface DraftTeam {
   name: string;
@@ -18,8 +21,10 @@ const GROUPS: PositionGroup[] = ['goalkeeper', 'defender', 'midfielder', 'forwar
 const STEPS = ['You', 'Position', 'Teams'];
 
 /**
- * First-run profile setup. There's no account or server behind this - it's the
- * player's details, kept on the device, and everything can be changed later.
+ * First-run profile setup: the player's details, kept on the device, and
+ * everything can be changed later. Someone joining a family that already uses
+ * Matchday can sign in here instead - the family's player arrives with the
+ * first sync, and this screen gives way to the app by itself.
  */
 export function OnboardingScreen() {
   const { profile, updateProfile, addTeam, teams } = useStore();
@@ -109,8 +114,11 @@ export function OnboardingScreen() {
           <>
             <h1>Let's set you up</h1>
             <p className="onboard-lead">
-              Your details stay on this device — there's no account and nothing gets uploaded.
+              {accountsAvailable()
+                ? 'Your details stay on this device unless you sign in to share them with your family.'
+                : "Your details stay on this device — there's no account and nothing gets uploaded."}
             </p>
+            <JoinFamily />
 
             <Field label="Your name">
               <input
@@ -172,7 +180,7 @@ export function OnboardingScreen() {
             </div>
 
             {POSITIONS_BY_GROUP[group].length > 1 && (
-              <Field label="More specifically">
+              <Field group label="More specifically">
                 <div className="chip-wrap">
                   {POSITIONS_BY_GROUP[group].map((p) => (
                     <button
@@ -283,5 +291,67 @@ export function OnboardingScreen() {
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * For a parent setting up their phone when the family already uses Matchday:
+ * sign in, join, and skip setting up a player who already exists.
+ */
+function JoinFamily() {
+  const sync = useSync();
+  const [open, setOpen] = useState(false);
+  if (!sync.available) return null;
+
+  if (sync.account) {
+    const email = sync.account.email;
+    const searching = sync.status === 'checking' || sync.status === 'syncing';
+    const retry = (
+      <div className="button-row">
+        <button className="ghost-btn" disabled={searching} onClick={() => sync.syncNow()}>
+          Check again
+        </button>
+        <button className="link-btn" disabled={searching} onClick={() => void sync.signOut()}>
+          Use a different email
+        </button>
+      </div>
+    );
+
+    if (sync.joinQuestion) return <JoinQuestionCard sync={sync} />;
+    if (searching) return <p className="notice">Signed in as {email}. Looking for your family…</p>;
+    if (sync.household) {
+      return <p className="notice">Signed in as {email}, in {sync.household.name}. Finish setting up below.</p>;
+    }
+    if (sync.status === 'offline' || sync.status === 'error') {
+      return (
+        <div className="detail-block">
+          <p>
+            Signed in as {email}, but the family could not be checked
+            {sync.status === 'offline' ? ' - there is no signal.' : `: ${sync.error}`}
+          </p>
+          {retry}
+        </div>
+      );
+    }
+    return (
+      <div className="detail-block">
+        <p>
+          Signed in as <strong>{email}</strong>, but there is no invite for it yet. Ask whoever set up Matchday to
+          invite this email from <strong>Setup → Sharing with your family</strong>, then check again.
+        </p>
+        <p className="muted small">Or carry on setting up below, and you will start a family of your own.</p>
+        {retry}
+      </div>
+    );
+  }
+
+  return open ? (
+    <div className="detail-block">
+      <SignInForm intro={false} />
+    </div>
+  ) : (
+    <button className="link-btn" onClick={() => setOpen(true)}>
+      Joining your family on Matchday? Sign in instead
+    </button>
   );
 }

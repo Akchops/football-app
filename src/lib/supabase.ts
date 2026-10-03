@@ -46,6 +46,23 @@ export function supabase(): Promise<SupabaseClient> {
   return client;
 }
 
+let settings: Promise<{ external?: Record<string, boolean> }> | null = null;
+
+/**
+ * The project's public sign-in settings - which providers are switched on.
+ * Read once; anyone can read them with the public key.
+ */
+export function authSettings(): Promise<{ external?: Record<string, boolean> }> {
+  if (!configured()) return Promise.resolve({});
+  settings ??= fetch(`${URL}/auth/v1/settings`, { headers: { apikey: KEY } })
+    .then((r) => (r.ok ? r.json() : {}))
+    .catch(() => {
+      settings = null;
+      return {};
+    });
+  return settings;
+}
+
 /** Where a provider should send the browser back to after signing in. */
 export function returnAddress(): string {
   return window.location.origin + import.meta.env.BASE_URL;

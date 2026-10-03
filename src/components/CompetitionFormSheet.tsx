@@ -116,7 +116,7 @@ export function CompetitionFormSheet({
         </select>
       </Field>
 
-      <Field label="Colour" hint="Shown on the calendar">
+      <Field group label="Colour" hint="Shown on the calendar">
         <div className="color-row">
           {COMPETITION_COLORS.map((c) => (
             <button

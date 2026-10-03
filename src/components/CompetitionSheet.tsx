@@ -6,6 +6,7 @@ import { positionStatCards } from '../lib/metrics';
 import { personalBests } from '../lib/records';
 import { scoreVerdict } from '../lib/score';
 import { computeStats, mainPositionGroup, placingLabel, recordSummary } from '../lib/stats';
+import { stageName } from '../lib/stage';
 import { MatchCard } from './MatchCard';
 import { Field, Section, Sheet, StatTile } from './ui';
 
@@ -126,9 +127,8 @@ export function CompetitionSheet({
           </>
         }
       >
-        {/* Not a <Field>: a label wrapped round buttons presses the first one when
-            its gaps are tapped. */}
-        <div className="field">
+        {/* A group, not a label: a label round buttons presses the first one when tapped. */}
+        <div className="field" role="group" aria-label="How far did you get?">
           <span className="field-label">How far did you get?</span>
           <div className="chip-wrap">
             {PLACINGS.map((p) => (
@@ -184,7 +184,7 @@ export function CompetitionSheet({
                       {m.venue === 'away' ? '@' : 'vs'} {m.opponent || 'TBC'}
                     </div>
                     <div className="prompt-meta">
-                      {m.stage ? `${m.stage} · ` : ''}
+                      {m.stage ? `${stageName(m.stage, m.stageDetail)} · ` : ''}
                       {formatDateShort(m.date)} · {formatTime(m.time)}
                     </div>
                   </div>

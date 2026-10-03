@@ -116,7 +116,7 @@ export function AiSection() {
         </p>
       )}
 
-      <Field label="Provider">
+      <Field group label="Provider">
         <div className="chip-wrap">
           {(Object.keys(PROVIDER_LABEL) as Provider[]).map((p) => (
             <button

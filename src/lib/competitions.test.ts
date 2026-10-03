@@ -22,8 +22,8 @@ let seq = 0;
 function match(over: Partial<Match> = {}): Match {
   seq += 1;
   return {
-    id: `m${seq}`, competitionId: 'harvest', teamId: 'wanderers', opponent: 'Vale FC', stage: 'Group stage',
-    date: '2026-10-18', time: '10:00', venue: 'neutral', location: 'North Pitch', durationMinutes: 30,
+    id: `m${seq}`, competitionId: 'harvest', teamId: 'wanderers', opponent: 'Vale FC', stage: 'group',
+    stageDetail: 'B', date: '2026-10-18', time: '10:00', venue: 'neutral', location: 'North Pitch', durationMinutes: 30,
     status: 'scheduled', result: null, notes: '', remindAfter: null, createdAt: '', updatedAt: '', deletedAt: null,
     ...over,
   };
@@ -34,12 +34,17 @@ function match(over: Partial<Match> = {}): Match {
  * need only its opponent and kickoff, not the whole tournament typed in again.
  */
 describe('the next match for a competition', () => {
+  it('keeps the group going: another game in the same group', () => {
+    expect(nextMatchFor(tournament(), [match()], [wanderers], settings, today)).toMatchObject({ stage: 'group', stageDetail: 'B' });
+  });
+
   it('starts an empty tournament from what it was set up with', () => {
     expect(nextMatchFor(tournament(), [], [wanderers], settings, today)).toEqual({
       competitionId: 'harvest',
       teamId: 'wanderers',
       opponent: '',
-      stage: 'Group stage',
+      stage: 'group',
+      stageDetail: '',
       date: '2026-10-18',
       time: '16:30',
       venue: 'neutral',
@@ -52,12 +57,14 @@ describe('the next match for a competition', () => {
   it('follows its latest match: same day an hour on, same ground, the next round', () => {
     const matches = [
       match({ time: '10:00' }),
-      match({ time: '11:00', stage: 'Semi-final' }),
+      match({ time: '11:00', stage: 'semi', stageDetail: 'Plate' }),
       // Another tournament's match doesn't count.
-      match({ competitionId: 'other', time: '15:00', stage: 'Final' }),
+      match({ competitionId: 'other', time: '15:00', stage: 'final', stageDetail: '' }),
     ];
     expect(nextMatchFor(tournament(), matches, [wanderers], settings, today)).toMatchObject({
-      stage: 'Final',
+      // The Plate semi is followed by the Plate final.
+      stage: 'final',
+      stageDetail: 'Plate',
       date: '2026-10-18',
       time: '12:00',
       location: 'North Pitch',
@@ -85,7 +92,8 @@ describe('the next match for a competition', () => {
   it('gives a league a home game with no round, at its usual length', () => {
     const league = tournament({ type: 'league', startDate: '', teamId: null, location: '', matchLength: 0 });
     expect(nextMatchFor(league, [], [wanderers], settings, today)).toMatchObject({
-      stage: '',
+      stage: null,
+      stageDetail: '',
       venue: 'home',
       date: today,
       durationMinutes: 90,

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { AGE_GROUPS, COMPETITION_COLORS, MATCH_LENGTHS, STAGES, nextStage } from '../types';
+import { AGE_GROUPS, COMPETITION_COLORS, MATCH_LENGTHS, type MatchStage } from '../types';
 import { seasonLabel, todayISO } from '../lib/date';
 import { hourAfter } from '../lib/competitions';
+import { STAGES, STAGE_LABEL, nextStage, toStage } from '../lib/stage';
 import { DurationPicker, Field, Sheet } from './ui';
 
 interface FixtureDraft {
-  stage: string;
+  stage: MatchStage | null;
   opponent: string;
   time: string;
   date: string;
@@ -31,6 +32,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
   const [multiDay, setMultiDay] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState(settings.defaultMatchLength);
   const [fixtures, setFixtures] = useState<FixtureDraft[]>([]);
+  const [groupName, setGroupName] = useState('');
   const [error, setError] = useState('');
 
   // A tournament can be played in a different age group to usual - up a year, say -
@@ -53,6 +55,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     setDurationMinutes(Math.min(settings.defaultMatchLength, 40));
     // None until asked for: the fixtures often aren't out yet.
     setFixtures([]);
+    setGroupName('');
     setError('');
   }, [open, teams, competitions.length, settings.defaultMatchLength, profile.ageGroup]);
 
@@ -69,7 +72,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
         ? // Another group game after a group game; after a knockout round, the next one.
           { stage: nextStage(last.stage), opponent: '', time: hourAfter(last.time), date: last.date }
         : // Tournaments mostly open with group games, first thing.
-          { stage: 'Group stage', opponent: '', time: '09:30', date },
+          { stage: 'group', opponent: '', time: '09:30', date },
     ]);
   };
 
@@ -95,6 +98,8 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
       durationMinutes,
       fixtures: used.map((f) => ({
         stage: f.stage,
+        // The group's name goes on every group game; a knockout round has none to start with.
+        stageDetail: f.stage === 'group' ? groupName.trim() : '',
         opponent: f.opponent.trim() || 'TBC',
         time: f.time,
         date: multiDay ? f.date || date : date,
@@ -184,7 +189,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
         />
       </Field>
 
-      <Field label="Colour" hint="How its matches show on the calendar">
+      <Field group label="Colour" hint="How its matches show on the calendar">
         <div className="color-row">
           {COMPETITION_COLORS.map((c) => (
             <button
@@ -199,7 +204,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
         </div>
       </Field>
 
-      <Field label="Match length" hint="Applied to every match in this tournament">
+      <Field group label="Match length" hint="Applied to every match in this tournament">
         <DurationPicker value={durationMinutes} onChange={setDurationMinutes} presets={MATCH_LENGTHS} />
       </Field>
 
@@ -229,13 +234,13 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
             <div className="fixture-when">
               <select
                 className="input"
-                value={fixture.stage}
-                onChange={(e) => setFixture(i, { stage: e.target.value })}
+                value={fixture.stage ?? ''}
+                onChange={(e) => setFixture(i, { stage: toStage(e.target.value) })}
                 aria-label={`Match ${i + 1} stage`}
               >
                 {STAGES.map((stage) => (
                   <option key={stage} value={stage}>
-                    {stage}
+                    {STAGE_LABEL[stage]}
                   </option>
                 ))}
                 <option value="">No stage</option>
@@ -277,6 +282,11 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
         <button className="ghost-btn" onClick={addRow}>
           {fixtures.length === 0 ? '+ Add a match' : '+ Add another match'}
         </button>
+        {fixtures.some((f) => f.stage === 'group') && (
+          <Field label="Your group" hint="Optional — your group games show it, e.g. Group B">
+            <input className="input" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="e.g. B" />
+          </Field>
+        )}
         {fixtures.length > 0 && (
           <p className="muted small">
             Don't know who you'll play in a round yet? Leave the opponent blank — it shows as TBC, and you can fill it in

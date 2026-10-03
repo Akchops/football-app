@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useStore, type NewMatchInput } from '../store/AppStore';
-import { MATCH_LENGTHS, STAGES, type Match, type Venue } from '../types';
+import { MATCH_LENGTHS, type Match, type MatchStage, type Venue } from '../types';
 import { todayISO } from '../lib/date';
+import { STAGES, STAGE_LABEL, detailPrompt, toStage } from '../lib/stage';
 import { DurationPicker, Field, Segmented, Sheet } from './ui';
 
 export interface MatchFormTarget {
@@ -32,7 +33,6 @@ export function MatchFormSheet({
   const editing = target?.mode === 'edit' ? target.match ?? null : null;
 
   const [opponent, setOpponent] = useState('');
-  const [stage, setStage] = useState('');
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(settings.defaultKickoff);
   const [competitionId, setCompetitionId] = useState<string>('');
@@ -41,6 +41,8 @@ export function MatchFormSheet({
   const [durationMinutes, setDurationMinutes] = useState(settings.defaultMatchLength);
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [stage, setStage] = useState<MatchStage | null>(null);
+  const [stageDetail, setStageDetail] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -49,7 +51,6 @@ export function MatchFormSheet({
     if (target.match) {
       const m = target.match;
       setOpponent(m.opponent);
-      setStage(m.stage);
       setDate(m.date);
       setTime(m.time);
       setCompetitionId(m.competitionId ?? '');
@@ -58,10 +59,11 @@ export function MatchFormSheet({
       setDurationMinutes(m.durationMinutes);
       setLocation(m.location);
       setNotes(m.notes);
+      setStage(m.stage);
+      setStageDetail(m.stageDetail);
     } else {
       const preset = target.preset ?? {};
       setOpponent(preset.opponent ?? '');
-      setStage(preset.stage ?? '');
       setDate(preset.date ?? target.dateISO ?? todayISO());
       setTime(preset.time ?? settings.defaultKickoff);
       // Default to the only competition still running when there is just one - one less tap.
@@ -75,14 +77,17 @@ export function MatchFormSheet({
       setDurationMinutes(preset.durationMinutes ?? settings.defaultMatchLength);
       setLocation(preset.location ?? '');
       setNotes(preset.notes ?? '');
+      setStage(preset.stage ?? null);
+      setStageDetail(preset.stageDetail ?? '');
     }
   }, [target, settings.defaultKickoff, competitions, teams]);
 
   if (!target) return null;
 
-  // Rounds only mean something in a tournament or cup.
-  const chosen = competitions.find((c) => c.id === competitionId);
-  const knockout = chosen?.type === 'tournament' || chosen?.type === 'cup';
+  // Stages belong to cups and tournaments; a league game never asks. A match
+  // that already has one keeps the field, so it can be changed or cleared.
+  const competition = competitions.find((c) => c.id === competitionId) ?? null;
+  const showStage = stage !== null || competition?.type === 'cup' || competition?.type === 'tournament';
 
   const submit = () => {
     if (!opponent.trim()) {
@@ -95,7 +100,6 @@ export function MatchFormSheet({
     }
     const payload = {
       opponent: opponent.trim(),
-      stage,
       date,
       time: time || '00:00',
       competitionId: competitionId || null,
@@ -104,6 +108,8 @@ export function MatchFormSheet({
       durationMinutes,
       location: location.trim(),
       notes: notes.trim(),
+      stage,
+      stageDetail: stage ? stageDetail.trim() : '',
     };
     if (editing) {
       updateMatch(editing.id, payload);
@@ -122,8 +128,8 @@ export function MatchFormSheet({
       subtitle={
         editing
           ? undefined
-          : target.preset?.competitionId && chosen
-            ? `For ${chosen.name}. It shows up on the calendar straight away.`
+          : target.preset?.competitionId && competition
+            ? `For ${competition.name}. It shows up on the calendar straight away.`
             : 'Fixtures show up on the calendar straight away.'
       }
       onClose={onClose}
@@ -173,7 +179,7 @@ export function MatchFormSheet({
         </Field>
       )}
 
-      <Field label="Home or away">
+      <Field group label="Home or away">
         <Segmented options={VENUE_OPTIONS} value={venue} onChange={setVenue} />
       </Field>
 
@@ -195,17 +201,33 @@ export function MatchFormSheet({
         </select>
       </Field>
 
-      {(knockout || stage) && (
-        <Field label="Stage" hint="Which round of the tournament this is.">
-          <select className="input" value={stage} onChange={(e) => setStage(e.target.value)}>
-            <option value="">No stage</option>
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </Field>
+      {showStage && (
+        <div className="row two">
+          <Field label="Stage">
+            <select
+              className="input"
+              value={stage ?? ''}
+              onChange={(e) => setStage(toStage(e.target.value))}
+            >
+              <option value="">None</option>
+              {STAGES.map((s) => (
+                <option key={s} value={s}>
+                  {STAGE_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {stage && (
+            <Field label={detailPrompt(stage).label} hint="Optional">
+              <input
+                className="input"
+                value={stageDetail}
+                onChange={(e) => setStageDetail(e.target.value)}
+                placeholder={detailPrompt(stage).placeholder}
+              />
+            </Field>
+          )}
+        </div>
       )}
 
       <Field

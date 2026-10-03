@@ -1,0 +1,26 @@
+name: Check accounts setup
+
+# Checks the Supabase project behind signing in is ready for the app, using
+# only the public URL and key the app itself is built with. Changes nothing.
+# Run it from the Actions tab after setting the project up (supabase/README.md).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node supabase/check-setup.mjs
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}

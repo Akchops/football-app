@@ -90,7 +90,7 @@ export function TrainingFormSheet({
         </>
       }
     >
-      <Field label="Type">
+      <Field group label="Type">
         <div className="chip-wrap">
           {TYPES.map((t) => (
             <button
@@ -114,11 +114,11 @@ export function TrainingFormSheet({
         </Field>
       </div>
 
-      <Field label="How long">
+      <Field group label="How long">
         <DurationPicker value={durationMinutes} onChange={setDuration} presets={TRAINING_LENGTHS} />
       </Field>
 
-      <Field label={`Intensity — ${INTENSITY_LABEL[intensity]}`}>
+      <Field group label={`Intensity — ${INTENSITY_LABEL[intensity]}`}>
         <div className="chip-wrap">
           {[1, 2, 3, 4, 5].map((n) => (
             <button

@@ -36,6 +36,29 @@ begin
   raise notice 'set up Family A';
 end $$;
 
+-- synced_at is the server's to set; updated_at is the phone's to keep.
+do $$
+declare pid uuid; t1 timestamptz; t2 timestamptz;
+begin
+  select v into pid from t_ids where k = 'pid_a';
+  insert into public.matches (player_id, id, data, updated_at, synced_at)
+    values (pid, 'match_clock', '{"date":"2026-12-01"}', '2000-01-01', '2000-01-01')
+    returning synced_at into t1;
+  if t1 < now() - interval '1 minute' then raise exception 'FAIL: a phone set synced_at to %', t1; end if;
+  raise notice 'PASS: the server stamps synced_at, whatever the phone sends';
+
+  perform pg_sleep(0.01);
+  update public.matches set data = '{"date":"2026-12-02"}' where player_id = pid and id = 'match_clock'
+    returning synced_at into t2;
+  if t2 <= t1 then raise exception 'FAIL: an update did not move synced_at'; end if;
+  if (select updated_at from public.matches where player_id = pid and id = 'match_clock') <> '2000-01-01' then
+    raise exception 'FAIL: the server changed updated_at';
+  end if;
+  raise notice 'PASS: an update moves synced_at and leaves updated_at alone';
+
+  delete from public.matches where player_id = pid and id = 'match_clock';
+end $$;
+
 -- ===========================================================================
 -- Family B signs in and sets itself up.
 -- ===========================================================================
@@ -161,6 +184,12 @@ begin
   if n <> 1 then raise exception 'FAIL: B sees % invites, expected 1', n; end if;
   raise notice 'PASS: B can see the invite addressed to them';
 
+  -- ...and who it is from and which household, though not a member yet.
+  if not exists (select 1 from public.my_invites() where household_name = 'Family A' and invited_by_email = 'parent.a@example.com') then
+    raise exception 'FAIL: my_invites does not say who invited B, or to what';
+  end if;
+  raise notice 'PASS: an invite says who sent it and which household';
+
   select id into inv from public.household_invites limit 1;
   hid := public.accept_invite(inv);
 
@@ -173,6 +202,22 @@ begin
     values ((select v from t_ids where k = 'pid_a'), 'match_from_b',
             '{"date":"2026-11-01","opponent":"Added by mum"}', now());
   raise notice 'PASS: B can add a match to the shared player';
+end $$;
+
+-- The member list, with emails, for the household you are in.
+do $$
+declare n int; hid_a uuid;
+begin
+  select v into hid_a from t_ids where k = 'hid_a';
+  select count(*) into n from public.household_people(hid_a);
+  if n <> 2 then raise exception 'FAIL: household_people shows % people, expected 2', n; end if;
+  if not exists (select 1 from public.household_people(hid_a) where email = 'parent.a@example.com' and role = 'owner') then
+    raise exception 'FAIL: household_people is missing the owner';
+  end if;
+  if not exists (select 1 from public.household_people(hid_a) where email = 'parent.b@example.com' and is_me) then
+    raise exception 'FAIL: household_people does not mark the caller';
+  end if;
+  raise notice 'PASS: members can see who else is in their household';
 end $$;
 
 -- An invite meant for somebody else must not be claimable.
@@ -212,8 +257,45 @@ begin
   select count(*) into n from public.matches;
   if n <> 1 then raise exception 'FAIL: after leaving, B still sees % matches', n; end if;
   raise notice 'PASS: after leaving, B is back to only its own match';
+
+  select count(*) into n from public.household_people(hid_a);
+  if n <> 0 then raise exception 'FAIL: after leaving, B can still list A''s members'; end if;
+  raise notice 'PASS: nobody outside a household can list its members';
 end $$;
 
 reset role;
+
+-- Someone who is not signed in cannot reach the tables at all - not even to
+-- be told there is nothing for them - but can ask which schema version runs.
+set role anon;
+do $$
+declare n int;
+begin
+  begin
+    select count(*) into n from public.matches;
+    raise exception 'FAIL: someone signed out could query the matches table';
+  exception when insufficient_privilege then
+    raise notice 'PASS: someone signed out cannot touch the tables';
+  end;
+
+  begin
+    insert into public.household_invites (household_id, email) values (gen_random_uuid(), 'x@example.com');
+    raise exception 'FAIL: someone signed out could write an invite';
+  exception when insufficient_privilege then
+    raise notice 'PASS: someone signed out cannot write';
+  end;
+
+  begin
+    perform public.create_household('Signed out');
+    raise exception 'FAIL: someone signed out could call create_household';
+  exception when insufficient_privilege then
+    raise notice 'PASS: someone signed out cannot call the sign-in functions';
+  end;
+
+  if public.schema_version() is null then raise exception 'FAIL: no schema version'; end if;
+  raise notice 'PASS: the schema version can be read without signing in';
+end $$;
+reset role;
+
 \echo ''
 \echo 'ALL RLS CHECKS PASSED'

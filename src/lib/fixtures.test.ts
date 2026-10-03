@@ -9,6 +9,7 @@ import {
   normaliseOpponent,
   problemWith,
   toMatchInput,
+  FIXTURES_SCHEMA,
   type ParsedFixture,
 } from './fixtures';
 
@@ -34,7 +35,6 @@ function match(over: Partial<Match> = {}): Match {
     competitionId: null,
     teamId: null,
     opponent: 'Oakwood United',
-    stage: '',
     date: '2026-09-12',
     time: '16:30',
     venue: 'away',
@@ -44,6 +44,8 @@ function match(over: Partial<Match> = {}): Match {
     result: null,
     notes: '',
     remindAfter: null,
+    stage: null,
+    stageDetail: '',
     createdAt: '',
     updatedAt: '',
     deletedAt: null,
@@ -235,5 +237,56 @@ describe('toMatchInput', () => {
     const input = toMatchInput(row, options);
     expect(input.opponent).toBe('Oakwood United');
     expect(input.location).toBe('Meadow Park');
+  });
+});
+
+describe('stages on imported fixtures', () => {
+  it('asks the reader for a stage on every row, with none as an answer', () => {
+    const row = FIXTURES_SCHEMA.properties.fixtures.items;
+    expect(row.required).toContain('stage');
+    expect(row.required).toContain('stageDetail');
+    expect(row.properties.stage.enum).toEqual(['none', 'group', 'round', 'last16', 'quarter', 'semi', 'third', 'final']);
+  });
+
+  it('keeps a real stage, trims its detail, and drops anything else', () => {
+    const rows = buildRows(
+      [
+        fixture({ stage: 'group', stageDetail: ' B ' }),
+        fixture({ stage: 'none', stageDetail: 'B', date: '2026-09-13' }),
+        fixture({ stage: 'Semi-final', date: '2026-09-14' }),
+        fixture({ date: '2026-09-15' }), // a reply from before stages: no field at all
+        fixture({ stage: 'semi', stageDetail: 'Semi-final 1', date: '2026-09-16' }), // as the live reader sent it
+        fixture({ stage: 'final', stageDetail: 'PLATE FINAL', date: '2026-09-17' }),
+      ],
+      [],
+      TODAY,
+    );
+    expect(rows.map((r) => [r.stage, r.stageDetail])).toEqual([
+      ['group', 'B'],
+      [null, ''],
+      [null, ''],
+      [null, ''],
+      ['semi', ''],
+      ['final', 'Plate'],
+    ]);
+  });
+
+  it('keeps a knockout game whose opponent is not known yet', () => {
+    expect(problemWith(fixture({ opponent: '', stage: 'semi' }), TODAY)).toBe('');
+    expect(problemWith(fixture({ opponent: '', stage: 'group' }), TODAY)).toBe('No opponent on this row');
+    expect(problemWith(fixture({ opponent: '' }), TODAY)).toBe('No opponent on this row');
+
+    const [row] = buildRows([fixture({ opponent: '', stage: 'final' })], [], TODAY);
+    const input = toMatchInput(row, { teamId: null, competitionId: null, defaultTime: '10:00', defaultLength: 60 });
+    expect(input).toMatchObject({ opponent: 'TBC', stage: 'final', stageDetail: '' });
+  });
+
+  it('does not take a final for the semi-final already in the calendar', () => {
+    const semi = match({ date: '2026-09-12', opponent: 'TBC', stage: 'semi' });
+    expect(findDuplicate(fixture({ opponent: 'TBC', stage: 'final' }), [semi])).toBeNull();
+    expect(findDuplicate(fixture({ opponent: '', stage: 'final' }), [semi])).toBeNull();
+    expect(findDuplicate(fixture({ opponent: 'TBC', stage: 'semi' }), [semi])?.id).toBe(semi.id);
+    // Without a stage on one side there is nothing to tell them apart by.
+    expect(findDuplicate(fixture({ opponent: 'TBC' }), [semi])?.id).toBe(semi.id);
   });
 });
