@@ -1,6 +1,6 @@
 import {
   DEFAULT_MATCH_LENGTH, DEFAULT_PROFILE, DEFAULT_SETTINGS, TEAM_COLORS, groupForPosition,
-  type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Team,
+  type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Profile, type Team,
   type TrainingSession,
 } from '../types';
 import { toStage } from '../lib/stage';
@@ -102,7 +102,29 @@ export function normaliseTeam(t: Team): Team {
 }
 
 export function normaliseCompetition(c: Competition): Competition {
-  return { ...c, updatedAt: c.updatedAt ?? c.createdAt ?? '', deletedAt: c.deletedAt ?? null };
+  return {
+    ...c,
+    ageGroup: c.ageGroup ?? '',
+    archived: c.archived ?? false,
+    placing: c.placing ?? '',
+    startDate: c.startDate ?? '',
+    teamId: c.teamId ?? null,
+    location: c.location ?? '',
+    matchLength: c.matchLength ?? 0,
+    updatedAt: c.updatedAt ?? c.createdAt ?? '',
+    deletedAt: c.deletedAt ?? null,
+  };
+}
+
+/**
+ * Profiles from before the new-season question count their age group as picked
+ * when they were set up. One set up last year is asked straight away; one set up
+ * this year isn't asked until the next. Also used for a profile arriving from a
+ * phone that hasn't updated yet.
+ */
+export function settledYear(onboardedAt: string | null): number {
+  const at = onboardedAt ? new Date(onboardedAt) : null;
+  return at && !Number.isNaN(at.getTime()) ? at.getFullYear() : 0;
 }
 
 export function normaliseTraining(t: TrainingSession): TrainingSession {
@@ -149,8 +171,12 @@ export function parseData(raw: string | null): AppData {
       matches = matches.map((m) => (m.teamId ? m : { ...m, teamId: team.id }));
     }
 
-    const profile = parsed.profile
-      ? { ...base.profile, ...parsed.profile }
+    const profile: Profile = parsed.profile
+      ? {
+          ...base.profile,
+          ...parsed.profile,
+          ageGroupYear: parsed.profile.ageGroupYear ?? settledYear(parsed.profile.onboardedAt ?? null),
+        }
       : {
           ...base.profile,
           name: legacySettings.playerName ?? '',

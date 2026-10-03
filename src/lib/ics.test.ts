@@ -50,8 +50,9 @@ describe('matchToICS', () => {
   it('says which stage a knockout game is, in the title and the description', () => {
     const semi = { ...match, venue: 'neutral' as const, opponent: 'TBC', stage: 'semi' as const, stageDetail: 'Plate' };
     const comp = {
-      id: 'c1', name: 'Easter 7s', type: 'tournament' as const, season: '', color: '#f59e0b', notes: '',
-      archived: false, createdAt: '', updatedAt: '', deletedAt: null,
+      id: 'c1', name: 'Easter 7s', type: 'tournament' as const, season: '', ageGroup: '', color: '#f59e0b', notes: '',
+      archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
+      createdAt: '', updatedAt: '', deletedAt: null,
     };
     const out = matchToICS(semi, team, comp, 60);
     expect(out).toContain('SUMMARY:Wanderers FC vs TBC · Plate semi-final');

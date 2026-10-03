@@ -1,4 +1,4 @@
-import type { Competition, Match, MatchResult, MetricTotals, Settings, Team, Venue } from '../types';
+import type { Competition, Match, MatchResult, MetricTotals, PositionGroup, Settings, Team, Venue } from '../types';
 import { MONTH_NAMES, fromISODate, kickoffAt, toISODate } from './date';
 import { addMetrics } from './metrics';
 import { matchScore } from './score';
@@ -117,6 +117,13 @@ function addToRecord(rec: Record_, result: MatchResult): void {
 
 export function recordSummary(rec: Record_): string {
   return `${rec.wins}W ${rec.draws}D ${rec.losses}L`;
+}
+
+const MEDALS: Record<string, string> = { Winners: '🏆', 'Runners-up': '🥈', 'Third place': '🥉' };
+
+/** "🏆 Winners" for a podium finish, just the words for anything else. */
+export function placingLabel(placing: string): string {
+  return MEDALS[placing] ? `${MEDALS[placing]} ${placing}` : placing;
 }
 
 export function computeStats(matches: Match[]): Stats {
@@ -253,6 +260,77 @@ export function statsByCompetition(matches: Match[], competitions: Competition[]
   const out = [...byId.values()];
   for (const entry of out) entry.points = entry.wins * 3 + entry.draws;
   return out.sort((a, b) => b.played - a.played);
+}
+
+/**
+ * Where a tournament is up to. "played" means every match has a result (or was
+ * called off) but nobody has said it's over yet - the time to finish it.
+ */
+export type TournamentStatus = 'upcoming' | 'playing' | 'played' | 'finished';
+
+export interface TournamentBreakdown extends Record_ {
+  competition: Competition;
+  status: TournamentStatus;
+  /** Matches that are on - everything except rounds called off. */
+  fixtures: number;
+  /** First and last dates of those matches, 'YYYY-MM-DD' - its own day, or '', when there are none. */
+  from: string;
+  to: string;
+}
+
+/** Every tournament, where it's up to and how it went - most recent first. */
+export function statsByTournament(
+  matches: Match[],
+  competitions: Competition[],
+  now: Date = new Date(),
+): TournamentBreakdown[] {
+  const out: TournamentBreakdown[] = [];
+  for (const competition of competitions) {
+    if (competition.type !== 'tournament') continue;
+    const on = matches.filter((m) => m.competitionId === competition.id && m.status !== 'cancelled');
+    const rec = emptyRecord();
+    for (const match of on) if (isPlayed(match)) addToRecord(rec, match.result);
+    const dates = on.map((m) => m.date).sort();
+    // Under way from the first kickoff, even before any score is logged.
+    const started = on.some((m) => isPlayed(m) || kickoffAt(m.date, m.time).getTime() <= now.getTime());
+    const status: TournamentStatus = competition.archived
+      ? 'finished'
+      : !started
+        ? 'upcoming'
+        : on.some((m) => m.status === 'scheduled')
+          ? 'playing'
+          : 'played';
+    out.push({
+      competition,
+      ...rec,
+      status,
+      fixtures: on.length,
+      // Before any matches are in, the day it was set up for.
+      from: dates[0] ?? competition.startDate,
+      to: dates[dates.length - 1] ?? competition.startDate,
+    });
+  }
+  return out.sort((a, b) => (a.to < b.to ? 1 : a.to > b.to ? -1 : 0));
+}
+
+/**
+ * The position group played most in these matches - the stats the player is
+ * judged on. A keeper who went outfield once is still judged as a keeper.
+ */
+export function mainPositionGroup(matches: Match[], fallback: PositionGroup): PositionGroup {
+  const counts = new Map<PositionGroup, number>();
+  for (const m of matches) {
+    if (m.result?.didPlay) counts.set(m.result.positionGroup, (counts.get(m.result.positionGroup) ?? 0) + 1);
+  }
+  let best = fallback;
+  let bestCount = 0;
+  for (const [group, count] of counts) {
+    if (count > bestCount) {
+      best = group;
+      bestCount = count;
+    }
+  }
+  return best;
 }
 
 export interface StageBreakdown extends Record_ {

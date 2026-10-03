@@ -108,6 +108,32 @@ describe('parseData', () => {
     expect(round2.matches[0].deletedAt).toBe('2026-05-01T00:00:00.000Z');
   });
 
+  it('gives competitions from before finishing an open, unplaced, ungrouped start', () => {
+    const [competition] = parseData(V1_BACKUP).competitions;
+    expect(competition).toMatchObject({ archived: false, placing: '', ageGroup: '' });
+    // Nor anything set up for matches added later.
+    expect(competition).toMatchObject({ startDate: '', teamId: null, location: '', matchLength: 0 });
+  });
+
+  it("counts an old profile's age group as picked in the year it was set up", () => {
+    // Saved by a version from before the question existed, so the field is missing, not blank.
+    const { ageGroupYear: _never, ...before } = emptyData().profile;
+    const saved = (profile: object) => JSON.stringify({ ...emptyData(), profile: { ...before, ...profile } });
+
+    // Set up in May 2025, so asked about moving up from New Year 2026 on.
+    expect(parseData(saved({ ageGroup: 'U13', onboardedAt: '2025-05-01T10:00:00.000Z' })).profile.ageGroupYear).toBe(2025);
+    // Never set up: nothing to ask about yet.
+    expect(parseData(saved({ onboardedAt: null })).profile.ageGroupYear).toBe(0);
+  });
+
+  it('keeps a year that was already answered', () => {
+    const json = JSON.stringify({
+      ...emptyData(),
+      profile: { ...emptyData().profile, onboardedAt: '2025-05-01T10:00:00.000Z', ageGroupYear: 2027 },
+    });
+    expect(parseData(json).profile.ageGroupYear).toBe(2027);
+  });
+
   it('leaves already-migrated data alone', () => {
     const migrated = parseData(V1_BACKUP);
     const round2 = parseData(JSON.stringify(migrated));

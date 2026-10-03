@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { COMPETITION_COLORS, COMPETITION_TYPE_LABEL, type Competition, type CompetitionType } from '../types';
+import { AGE_GROUPS, COMPETITION_COLORS, COMPETITION_TYPE_LABEL, type Competition, type CompetitionType } from '../types';
 import { seasonLabel } from '../lib/date';
 import { Field, Sheet } from './ui';
 
@@ -18,12 +18,13 @@ export function CompetitionFormSheet({
   target: CompetitionFormTarget | null;
   onClose: () => void;
 }) {
-  const { addCompetition, updateCompetition, competitions } = useStore();
+  const { addCompetition, updateCompetition, competitions, profile } = useStore();
   const editing = target?.competition ?? null;
 
   const [name, setName] = useState('');
   const [type, setType] = useState<CompetitionType>('league');
   const [season, setSeason] = useState(seasonLabel());
+  const [ageGroup, setAgeGroup] = useState('');
   const [color, setColor] = useState(COMPETITION_COLORS[0]);
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -35,16 +36,18 @@ export function CompetitionFormSheet({
       setName(editing.name);
       setType(editing.type);
       setSeason(editing.season);
+      setAgeGroup(editing.ageGroup);
       setColor(editing.color);
       setNotes(editing.notes);
     } else {
       setName('');
       setType('league');
       setSeason(seasonLabel());
+      setAgeGroup(profile.ageGroup);
       setColor(COMPETITION_COLORS[competitions.length % COMPETITION_COLORS.length]);
       setNotes('');
     }
-  }, [target, editing, competitions.length]);
+  }, [target, editing, competitions.length, profile.ageGroup]);
 
   if (!target) return null;
 
@@ -53,7 +56,7 @@ export function CompetitionFormSheet({
       setError('Give it a name, e.g. "Sunday League".');
       return;
     }
-    const payload = { name: name.trim(), type, season: season.trim(), color, notes: notes.trim() };
+    const payload = { name: name.trim(), type, season: season.trim(), ageGroup, color, notes: notes.trim() };
     if (editing) updateCompetition(editing.id, payload);
     else addCompetition(payload);
     onClose();
@@ -100,6 +103,17 @@ export function CompetitionFormSheet({
 
       <Field label="Season" hint="Optional — keeps last year's stats separate">
         <input className="input" value={season} onChange={(e) => setSeason(e.target.value)} placeholder="2025/26" />
+      </Field>
+
+      <Field label="Age group" hint="The one you play in here — it can differ from competition to competition.">
+        <select className="input" value={ageGroup} onChange={(e) => setAgeGroup(e.target.value)}>
+          <option value="">Not set</option>
+          {AGE_GROUPS.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
       </Field>
 
       <Field group label="Colour" hint="Shown on the calendar">

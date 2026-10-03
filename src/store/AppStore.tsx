@@ -15,9 +15,12 @@ type Action =
   | { type: 'team/update'; id: string; patch: Partial<Team> }
   | { type: 'team/delete'; id: string }
   | { type: 'match/addMany'; matches: Match[] }
+  | { type: 'profile/confirmAgeGroup'; ageGroup: string; year: number }
   | { type: 'competition/add'; competition: Competition }
   | { type: 'competition/update'; id: string; patch: Partial<Competition> }
   | { type: 'competition/delete'; id: string }
+  | ({ type: 'competition/finish'; id: string } & FinishCompetitionInput)
+  | { type: 'competition/reopen'; id: string }
   | { type: 'match/add'; match: Match }
   | { type: 'match/update'; id: string; patch: Partial<Match> }
   | { type: 'match/delete'; id: string }
@@ -58,11 +61,27 @@ export function reducer(state: AppData, action: Action): AppData {
     case 'profile/update':
       return { ...state, profile: touch({ ...state.profile, ...action.patch }) };
 
+    case 'profile/confirmAgeGroup': {
+      // A squad moves up together, so teams in the player's old age group come
+      // too. A team in any other group was set that way on purpose and stays.
+      const from = state.profile.ageGroup;
+      const moving = from !== '' && action.ageGroup !== from;
+      return {
+        ...state,
+        profile: touch({ ...state.profile, ageGroup: action.ageGroup, ageGroupYear: action.year }),
+        teams: moving
+          ? state.teams.map((t) =>
+              t.deletedAt === null && t.ageGroup === from ? touch({ ...t, ageGroup: action.ageGroup }) : t,
+            )
+          : state.teams,
+      };
+    }
+
     case 'team/add':
       return { ...state, teams: [...state.teams, action.team] };
 
     case 'team/update':
-      return { ...state, teams: state.teams.map((t) => (t.id === action.id ? { ...t, ...action.patch } : t)) };
+      return { ...state, teams: state.teams.map((t) => (t.id === action.id ? touch({ ...t, ...action.patch }) : t)) };
 
     case 'team/delete':
       // Matches outlive their team, same as competitions.
@@ -95,7 +114,31 @@ export function reducer(state: AppData, action: Action): AppData {
     case 'competition/update':
       return {
         ...state,
-        competitions: state.competitions.map((c) => (c.id === action.id ? { ...c, ...action.patch } : c)),
+        competitions: state.competitions.map((c) => (c.id === action.id ? touch({ ...c, ...action.patch }) : c)),
+      };
+
+    case 'competition/finish': {
+      const { id, placing, ageGroup, notes } = action;
+      return {
+        ...state,
+        competitions: state.competitions.map((c) =>
+          c.id === id ? touch({ ...c, archived: true, placing, ageGroup, notes }) : c,
+        ),
+        // Rounds that never happened - a final they didn't reach - are called
+        // off, the same as "Off" on the result prompt: nothing is lost, and they
+        // stop asking for a score.
+        matches: state.matches.map((m) =>
+          m.competitionId === id && m.status === 'scheduled' && m.deletedAt === null
+            ? touch<Match>({ ...m, status: 'cancelled', result: null, remindAfter: null })
+            : m,
+        ),
+      };
+    }
+
+    case 'competition/reopen':
+      return {
+        ...state,
+        competitions: state.competitions.map((c) => (c.id === action.id ? touch({ ...c, archived: false }) : c)),
       };
 
     case 'competition/delete':
@@ -144,7 +187,15 @@ export interface NewCompetitionInput {
   name: string;
   type: Competition['type'];
   season: string;
+  ageGroup: string;
   color: string;
+  notes: string;
+}
+
+/** What finishing a competition records - the stats themselves come from its matches. */
+export interface FinishCompetitionInput {
+  placing: string;
+  ageGroup: string;
   notes: string;
 }
 
@@ -177,6 +228,8 @@ export interface TournamentFixture {
 }
 
 export interface NewTournamentInput extends NewCompetitionInput {
+  /** Its first day - kept even when no matches are known yet. */
+  startDate: string;
   teamId: string | null;
   location: string;
   /** Tournament games are usually short - applied to every fixture. */
@@ -202,12 +255,19 @@ export function buildMatch(input: NewMatchInput, at: string): Match {
 
 /** The tournament and every fixture in it, each with the stage it was set up as. */
 export function buildTournament(input: NewTournamentInput, at: string): { competition: Competition; matches: Match[] } {
-  const { fixtures, teamId, location, durationMinutes, ...competitionInput } = input;
+  const { fixtures, teamId, location, startDate, durationMinutes, ...competitionInput } = input;
   const competition: Competition = {
     id: createId('comp'),
     ...competitionInput,
     type: 'tournament',
     archived: false,
+    placing: '',
+    // Kept on the tournament itself, so matches added one at a time later -
+    // when there were no fixtures to make with it - start from them.
+    startDate,
+    teamId,
+    location,
+    matchLength: durationMinutes,
     createdAt: at,
     updatedAt: at,
     deletedAt: null,
@@ -257,6 +317,9 @@ interface StoreValue {
   deleteCompetition(id: string): void;
   /** Creates the tournament and all of its fixtures in one go. */
   addTournament(input: NewTournamentInput): Competition;
+  /** Marks it over with how far they got, and calls off any rounds never played. */
+  finishCompetition(id: string, input: FinishCompetitionInput): void;
+  reopenCompetition(id: string): void;
   addTraining(input: NewTrainingInput): TrainingSession;
   updateTraining(id: string, patch: Partial<TrainingSession>): void;
   deleteTraining(id: string): void;
@@ -265,6 +328,8 @@ interface StoreValue {
   deleteTeam(id: string): void;
   updateSettings(patch: Partial<Settings>): void;
   updateProfile(patch: Partial<Profile>): void;
+  /** Answers the new-season question: move to `ageGroup`, or pass the current one to stay. */
+  confirmAgeGroup(ageGroup: string, year: number): void;
   competitionOf(match: Match): Competition | null;
   teamOf(match: Match): Team | null;
   /** Calendar dot colour, following the colour-by setting. */
@@ -349,6 +414,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           id: createId('comp'),
           ...input,
           archived: false,
+          placing: '',
+          startDate: '',
+          teamId: null,
+          location: '',
+          matchLength: 0,
           createdAt: now(),
           updatedAt: now(),
           deletedAt: null,
@@ -370,6 +440,14 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'competition/add', competition });
         if (created.length) dispatch({ type: 'match/addMany', matches: created });
         return competition;
+      },
+
+      finishCompetition(id, input) {
+        dispatch({ type: 'competition/finish', id, ...input });
+      },
+
+      reopenCompetition(id) {
+        dispatch({ type: 'competition/reopen', id });
       },
 
       addTraining(input) {
@@ -412,6 +490,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       updateProfile(patch) {
         dispatch({ type: 'profile/update', patch });
+      },
+
+      confirmAgeGroup(ageGroup, year) {
+        dispatch({ type: 'profile/confirmAgeGroup', ageGroup, year });
       },
 
       competitionOf(match) {

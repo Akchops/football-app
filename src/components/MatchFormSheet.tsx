@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useStore } from '../store/AppStore';
+import { useStore, type NewMatchInput } from '../store/AppStore';
 import { MATCH_LENGTHS, type Match, type MatchStage, type Venue } from '../types';
 import { todayISO } from '../lib/date';
 import { STAGES, STAGE_LABEL, detailPrompt, toStage } from '../lib/stage';
@@ -9,6 +9,8 @@ export interface MatchFormTarget {
   mode: 'create' | 'edit';
   match?: Match;
   dateISO?: string;
+  /** Where a new match starts - e.g. one added to a tournament from its page. */
+  preset?: Partial<NewMatchInput>;
 }
 
 const VENUE_OPTIONS: { value: Venue; label: string }[] = [
@@ -60,19 +62,23 @@ export function MatchFormSheet({
       setStage(m.stage);
       setStageDetail(m.stageDetail);
     } else {
-      setOpponent('');
-      setDate(target.dateISO ?? todayISO());
-      setTime(settings.defaultKickoff);
-      // Default to the only competition when there is just one - one less tap.
-      setCompetitionId(competitions.length === 1 ? competitions[0].id : '');
-      setTeamId(teams.length >= 1 ? teams[0].id : '');
-      setVenue('home');
+      const preset = target.preset ?? {};
+      setOpponent(preset.opponent ?? '');
+      setDate(preset.date ?? target.dateISO ?? todayISO());
+      setTime(preset.time ?? settings.defaultKickoff);
+      // Default to the only competition still running when there is just one - one less tap.
+      const running = competitions.filter((c) => !c.archived);
+      setCompetitionId(
+        preset.competitionId !== undefined ? preset.competitionId ?? '' : running.length === 1 ? running[0].id : '',
+      );
+      setTeamId(preset.teamId !== undefined ? preset.teamId ?? '' : teams.length >= 1 ? teams[0].id : '');
+      setVenue(preset.venue ?? 'home');
       // A team that plays shorter games keeps its length as the starting point.
-      setDurationMinutes(settings.defaultMatchLength);
-      setLocation('');
-      setNotes('');
-      setStage(null);
-      setStageDetail('');
+      setDurationMinutes(preset.durationMinutes ?? settings.defaultMatchLength);
+      setLocation(preset.location ?? '');
+      setNotes(preset.notes ?? '');
+      setStage(preset.stage ?? null);
+      setStageDetail(preset.stageDetail ?? '');
     }
   }, [target, settings.defaultKickoff, competitions, teams]);
 
@@ -119,7 +125,13 @@ export function MatchFormSheet({
     <Sheet
       open
       title={editing ? 'Edit match' : 'Add match'}
-      subtitle={editing ? undefined : 'Fixtures show up on the calendar straight away.'}
+      subtitle={
+        editing
+          ? undefined
+          : target.preset?.competitionId && competition
+            ? `For ${competition.name}. It shows up on the calendar straight away.`
+            : 'Fixtures show up on the calendar straight away.'
+      }
       onClose={onClose}
       footer={
         <>
@@ -177,12 +189,15 @@ export function MatchFormSheet({
       >
         <select className="input" value={competitionId} onChange={(e) => setCompetitionId(e.target.value)}>
           <option value="">No competition</option>
-          {competitions.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-              {c.season ? ` (${c.season})` : ''}
-            </option>
-          ))}
+          {/* A finished one isn't taking new fixtures, but a match already in it keeps it. */}
+          {competitions
+            .filter((c) => !c.archived || c.id === editing?.competitionId)
+            .map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.season ? ` (${c.season})` : ''}
+              </option>
+            ))}
         </select>
       </Field>
 

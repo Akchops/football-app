@@ -2,22 +2,27 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import { MONTH_NAMES, fromISODate, kickoffAt } from '../lib/date';
-import { pendingResultMatches, playedMatches, upcomingMatches } from '../lib/stats';
+import { pendingResultMatches, playedMatches, statsByTournament, upcomingMatches } from '../lib/stats';
 import { MatchCard } from './MatchCard';
+import { TournamentList } from './TournamentList';
 import { EmptyState, Segmented } from './ui';
 
-type Tab = 'upcoming' | 'results' | 'all';
+type Tab = 'upcoming' | 'results' | 'all' | 'tournaments';
 
 export function MatchesScreen({
   now,
   onOpenMatch,
   onAddMatch,
   onEnterResult,
+  onAddTournament,
+  onOpenCompetition,
 }: {
   now: Date;
   onOpenMatch: (match: Match) => void;
   onAddMatch: (dateISO?: string) => void;
   onEnterResult: (match: Match) => void;
+  onAddTournament: () => void;
+  onOpenCompetition: (id: string, step?: 'summary' | 'finish') => void;
 }) {
   const { matches, competitions, teams, settings } = useStore();
   const [tab, setTab] = useState<Tab>('upcoming');
@@ -38,6 +43,15 @@ export function MatchesScreen({
   const cancelled = filtered
     .filter((m) => m.status === 'cancelled')
     .sort((a, b) => kickoffAt(b.date, b.time).getTime() - kickoffAt(a.date, a.time).getTime());
+
+  // Every tournament, not just the one a chip filters to - this is the list of them.
+  const tournaments = useMemo(() => statsByTournament(matches, competitions, now), [matches, competitions, now]);
+  const going = tournaments.filter((t) => t.status === 'playing' || t.status === 'played');
+  // Soonest first, and one with no matches yet after anything dated.
+  const comingUp = tournaments
+    .filter((t) => t.status === 'upcoming')
+    .sort((a, b) => (a.from || '9999').localeCompare(b.from || '9999'));
+  const finished = tournaments.filter((t) => t.status === 'finished');
 
   const groupByMonth = (list: Match[]) => {
     const groups: { key: string; label: string; items: Match[] }[] = [];
@@ -75,7 +89,10 @@ export function MatchesScreen({
     <div className="screen">
       <div className="screen-head">
         <h1>Matches</h1>
-        <button className="primary-btn small" onClick={() => onAddMatch()}>
+        <button
+          className="primary-btn small"
+          onClick={() => (tab === 'tournaments' ? onAddTournament() : onAddMatch())}
+        >
           + Add
         </button>
       </div>
@@ -85,12 +102,13 @@ export function MatchesScreen({
           { value: 'upcoming', label: `Upcoming ${upcoming.length ? `(${upcoming.length})` : ''}`.trim() },
           { value: 'results', label: `Results ${played.length ? `(${played.length})` : ''}`.trim() },
           { value: 'all', label: 'All' },
+          { value: 'tournaments', label: 'Tournaments' },
         ]}
         value={tab}
         onChange={setTab}
       />
 
-      {teams.length > 1 && (
+      {teams.length > 1 && tab !== 'tournaments' && (
         <div className="chip-scroll">
           <button className={teamId === 'all' ? 'filter-chip on' : 'filter-chip'} onClick={() => setTeamId('all')}>
             All teams
@@ -108,7 +126,7 @@ export function MatchesScreen({
         </div>
       )}
 
-      {competitions.length > 0 && (
+      {competitions.length > 0 && tab !== 'tournaments' && (
         <div className="chip-scroll">
           <button
             className={competitionId === 'all' ? 'filter-chip on' : 'filter-chip'}
@@ -174,6 +192,38 @@ export function MatchesScreen({
           />
         ) : (
           renderList(played)
+        ))}
+
+      {tab === 'tournaments' &&
+        (tournaments.length === 0 ? (
+          <EmptyState
+            icon="🏆"
+            title="No tournaments yet"
+            message="Add one and all of its matches go in at once. Every tournament you play shows up here, finished or not."
+            action={
+              <button className="primary-btn" onClick={onAddTournament}>
+                Add a tournament
+              </button>
+            }
+          />
+        ) : (
+          [
+            { label: 'Still going', rows: going },
+            { label: 'Coming up', rows: comingUp },
+            { label: 'Finished', rows: finished },
+          ]
+            .filter((group) => group.rows.length > 0)
+            .map((group) => (
+              <div key={group.label} className="month-group">
+                <h3 className="group-label">{group.label}</h3>
+                <TournamentList
+                  rows={group.rows}
+                  now={now}
+                  onOpen={(id) => onOpenCompetition(id)}
+                  onFinish={(id) => onOpenCompetition(id, 'finish')}
+                />
+              </div>
+            ))
         ))}
 
       {tab === 'all' && (

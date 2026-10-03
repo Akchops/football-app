@@ -106,3 +106,18 @@ export function detailPrompt(stage: MatchStage): { label: string; placeholder: s
   if (stage === 'round') return { label: 'Which round?', placeholder: 'e.g. 2' };
   return { label: 'Cup, Plate…', placeholder: 'e.g. Plate' };
 }
+
+const NEXT_STAGE: Partial<Record<MatchStage, MatchStage>> = {
+  last16: 'quarter',
+  quarter: 'semi',
+  semi: 'final',
+  third: 'final',
+};
+
+/**
+ * A sensible stage for the match added after one in `previous`: more group games
+ * follow a group game, and after a knockout round comes the next one.
+ */
+export function nextStage(previous: MatchStage | null): MatchStage | null {
+  return previous ? NEXT_STAGE[previous] ?? previous : null;
+}

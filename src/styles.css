@@ -650,7 +650,14 @@ p { margin: 0; }
 }
 .input:focus { outline: 2px solid rgba(41, 209, 124, 0.5); outline-offset: 1px; border-color: var(--accent); }
 textarea.input { resize: vertical; }
-select.input { background-image: none; }
+/* appearance: none takes the native arrow away too, which left every dropdown
+   looking like a text box. Draw it back so they read as something to pick from. */
+select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238ea0c6' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 34px;
+}
 
 .form-error {
   background: rgba(242, 104, 95, 0.14);
@@ -674,7 +681,8 @@ select.input { background-image: none; }
   background: none;
   border: 0;
   border-radius: 9px;
-  padding: 8px 6px;
+  /* Tight at the sides: Matches has four of these, counts and all, on a 360px phone. */
+  padding: 8px 4px;
   font-size: 13px;
   font-weight: 700;
   color: var(--muted);
@@ -781,6 +789,8 @@ select.input { background-image: none; }
 .detail-list > div:last-child { border-bottom: 0; }
 .detail-list dt { color: var(--muted); font-size: 13px; }
 .detail-list dd { margin: 0; font-weight: 600; font-size: 14px; text-align: right; }
+/* A value that opens something keeps the row the same height as the rest. */
+.detail-list .link-btn { padding: 0; text-align: right; }
 
 .your-game { display: flex; flex-direction: column; gap: 8px; }
 .your-game h3, .notes-block h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -1128,23 +1138,23 @@ select.input { background-image: none; }
 /* ---------- tournament fixtures ---------- */
 .fixtures { display: flex; flex-direction: column; gap: 8px; }
 .fixtures h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.fixture-row {
-  display: grid;
-  grid-template-columns: 74px 96px minmax(0, 1fr) auto;
-  grid-template-areas: "stage time opp remove";
-  gap: 6px;
-  align-items: center;
+/* One card per match, so its stage, kickoff, day and opponent read as belonging together. */
+.fixture-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px 10px;
 }
-.fixture-row.three { grid-template-areas: "stage time date remove" "opp opp opp opp"; }
-.fixture-row .input { padding: 9px 10px; min-width: 0; }
-.fixture-row .f-stage { grid-area: stage; padding-right: 4px; }
-.fixture-row .f-time { grid-area: time; }
-.fixture-row .f-date { grid-area: date; }
-.fixture-row .f-opp { grid-area: opp; }
-.fixture-row .f-remove { grid-area: remove; }
-
-.tournament-format { display: flex; flex-direction: column; gap: 10px; }
-.tournament-format h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.fixture-head { display: flex; align-items: center; justify-content: space-between; min-height: 30px; }
+.fixture-title { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.fixture-head .icon-btn { width: 30px; height: 30px; font-size: 14px; }
+/* Wide enough that a 12-hour clock's "AM" isn't cut off. */
+.fixture-when { display: grid; grid-template-columns: 1fr 136px; gap: 8px; }
+.fixture-card .input { padding: 9px 10px; }
+.fixture-card select.input { padding-right: 30px; background-position: right 10px center; }
 
 .duration-picker { display: flex; flex-direction: column; gap: 8px; }
 .duration-custom { display: flex; align-items: center; gap: 8px; }
@@ -1619,6 +1629,53 @@ select.input { background-image: none; }
    this yet" looked identical to "press me". */
 button:disabled { opacity: 0.45; }
 button:disabled:active { transform: none; }
+
+/* ---------- competition sheet ---------- */
+.placing-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(245, 196, 81, 0.1);
+  border: 1px solid rgba(245, 196, 81, 0.35);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.placing-hero strong { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--gold); }
+.placing-hero span { font-size: 13px; color: var(--muted); }
+
+/* ---------- tournament list ---------- */
+/* Looks like a stats table, but each row opens its tournament and can carry a
+   Finish button of its own - so the row is a div, not one big button. */
+.tourney-list {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.tourney-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.tourney-row:last-child { border-bottom: 0; }
+.tourney-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 11px 2px 11px 14px;
+  text-align: left;
+}
+.tourney-main:active { background: var(--surface-2); }
+.tourney-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tourney-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tourney-meta { font-size: 12px; color: var(--muted); }
+.tourney-record { font-weight: 700; font-size: 14px; flex: none; }
 
 /* Who shares this household, in Setup. */
 .family-list { list-style: none; margin: 4px 0 12px; padding: 0; }

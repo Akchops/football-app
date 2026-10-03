@@ -5,16 +5,25 @@ import { formatDateShort } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import {
-  computeStats, recentScores, recordSummary, scoreline, statsByCompetition, statsByMonth,
-  statsByOpponent, statsByStage, statsByTeam, statsByVenue, type StageBreakdown,
+  computeStats, mainPositionGroup, recentScores, recordSummary, scoreline, statsByCompetition, statsByMonth,
+  statsByOpponent, statsByStage, statsByTeam, statsByTournament, statsByVenue, type StageBreakdown,
 } from '../lib/stats';
 import { milestones, personalBests } from '../lib/records';
 import { TRAINING_TYPE_LABEL } from '../types';
 import { Avatar } from './Avatar';
 import { MissionBoard } from './MissionBoard';
+import { TournamentList } from './TournamentList';
 import { EmptyState, Section, StatTile } from './ui';
 
-export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: () => void }) {
+export function StatsScreen({
+  now,
+  onGoToMatches,
+  onOpenCompetition,
+}: {
+  now: Date;
+  onGoToMatches: () => void;
+  onOpenCompetition: (id: string, step?: 'summary' | 'finish') => void;
+}) {
   const { matches, competitions, teams, profile, training } = useStore();
   const [competitionId, setCompetitionId] = useState<string>('all');
   const [teamId, setTeamId] = useState<string>('all');
@@ -29,6 +38,11 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
 
   const stats = useMemo(() => computeStats(scoped), [scoped]);
   const byComp = useMemo(() => statsByCompetition(matches, competitions), [matches, competitions]);
+  // Only the ones there's something to show for - the Matches tab lists them all.
+  const withResults = useMemo(
+    () => statsByTournament(matches, competitions, now).filter((row) => row.played > 0),
+    [matches, competitions, now],
+  );
   const byTeam = useMemo(() => statsByTeam(matches, teams), [matches, teams]);
   const byMonth = useMemo(() => statsByMonth(scoped, 6, now), [scoped, now]);
   const byVenue = useMemo(() => statsByVenue(scoped), [scoped]);
@@ -46,21 +60,10 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
   }, [training, now]);
 
   // Judge the player by the position they actually played most in this selection.
-  const group: PositionGroup = useMemo(() => {
-    const counts = new Map<PositionGroup, number>();
-    for (const m of scoped) {
-      if (m.result?.didPlay) counts.set(m.result.positionGroup, (counts.get(m.result.positionGroup) ?? 0) + 1);
-    }
-    let best: PositionGroup = profile.positionGroup;
-    let bestCount = 0;
-    for (const [g, count] of counts) {
-      if (count > bestCount) {
-        best = g;
-        bestCount = count;
-      }
-    }
-    return best;
-  }, [scoped, profile.positionGroup]);
+  const group: PositionGroup = useMemo(
+    () => mainPositionGroup(scoped, profile.positionGroup),
+    [scoped, profile.positionGroup],
+  );
 
   const bests = useMemo(() => personalBests(scoped, group), [scoped, group]);
   const goals = useMemo(() => milestones(scoped, group), [scoped, group]);
@@ -275,6 +278,17 @@ export function StatsScreen({ now, onGoToMatches }: { now: Date; onGoToMatches: 
               </div>
             ))}
           </div>
+        </Section>
+      )}
+
+      {withResults.length > 0 && competitionId === 'all' && (
+        <Section title="Tournaments">
+          <TournamentList
+            rows={withResults}
+            now={now}
+            onOpen={(id) => onOpenCompetition(id)}
+            onFinish={(id) => onOpenCompetition(id, 'finish')}
+          />
         </Section>
       )}
 

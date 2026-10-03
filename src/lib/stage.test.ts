@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STAGES, bracketOf, cleanDetail, fixtureContext, isKnockout, stageName, toStage } from './stage';
+import { STAGES, bracketOf, cleanDetail, fixtureContext, isKnockout, nextStage, stageName, toStage } from './stage';
 
 describe('stageName', () => {
   it('names every stage on its own', () => {
@@ -85,5 +85,29 @@ describe('cleanDetail', () => {
     expect(cleanDetail('round', '3')).toBe('3');
     expect(cleanDetail(null, 'B')).toBe('');
     expect(bracketOf('Winners Cup')).toBe('Winners Cup');
+  });
+});
+
+/** Adding a match to a tournament starts it on the round most likely to come next. */
+describe('nextStage', () => {
+  it('follows a group game with another', () => {
+    expect(nextStage('group')).toBe('group');
+  });
+
+  it('moves through the knockout rounds to the final', () => {
+    expect(nextStage('last16')).toBe('quarter');
+    expect(nextStage('quarter')).toBe('semi');
+    expect(nextStage('semi')).toBe('final');
+    expect(nextStage('third')).toBe('final');
+  });
+
+  it('stays put after the final, an early round, or with no stage', () => {
+    expect(nextStage('final')).toBe('final');
+    expect(nextStage('round')).toBe('round');
+    expect(nextStage(null)).toBeNull();
+  });
+
+  it('only ever suggests a real stage', () => {
+    for (const stage of STAGES) expect(STAGES).toContain(nextStage(stage));
   });
 });

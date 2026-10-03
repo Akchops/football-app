@@ -84,6 +84,7 @@ export function OnboardingScreen() {
       name: name.trim(),
       dateOfBirth: dob,
       ageGroup: effectiveAgeGroup,
+      ageGroupYear: new Date().getFullYear(),
       position,
       positionGroup: group,
       onboardedAt: new Date().toISOString(),

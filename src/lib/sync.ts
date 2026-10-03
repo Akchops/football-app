@@ -2,7 +2,7 @@ import {
   DEFAULT_PROFILE, DEFAULT_SETTINGS,
   type AppData, type Competition, type Match, type Profile, type Settings, type Team, type TrainingSession,
 } from '../types';
-import { normaliseCompetition, normaliseMatch, normaliseTeam, normaliseTraining } from '../store/storage';
+import { normaliseCompetition, normaliseMatch, normaliseTeam, normaliseTraining, settledYear } from '../store/storage';
 
 /**
  * Bringing two phones' copies of the same player back together.
@@ -253,7 +253,14 @@ export function fromServer<T extends Table>(table: T, data: unknown): RecordOf[T
 }
 
 export function profileFromServer(data: unknown): Profile {
-  return { ...DEFAULT_PROFILE, ...(data as Partial<Profile>) };
+  const profile = data as Partial<Profile>;
+  return {
+    ...DEFAULT_PROFILE,
+    ...profile,
+    // A phone that hasn't updated yet sends no answer to the new-season question;
+    // count it from when the profile was set up, as an old backup is.
+    ageGroupYear: profile.ageGroupYear ?? settledYear(profile.onboardedAt ?? null),
+  };
 }
 
 export function settingsFromServer(data: unknown): Settings {
