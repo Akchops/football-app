@@ -26,7 +26,7 @@ const STEPS = ['You', 'Position', 'Teams'];
  * Matchday can sign in here instead - the family's player arrives with the
  * first sync, and this screen gives way to the app by itself.
  */
-export function OnboardingScreen() {
+export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
   const { profile, updateProfile, addTeam, teams } = useStore();
   const [step, setStep] = useState(0);
   const [error, setError] = useState('');
@@ -279,8 +279,8 @@ export function OnboardingScreen() {
       </div>
 
       <div className="onboard-foot">
-        {step > 0 ? (
-          <button className="ghost-btn wide" onClick={back}>
+        {step > 0 || onBack ? (
+          <button className="ghost-btn wide" onClick={step > 0 ? back : onBack}>
             Back
           </button>
         ) : (

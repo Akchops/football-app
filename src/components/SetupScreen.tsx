@@ -9,6 +9,8 @@ import { currentAge, suggestAgeGroup } from '../lib/date';
 import { computeStats, placingLabel } from '../lib/stats';
 import { formatBytes, listAllMedia } from '../store/media';
 import { AccountSection } from './AccountSettings';
+import { AcademySection } from './academy/AcademySection';
+import { ACADEMY } from '../lib/features';
 import { useSync } from '../store/SyncProvider';
 import { AiSection } from './AiSettings';
 import { DurationPicker, EmptyState, Field, Section } from './ui';
@@ -333,6 +335,7 @@ export function SetupScreen({
       </Section>
 
       <AccountSection />
+      {ACADEMY && <AcademySection />}
 
       <Section title="Your data">
         <p className="muted small">

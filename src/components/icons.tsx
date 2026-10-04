@@ -72,3 +72,32 @@ export function CoachIcon() {
     </svg>
   );
 }
+
+export function ShieldIcon() {
+  return (
+    <svg {...base}>
+      <path d="M12 3l7.5 3v5.4c0 4.6-3.1 8.4-7.5 9.6-4.4-1.2-7.5-5-7.5-9.6V6z" />
+      <path d="M8.8 12.2l2.2 2.2 4.2-4.4" />
+    </svg>
+  );
+}
+
+export function HomeIcon() {
+  return (
+    <svg {...base}>
+      <path d="M4 10.5L12 4l8 6.5" />
+      <path d="M6 9v10.5h4.5V15h3v4.5H18V9" />
+    </svg>
+  );
+}
+
+export function PeopleIcon() {
+  return (
+    <svg {...base}>
+      <circle cx="9" cy="8.5" r="3.2" />
+      <path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
+      <circle cx="16.8" cy="9.3" r="2.5" />
+      <path d="M16.2 14.6c2.4 0 4 1.5 4.4 4.4" />
+    </svg>
+  );
+}

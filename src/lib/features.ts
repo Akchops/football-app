@@ -4,4 +4,4 @@
  * sets VITE_ACADEMY to 'true', none of it shows, so work in progress can be
  * pushed and deployed without anyone meeting half a feature.
  */
-export const ACADEMY = import.meta.env.VITE_ACADEMY === 'true';
+export const ACADEMY: boolean = __ACADEMY__;

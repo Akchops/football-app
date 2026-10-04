@@ -35,3 +35,47 @@ export function toSquareDataUrl(file: File): Promise<string | null> {
     img.src = url;
   });
 }
+
+/** Max edge of an academy's logo, and the most it may take as a data URL (the server's limit is 200,000). */
+const LOGO_SIZE = 256;
+const LOGO_MAX = 150_000;
+
+/**
+ * Shrinks a logo to fit a 256px square without cropping it. PNG first, which
+ * keeps a transparent background; a logo too detailed for that is drawn on
+ * white and saved as a JPEG instead.
+ */
+export function toLogoDataUrl(file: File): Promise<string | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    const done = (value: string | null) => {
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, LOGO_SIZE / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return done(null);
+        ctx.drawImage(img, 0, 0, width, height);
+        const png = canvas.toDataURL('image/png');
+        if (png.length <= LOGO_MAX) return done(png);
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        const jpeg = canvas.toDataURL('image/jpeg', 0.85);
+        done(jpeg.length <= LOGO_MAX ? jpeg : null);
+      } catch {
+        done(null);
+      }
+    };
+    img.onerror = () => done(null);
+    img.src = url;
+  });
+}

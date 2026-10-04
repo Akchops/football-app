@@ -5,3 +5,6 @@ dist
 .vite
 coverage
 *.tsbuildinfo
+
+# Python packages fetched to check SQL locally - never part of the app.
+*.whl

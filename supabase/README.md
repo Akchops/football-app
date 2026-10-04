@@ -128,10 +128,14 @@ its data; and that someone not signed in cannot touch any table.
 
 The academy checks end with `ALL ACADEMY CHECKS PASSED`. Among them: a
 player's records stay hidden until their family says yes, and again the moment
-they leave; a coach sees only the squads they coach; the office admin role sees
-no player's stats; nobody at an academy can write a player's records; usernames
-are unique ignoring case; an owner cannot verify their own academy; and with
-approval required, an unverified academy cannot take on any player.
+they leave; a coach sees only the squads they coach; the office admin role
+looks after staff and the academy's details but sees no player's stats, and
+cannot promote itself or touch a manager; nobody at an academy can write a
+player's records; usernames are unique ignoring case; an old join code stops
+working once a new one is made; an owner cannot verify their own academy; and
+with approval required, an unverified academy cannot take on any player.
+
+The two files can be run in either order, and again, on the same database.
 
 ## Testing sync end to end, locally
 
@@ -154,11 +158,11 @@ postgrest /tmp/postgrest.conf &
 JWT_SECRET=local-only-jwt-secret-that-is-long-enough-1234 POSTGREST_URL=http://localhost:3001 \
   PGHOST=localhost PGPORT=5433 PGDATABASE=postgres PGUSER=postgres node supabase/local-api.mjs &
 
-# 3. The sync tests against it, through the real supabase-js client:
+# 3. The sync and academy tests against it, through the real supabase-js client:
 LOCAL_SUPABASE_URL=http://localhost:54321 LOCAL_SUPABASE_ANON_KEY=<printed key> \
-  npx vitest run src/lib/remote.integration.test.ts
+  npx vitest run src/lib/remote.integration.test.ts src/lib/academy.integration.test.ts
 
-# 4. Or the app itself, signed in against it:
+# 4. Or the app itself, signed in against it (add VITE_ACADEMY=true for the academy area):
 VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_ANON_KEY=<printed key> npm run dev
 ```
 

@@ -61,7 +61,8 @@ grant execute on function public.t_set(text, text), public.t_get(text), public.t
 -- ---------------------------------------------------------------------------
 -- The people.
 -- ---------------------------------------------------------------------------
-delete from public.academies where created_by::text like '0a000000-%';
+-- Academies left by an earlier run, including any whose maker rls-test.sql has since removed.
+delete from public.academies where created_by is null or created_by::text like '0a000000-%';
 delete from auth.users where id::text like '0a000000-%';
 insert into auth.users (id, email) values
   ('0a000000-0000-0000-0000-000000000001', 'owner@riverside.test'),
@@ -167,7 +168,9 @@ set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000009';
 select public.t_expect(format($$select * from public.academies where id = %L$$, public.t_get('aid')), 0,
   'a stranger cannot see the academy');
 select public.t_refused(format($$select public.invite_staff(%L, 'stranger_s', 'manager')$$, public.t_get('aid')),
-  'only the owner or a manager', 'a stranger cannot invite staff');
+  'only the owner, a manager or an admin', 'a stranger cannot invite staff');
+select public.t_expect(format($$select * from public.pending_staff(%L)$$, public.t_get('aid')), 0,
+  'a stranger cannot see who the academy has invited');
 select public.t_refused(format($$insert into public.academy_members values (%L, auth.uid(), 'owner')$$, public.t_get('aid')),
   'permission denied', 'a stranger cannot write themselves onto the staff');
 
@@ -188,6 +191,81 @@ set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000005';
 select public.answer_staff_invite((select id from public.my_staff_invites()), true);
 select public.t_expect(format($$select * from public.academy_staff(%L)$$, public.t_get('aid')), 5,
   'staff see the whole staff list');
+select public.t_expect(format($$select * from public.pending_staff(%L)$$, public.t_get('aid')), 0,
+  'an answered invite leaves the pending list');
+
+-- The admin role runs the office side: the academy's details and its staff.
+do $$
+declare n int;
+begin
+  update public.academies set town = 'Leeds LS1' where id = public.t_get('aid')::uuid;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: the admin role could not change the academy''s details'; end if;
+  raise notice 'PASS: the admin role changes the academy''s details';
+  perform public.invite_staff(public.t_get('aid')::uuid, 'stranger_s', 'coach');
+  raise notice 'PASS: the admin role invites a coach';
+end $$;
+select public.t_refused(format($$select public.invite_staff(%L, 'stranger_s', 'manager')$$, public.t_get('aid')),
+  'only the owner can invite a manager', 'the admin role cannot make a manager');
+select public.t_refused(format($$select public.set_staff_role(%L, auth.uid(), 'coach')$$, public.t_get('aid')),
+  'your own role', 'the admin role cannot make themselves a coach');
+select public.t_refused(format($$select public.set_staff_role(%L, '0a000000-0000-0000-0000-000000000002', 'coach')$$, public.t_get('aid')),
+  'cannot change that role', 'the admin role cannot change a manager''s role');
+select public.t_refused(format($$select public.remove_staff(%L, '0a000000-0000-0000-0000-000000000002')$$, public.t_get('aid')),
+  'cannot remove them', 'the admin role cannot remove a manager');
+select public.t_refused(format($$select public.new_join_code(%L)$$, public.t_get('aid')),
+  'only the owner or a manager', 'the admin role cannot change the join code');
+do $$ begin
+  perform public.set_staff_role(public.t_get('aid')::uuid, '0a000000-0000-0000-0000-000000000004', 'admin');
+  perform public.set_staff_role(public.t_get('aid')::uuid, '0a000000-0000-0000-0000-000000000004', 'coach');
+  raise notice 'PASS: the admin role moves someone between coach and admin';
+end $$;
+
+-- Everyone on the staff sees who has been invited, by username.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+do $$
+declare r record;
+begin
+  select * into r from public.pending_staff(public.t_get('aid')::uuid);
+  if r.username <> 'stranger_s' or r.role <> 'coach' or r.invited_by <> 'office_ad' then
+    raise exception 'FAIL: pending_staff gave %', r;
+  end if;
+  raise notice 'PASS: staff see a waiting invite by username, role and who sent it';
+end $$;
+do $$
+declare n int;
+begin
+  update public.academies set name = 'Coach FC' where id = public.t_get('aid')::uuid;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL: a coach renamed the academy'; end if;
+  delete from public.academy_staff_invites where academy_id = public.t_get('aid')::uuid;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL: a coach cancelled a staff invite'; end if;
+  raise notice 'PASS: a coach cannot change the academy''s details or cancel invites';
+end $$;
+select public.t_refused(format($$select public.invite_staff(%L, 'stranger_s', 'admin')$$, public.t_get('aid')),
+  'only the owner, a manager or an admin', 'a coach cannot invite staff');
+
+-- The stranger sees the invite addressed to them; the admin then thinks better of it.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000009';
+do $$ begin
+  if (select town from public.my_staff_invites()) <> 'Leeds LS1' then raise exception 'FAIL: the invite does not say where the academy is'; end if;
+  raise notice 'PASS: an invite says where the academy is';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000005';
+do $$
+declare n int;
+begin
+  delete from public.academy_staff_invites where academy_id = public.t_get('aid')::uuid;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: the admin role could not cancel an invite'; end if;
+  raise notice 'PASS: the admin role cancels an invite';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000009';
+select public.t_refused($$select public.answer_staff_invite((select id from public.academy_staff_invites limit 1), true)$$,
+  'has gone', 'a cancelled invite cannot be accepted');
+select public.t_expect(format($$select * from public.academies where id = %L$$, public.t_get('aid')), 0,
+  'after a cancelled invite, the stranger still cannot see the academy');
 
 -- Squads: owners and managers make them and say who coaches them.
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000005';
@@ -430,6 +508,22 @@ do $$ begin
   if public.academy_role(public.t_get('aid')::uuid) <> 'manager' then raise exception 'FAIL: old owner not a manager'; end if;
   raise notice 'PASS: the owner hands over and stays on as a manager';
 end $$;
+
+-- A new join code, when the old one has got around: the old one stops working.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+select public.t_refused(format($$select public.new_join_code(%L)$$, public.t_get('aid')),
+  'only the owner or a manager', 'a coach cannot change the join code');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000001';
+do $$
+declare fresh text;
+begin
+  fresh := public.new_join_code(public.t_get('aid')::uuid);
+  if fresh = public.t_get('code') or fresh !~ '^[A-HJ-NP-Z2-9]{6}$' then raise exception 'FAIL: new code %', fresh; end if;
+  raise notice 'PASS: a manager makes a new join code';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000009';
+select public.t_refused(format($$select public.join_by_code(%L, true)$$, public.t_get('code')), 'no academy has that code',
+  'the old join code stops working');
 
 -- Removing a coach takes their squads off them.
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000002';

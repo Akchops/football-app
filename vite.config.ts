@@ -6,7 +6,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({ mode }) => {
   // Served from https://<user>.github.io/football-app/ - an absolute base keeps the
   // service worker scope, manifest and start_url pointing at the right place.
-  const base = loadEnv(mode, '.', 'VITE_').VITE_BASE || '/football-app/';
+  const env = loadEnv(mode, '.', 'VITE_');
+  const base = env.VITE_BASE || '/football-app/';
 
   // Lets the running app say which build it is, so "did my deploy arrive?" has
   // an answer that does not depend on guessing.
@@ -14,7 +15,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     base,
-    define: { __BUILD_ID__: JSON.stringify(buildId) },
+    define: {
+      __BUILD_ID__: JSON.stringify(buildId),
+      // A plain true or false in the code, not a lookup, so a build with the
+      // academy release switched off leaves all of it out rather than carrying
+      // it unused. See src/lib/features.ts.
+      __ACADEMY__: JSON.stringify(env.VITE_ACADEMY === 'true'),
+    },
     plugins: [
       react(),
       VitePWA({

@@ -523,7 +523,8 @@ create table if not exists public.academies (
                       check (verification in ('unverified', 'pending', 'verified', 'rejected')),
   verification_note text not null default '',
   verified_at       timestamptz,
-  created_by        uuid not null references auth.users(id),
+  -- Who made it, for the record. The owner is whoever academy_members says.
+  created_by        uuid references auth.users(id) on delete set null,
   created_at        timestamptz not null default now()
 );
 
@@ -543,10 +544,21 @@ create table if not exists public.academy_staff_invites (
   academy_id uuid not null references public.academies(id) on delete cascade,
   user_id    uuid not null references auth.users(id) on delete cascade,
   role       text not null check (role in ('manager', 'coach', 'admin')),
-  invited_by uuid not null references auth.users(id),
+  invited_by uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
   unique (academy_id, user_id)
 );
+
+-- Deleting an account must never be blocked by an academy it made or an
+-- invite it sent. Repeated here for projects that ran an earlier draft of
+-- this file, where both references refused the delete.
+alter table public.academies alter column created_by drop not null;
+alter table public.academies drop constraint if exists academies_created_by_fkey;
+alter table public.academies add constraint academies_created_by_fkey
+  foreign key (created_by) references auth.users(id) on delete set null;
+alter table public.academy_staff_invites drop constraint if exists academy_staff_invites_invited_by_fkey;
+alter table public.academy_staff_invites add constraint academy_staff_invites_invited_by_fkey
+  foreign key (invited_by) references auth.users(id) on delete cascade;
 
 create table if not exists public.academy_squads (
   id         uuid primary key default gen_random_uuid(),
@@ -715,6 +727,18 @@ as $$
   select coalesce(public.academy_role(aid) in ('owner', 'manager', 'coach'), false);
 $$;
 
+-- The office side: the academy's details and its staff. Owners, managers, and
+-- the admin role - who never see a player's stats.
+create or replace function public.manages_staff(aid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select coalesce(public.academy_role(aid) in ('owner', 'manager', 'admin'), false);
+$$;
+
 -- The one rule that opens a player's records to an academy: linked, with the
 -- family's yes, and read by an owner or manager, or by a coach of one of the
 -- squads the player is in.
@@ -801,7 +825,7 @@ create policy academies_read on public.academies
   for select using (public.is_academy_staff(id) or public.is_linked_to_academy(id) or public.is_app_admin());
 drop policy if exists academies_edit on public.academies;
 create policy academies_edit on public.academies
-  for update using (public.runs_academy(id)) with check (public.runs_academy(id));
+  for update using (public.manages_staff(id)) with check (public.manages_staff(id));
 drop policy if exists academies_delete on public.academies;
 create policy academies_delete on public.academies
   for delete using (public.academy_role(id) = 'owner');
@@ -815,7 +839,7 @@ create policy staff_invites_read on public.academy_staff_invites
   for select using (public.is_academy_staff(academy_id) or user_id = auth.uid());
 drop policy if exists staff_invites_cancel on public.academy_staff_invites;
 create policy staff_invites_cancel on public.academy_staff_invites
-  for delete using (public.runs_academy(academy_id) or user_id = auth.uid());
+  for delete using (public.manages_staff(academy_id) or user_id = auth.uid());
 
 drop policy if exists squads_read on public.academy_squads;
 create policy squads_read on public.academy_squads
@@ -980,7 +1004,7 @@ declare
   wanted text := lower(btrim(coalesce(name, '')));
   problem text := public.username_problem(name);
 begin
-  if auth.uid() is null then raise exception 'must be signed in'; end if;
+  if auth.uid() is null then raise exception 'Sign in first'; end if;
   if problem is not null then raise exception '%', problem; end if;
   begin
     insert into public.profiles (user_id, username) values (auth.uid(), wanted)
@@ -996,6 +1020,28 @@ $$;
 -- Academies, staff and roles.
 -- ---------------------------------------------------------------------------
 
+-- A join code no academy has: six characters from an alphabet without 0/O or
+-- 1/I, so it can be read out loud at a training session.
+create or replace function public.fresh_join_code()
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  code text;
+begin
+  loop
+    code := (
+      select string_agg(substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + floor(random() * 32)::int, 1), '')
+      from generate_series(1, 6)
+    );
+    exit when not exists (select 1 from public.academies where join_code = code);
+  end loop;
+  return code;
+end;
+$$;
+
 create or replace function public.create_academy(
   name text, town text default '', country text default '', contact_email text default '',
   age_groups text[] default '{}'
@@ -1007,25 +1053,35 @@ set search_path = public, pg_temp
 as $$
 declare
   aid uuid;
-  code text;
 begin
-  if auth.uid() is null then raise exception 'must be signed in'; end if;
-  loop
-    -- Six characters from an alphabet without 0/O or 1/I, to read out loud.
-    code := (
-      select string_agg(substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 1 + floor(random() * 32)::int, 1), '')
-      from generate_series(1, 6)
-    );
-    exit when not exists (select 1 from public.academies where join_code = code);
-  end loop;
+  if auth.uid() is null then raise exception 'Sign in first'; end if;
+  if length(btrim(coalesce(name, ''))) < 2 then raise exception 'Give the academy a name'; end if;
 
   insert into public.academies (name, town, country, contact_email, age_groups, join_code, created_by)
   values (btrim(name), coalesce(btrim(town), ''), coalesce(btrim(country), ''), coalesce(btrim(contact_email), ''),
-          coalesce(age_groups, '{}'), code, auth.uid())
+          coalesce(age_groups, '{}'), public.fresh_join_code(), auth.uid())
   returning id into aid;
 
   insert into public.academy_members (academy_id, user_id, role) values (aid, auth.uid(), 'owner');
   return aid;
+end;
+$$;
+
+-- A new code, if the old one got passed around further than it should have.
+-- Requests already made with the old one still stand.
+create or replace function public.new_join_code(aid uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  code text;
+begin
+  if not public.runs_academy(aid) then raise exception 'Only the owner or a manager can change the join code'; end if;
+  code := public.fresh_join_code();
+  update public.academies set join_code = code where id = aid;
+  return code;
 end;
 $$;
 
@@ -1039,7 +1095,8 @@ as $$
   select user_id from public.profiles where username = lower(btrim(coalesce(name, '')));
 $$;
 
--- Owners invite managers; owners and managers invite coaches and admins.
+-- Owners invite managers; the owner, managers and the admin role invite
+-- coaches and admins.
 create or replace function public.invite_staff(aid uuid, username text, role text)
 returns uuid
 language plpgsql
@@ -1051,8 +1108,8 @@ declare
   target uuid := public.user_by_username(username);
   iid uuid;
 begin
-  if me is null or me not in ('owner', 'manager') then raise exception 'Only the owner or a manager can invite staff'; end if;
-  if role not in ('manager', 'coach', 'admin') then raise exception 'Not a role'; end if;
+  if not public.manages_staff(aid) then raise exception 'Only the owner, a manager or an admin can invite staff'; end if;
+  if role is null or role not in ('manager', 'coach', 'admin') then raise exception 'Pick a role for them'; end if;
   if role = 'manager' and me <> 'owner' then raise exception 'Only the owner can invite a manager'; end if;
   if target is null then raise exception 'No one has that username'; end if;
   if exists (select 1 from public.academy_members where academy_id = aid and user_id = target) then
@@ -1066,20 +1123,38 @@ begin
 end;
 $$;
 
--- Staff invites waiting for the caller, with the academy's name and badge.
-create or replace function public.my_staff_invites()
-returns table (id uuid, academy_id uuid, academy_name text, verification text, role text, invited_by text)
+-- Staff invites waiting for the caller, with the academy's name, town and badge.
+-- Dropped first because its columns grew; re-running the file must still work.
+drop function if exists public.my_staff_invites();
+create function public.my_staff_invites()
+returns table (id uuid, academy_id uuid, academy_name text, town text, verification text, role text, invited_by text)
 language sql
 security definer
 set search_path = public, pg_temp
 stable
 as $$
-  select i.id, a.id, a.name, a.verification, i.role, coalesce(p.username, '')
+  select i.id, a.id, a.name, a.town, a.verification, i.role, coalesce(p.username, '')
   from public.academy_staff_invites i
   join public.academies a on a.id = i.academy_id
   left join public.profiles p on p.user_id = i.invited_by
   where i.user_id = auth.uid()
   order by i.created_at desc;
+$$;
+
+-- Invites the academy has sent and nobody has answered yet, by username.
+create or replace function public.pending_staff(aid uuid)
+returns table (id uuid, username text, role text, invited_by text)
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select i.id, coalesce(p.username, ''), i.role, coalesce(b.username, '')
+  from public.academy_staff_invites i
+  left join public.profiles p on p.user_id = i.user_id
+  left join public.profiles b on b.user_id = i.invited_by
+  where i.academy_id = aid and public.is_academy_staff(aid)
+  order by i.created_at;
 $$;
 
 create or replace function public.answer_staff_invite(invite_id uuid, accept boolean)
@@ -1092,7 +1167,7 @@ declare
   inv public.academy_staff_invites;
 begin
   select * into inv from public.academy_staff_invites where id = invite_id and user_id = auth.uid();
-  if inv is null then raise exception 'invite not found'; end if;
+  if inv is null then raise exception 'That invite has gone - it may have been cancelled'; end if;
   if accept then
     insert into public.academy_members (academy_id, user_id, role) values (inv.academy_id, auth.uid(), inv.role)
     on conflict (academy_id, user_id) do nothing;
@@ -1117,7 +1192,8 @@ as $$
   order by case m.role when 'owner' then 0 when 'manager' then 1 when 'coach' then 2 else 3 end, p.username;
 $$;
 
--- Owners change anyone's role but their own; managers move coaches and admins.
+-- The owner changes anyone's role but their own; managers and the admin role
+-- move people between coach and admin. Nobody changes their own.
 create or replace function public.set_staff_role(aid uuid, member uuid, role text)
 returns void
 language plpgsql
@@ -1129,10 +1205,11 @@ declare
   theirs text;
 begin
   select m.role into theirs from public.academy_members m where m.academy_id = aid and m.user_id = member;
-  if theirs is null then raise exception 'Not staff here'; end if;
-  if role not in ('manager', 'coach', 'admin') then raise exception 'Not a role'; end if;
+  if theirs is null then raise exception 'They are not on the staff here'; end if;
+  if role is null or role not in ('manager', 'coach', 'admin') then raise exception 'Pick a role for them'; end if;
   if theirs = 'owner' then raise exception 'Hand over ownership instead'; end if;
-  if me = 'owner' or (me = 'manager' and theirs in ('coach', 'admin') and role in ('coach', 'admin')) then
+  if member = auth.uid() then raise exception 'Ask the owner to change your own role'; end if;
+  if me = 'owner' or (me in ('manager', 'admin') and theirs in ('coach', 'admin') and role in ('coach', 'admin')) then
     update public.academy_members m set role = set_staff_role.role where m.academy_id = aid and m.user_id = member;
   else
     raise exception 'You cannot change that role';
@@ -1152,9 +1229,9 @@ declare
   theirs text;
 begin
   select m.role into theirs from public.academy_members m where m.academy_id = aid and m.user_id = member;
-  if theirs is null then raise exception 'Not staff here'; end if;
+  if theirs is null then raise exception 'They are not on the staff here'; end if;
   if theirs = 'owner' then raise exception 'The owner hands over ownership before leaving'; end if;
-  if not (member = auth.uid() or me = 'owner' or (me = 'manager' and theirs in ('coach', 'admin'))) then
+  if not (member = auth.uid() or me = 'owner' or (me in ('manager', 'admin') and theirs in ('coach', 'admin'))) then
     raise exception 'You cannot remove them';
   end if;
   delete from public.squad_coaches sc
@@ -1465,17 +1542,18 @@ grant update (require_verification) on public.app_settings to authenticated;
 -- Used only inside the functions above, which run as their owner. Nobody
 -- calls them directly: one turns a username into an account id.
 revoke all on function
-  public.player_of(uuid), public.user_by_username(text), public.can_take_players(uuid), public.username_problem(text)
+  public.player_of(uuid), public.user_by_username(text), public.can_take_players(uuid), public.username_problem(text),
+  public.fresh_join_code()
   from public, anon, authenticated;
 
 -- The helper checks run inside the rules; the actions are called by the app.
 revoke all on function
   public.is_app_admin(), public.academy_role(uuid), public.is_academy_staff(uuid), public.runs_academy(uuid),
-  public.coaches_at(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid), public.player_of(uuid),
-  public.user_by_username(text), public.can_take_players(uuid),
+  public.coaches_at(uuid), public.manages_staff(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid),
+  public.player_of(uuid), public.user_by_username(text), public.can_take_players(uuid),
   public.username_available(text), public.claim_username(text),
-  public.create_academy(text, text, text, text, text[]), public.invite_staff(uuid, text, text),
-  public.my_staff_invites(), public.answer_staff_invite(uuid, boolean), public.academy_staff(uuid),
+  public.create_academy(text, text, text, text, text[]), public.new_join_code(uuid), public.invite_staff(uuid, text, text),
+  public.my_staff_invites(), public.pending_staff(uuid), public.answer_staff_invite(uuid, boolean), public.academy_staff(uuid),
   public.set_staff_role(uuid, uuid, text), public.remove_staff(uuid, uuid), public.transfer_ownership(uuid, uuid),
   public.invite_player(uuid, text, uuid), public.join_by_code(text, boolean), public.my_player_invites(),
   public.answer_player_invite(uuid, boolean, boolean), public.answer_join_request(uuid, boolean),
@@ -1485,10 +1563,10 @@ revoke all on function
 
 grant execute on function
   public.is_app_admin(), public.academy_role(uuid), public.is_academy_staff(uuid), public.runs_academy(uuid),
-  public.coaches_at(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid),
+  public.coaches_at(uuid), public.manages_staff(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid),
   public.username_available(text), public.claim_username(text),
-  public.create_academy(text, text, text, text, text[]), public.invite_staff(uuid, text, text),
-  public.my_staff_invites(), public.answer_staff_invite(uuid, boolean), public.academy_staff(uuid),
+  public.create_academy(text, text, text, text, text[]), public.new_join_code(uuid), public.invite_staff(uuid, text, text),
+  public.my_staff_invites(), public.pending_staff(uuid), public.answer_staff_invite(uuid, boolean), public.academy_staff(uuid),
   public.set_staff_role(uuid, uuid, text), public.remove_staff(uuid, uuid), public.transfer_ownership(uuid, uuid),
   public.invite_player(uuid, text, uuid), public.join_by_code(text, boolean), public.my_player_invites(),
   public.answer_player_invite(uuid, boolean, boolean), public.answer_join_request(uuid, boolean),

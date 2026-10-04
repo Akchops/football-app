@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { SyncProvider } from './store/SyncProvider';
+import { AcademyProvider, useAcademy } from './store/AcademyProvider';
 import { useNow } from './useNow';
 import type { Match } from './types';
 import { ageGroupCheck, kickoffAt, todayISO } from './lib/date';
@@ -22,13 +23,18 @@ import { TournamentSheet } from './components/TournamentSheet';
 import { ImportFixturesSheet } from './components/ImportFixturesSheet';
 import { TrainingFormSheet, type TrainingFormTarget } from './components/TrainingFormSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
+import { WhoIsThisFor } from './components/WhoIsThisFor';
+import { ACADEMY } from './lib/features';
 import { MediaScreen } from './components/MediaScreen';
 // The Anthropic SDK is only needed on the Coach tab, so it stays out of the
 // bundle that has to load before the calendar appears.
 const AIScreen = lazy(() => import('./components/AIScreen'));
+// Likewise the academy area, which only staff ever open. Marked pure so a
+// build with the academy release switched off drops it altogether.
+const AcademyShell = /* @__PURE__ */ lazy(() => import('./components/academy/AcademyShell'));
 import { InstallBanner } from './components/InstallBanner';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, MediaIcon } from './components/icons';
+import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, MediaIcon, ShieldIcon } from './components/icons';
 
 type Tab = 'calendar' | 'matches' | 'media' | 'coach' | 'stats' | 'setup';
 
@@ -42,6 +48,7 @@ const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
 
 function Shell() {
   const { matches, settings, profile, training, competitions, teams } = useStore();
+  const academy = useAcademy();
   const now = useNow();
 
   const [tab, setTab] = useState<Tab>('calendar');
@@ -104,8 +111,22 @@ function Shell() {
   );
   const showAgeAsk = newSeason !== null && !ageAskHidden && !showPrompt && !sheetOpen;
 
-  // First run: collect the player's details before showing the app proper.
-  if (!profile.onboardedAt) return <OnboardingScreen />;
+  // Academy staff: their half of the app, with no player's calendar unless this phone has one.
+  // (ACADEMY first each time: with the release switched off, the build drops all of this.)
+  if (ACADEMY && academy.enabled && academy.mode === 'academy') {
+    return (
+      <Suspense fallback={<div className="app" />}>
+        <AcademyShell hasPlayer={Boolean(profile.onboardedAt)} />
+      </Suspense>
+    );
+  }
+
+  // First run: collect the player's details before showing the app proper -
+  // once it is clear this phone is for a player rather than an academy.
+  if (!profile.onboardedAt) {
+    if (ACADEMY && academy.enabled && academy.mode === null) return <WhoIsThisFor onPick={academy.setMode} />;
+    return <OnboardingScreen onBack={ACADEMY && academy.enabled ? () => academy.setMode(null) : undefined} />;
+  }
 
   return (
     <div className="app">
@@ -120,6 +141,17 @@ function Shell() {
           {pending.length > 0 && (
             <button className="pending-pill" onClick={() => setPromptHidden(false)}>
               {pending.length} to log
+            </button>
+          )}
+          {ACADEMY && academy.invites.length > 0 && tab !== 'setup' && (
+            <button className="pending-pill with-icon" onClick={() => setTab('setup')} aria-label="Academy invite">
+              <ShieldIcon />
+              Invite
+            </button>
+          )}
+          {ACADEMY && academy.academies.length > 0 && (
+            <button className="topbar-btn" onClick={() => academy.setMode('academy')} aria-label="Academy">
+              <ShieldIcon />
             </button>
           )}
           <button
@@ -288,7 +320,9 @@ export default function App() {
       {/* Sits outside Shell so the service worker registers during onboarding too. */}
       <UpdatePrompt />
       <SyncProvider>
-        <Shell />
+        <AcademyProvider>
+          <Shell />
+        </AcademyProvider>
       </SyncProvider>
     </AppStoreProvider>
   );

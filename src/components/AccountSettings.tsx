@@ -30,8 +30,14 @@ function message(e: unknown): string {
   return describeAuthError(e instanceof Error ? e.message : String(e));
 }
 
-/** Email, then code. Used in Setup and on the first setup screen, for joining. */
-export function SignInForm({ intro = true }: { intro?: boolean }) {
+/** Email, then code. Used in Setup, on the first setup screen for joining, and to open the academy area. */
+export function SignInForm({
+  intro = true,
+  footnote = 'Nothing leaves this phone until you sign in, and the app works exactly as it does now if you never do.',
+}: {
+  intro?: boolean;
+  footnote?: string;
+}) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [stage, setStage] = useState<'email' | 'code'>('email');
@@ -142,9 +148,7 @@ export function SignInForm({ intro = true }: { intro?: boolean }) {
         </>
       )}
 
-      <p className="muted small">
-        Nothing leaves this phone until you sign in, and the app works exactly as it does now if you never do.
-      </p>
+      <p className="muted small">{footnote}</p>
     </>
   );
 }
