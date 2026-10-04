@@ -77,6 +77,8 @@ begin
 
   insert into public.matches (player_id, id, data, updated_at) values
     (pid, 'match_b1', '{"date":"2026-09-28","opponent":"Secret Opponent","status":"scheduled"}', now());
+  insert into public.results (player_id, id, data, updated_at) values
+    (pid, 'result_b1', '{"competitionId":"c_b","home":"Secret Rovers","away":"Hidden FC","homeGoals":2,"awayGoals":0}', now());
   raise notice 'set up Family B';
 end $$;
 
@@ -126,6 +128,23 @@ begin
   select count(*) into n from public.players where id = b_pid;
   if n <> 0 then raise exception 'FAIL: A read B''s player row'; end if;
   raise notice 'PASS: A cannot read B''s player';
+
+  select count(*) into n from public.results where player_id = b_pid or data ->> 'home' = 'Secret Rovers';
+  if n <> 0 then raise exception 'FAIL: A read % of B''s table results', n; end if;
+  raise notice 'PASS: A cannot read B''s table results';
+end $$;
+
+do $$
+declare b_pid uuid;
+begin
+  select v into b_pid from t_ids where k = 'pid_b';
+  begin
+    insert into public.results (player_id, id, data, updated_at)
+      values (b_pid, 'result_evil', '{"home":"Injected","away":"FC","homeGoals":9,"awayGoals":0}', now());
+    raise exception 'FAIL: A wrote a result into B''s table';
+  exception when insufficient_privilege then
+    raise notice 'PASS: A blocked from writing into B''s table results';
+  end;
 end $$;
 
 -- Writing into B's player must be refused, not silently accepted.

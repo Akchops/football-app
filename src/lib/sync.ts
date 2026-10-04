@@ -1,8 +1,11 @@
 import {
   DEFAULT_PROFILE, DEFAULT_SETTINGS,
-  type AppData, type Competition, type Match, type Profile, type Settings, type Team, type TrainingSession,
+  type AppData, type Competition, type Match, type Profile, type Result, type Settings, type Team,
+  type TrainingSession,
 } from '../types';
-import { normaliseCompetition, normaliseMatch, normaliseTeam, normaliseTraining, settledYear } from '../store/storage';
+import {
+  normaliseCompetition, normaliseMatch, normaliseResult, normaliseTeam, normaliseTraining, settledYear,
+} from '../store/storage';
 
 /**
  * Bringing two phones' copies of the same player back together.
@@ -102,6 +105,7 @@ export function mergeData(mine: AppData, theirs: AppData): AppData {
     competitions: mergeList(mine.competitions, theirs.competitions),
     matches: mergeList(mine.matches, theirs.matches),
     training: mergeList(mine.training, theirs.training),
+    results: mergeList(mine.results, theirs.results),
   };
 }
 
@@ -116,6 +120,7 @@ export function hasContent(data: AppData): boolean {
     data.training.length > 0 ||
     data.teams.length > 0 ||
     data.competitions.length > 0 ||
+    data.results.length > 0 ||
     data.profile.onboardedAt !== null
   );
 }
@@ -124,9 +129,9 @@ export function hasContent(data: AppData): boolean {
 // Between this phone and the server.
 // ---------------------------------------------------------------------------
 
-/** The four lists that sync, by the names the app uses. */
-export type Table = 'matches' | 'training' | 'teams' | 'competitions';
-export const TABLES: readonly Table[] = ['matches', 'training', 'teams', 'competitions'];
+/** The lists that sync, by the names the app uses. */
+export type Table = 'matches' | 'training' | 'teams' | 'competitions' | 'results';
+export const TABLES: readonly Table[] = ['matches', 'training', 'teams', 'competitions', 'results'];
 
 /** What each list is called on the server. */
 export const SERVER_TABLE: Record<Table, string> = {
@@ -134,9 +139,16 @@ export const SERVER_TABLE: Record<Table, string> = {
   training: 'training_sessions',
   teams: 'teams',
   competitions: 'competitions',
+  results: 'results',
 };
 
-type RecordOf = { matches: Match; training: TrainingSession; teams: Team; competitions: Competition };
+type RecordOf = {
+  matches: Match;
+  training: TrainingSession;
+  teams: Team;
+  competitions: Competition;
+  results: Result;
+};
 
 /**
  * What came back from the server in one pull: any of the lists - only the
@@ -147,6 +159,7 @@ export interface RemoteChanges {
   training?: TrainingSession[];
   teams?: Team[];
   competitions?: Competition[];
+  results?: Result[];
   profile?: Profile;
   settings?: Settings;
 }
@@ -218,7 +231,7 @@ export interface Outgoing {
 }
 
 export function outgoing(local: AppData, confirmed: Readonly<Record<string, string>>): Outgoing {
-  const rows = { matches: [], training: [], teams: [], competitions: [] } as unknown as Outgoing['rows'];
+  const rows = { matches: [], training: [], teams: [], competitions: [], results: [] } as unknown as Outgoing['rows'];
   for (const table of TABLES) {
     const list = local[table] as { id: string }[];
     (rows[table] as unknown[]) = list.filter((record) => fingerprint(record) !== confirmed[keyOf(table, record.id)]);
@@ -247,6 +260,8 @@ export function fromServer<T extends Table>(table: T, data: unknown): RecordOf[T
       return normaliseTraining(record as TrainingSession) as RecordOf[T];
     case 'teams':
       return normaliseTeam(record as Team) as RecordOf[T];
+    case 'results':
+      return normaliseResult(record as Result) as RecordOf[T];
     default:
       return normaliseCompetition(record as Competition) as RecordOf[T];
   }

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 import type {
-  AppData, Competition, Match, MatchResult, MatchStage, Profile, Settings, Team, TrainingSession,
+  AppData, Competition, Match, MatchResult, MatchStage, Profile, Result, Settings, Team, TrainingSession,
 } from '../types';
 import { createId, emptyData, live, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
@@ -26,7 +26,10 @@ type Action =
   | { type: 'match/delete'; id: string }
   | { type: 'training/add'; session: TrainingSession }
   | { type: 'training/update'; id: string; patch: Partial<TrainingSession> }
-  | { type: 'training/delete'; id: string };
+  | { type: 'training/delete'; id: string }
+  | { type: 'result/add'; result: Result }
+  | { type: 'result/update'; id: string; patch: Partial<Result> }
+  | { type: 'result/delete'; id: string };
 
 function touch<T extends { updatedAt: string }>(row: T): T {
   return { ...row, updatedAt: new Date().toISOString() };
@@ -142,14 +145,28 @@ export function reducer(state: AppData, action: Action): AppData {
       };
 
     case 'competition/delete':
-      // Matches outlive their competition - they just become uncategorised.
+      // Matches outlive their competition - they just become uncategorised. Other
+      // teams' results only ever meant something inside it, so they go with it.
       return {
         ...state,
         competitions: state.competitions.map((c) => (c.id === action.id ? bury(c) : c)),
         matches: state.matches.map((m) =>
           m.competitionId === action.id ? touch({ ...m, competitionId: null }) : m,
         ),
+        results: state.results.map((r) => (r.competitionId === action.id && r.deletedAt === null ? bury(r) : r)),
       };
+
+    case 'result/add':
+      return { ...state, results: [...state.results, action.result] };
+
+    case 'result/update':
+      return {
+        ...state,
+        results: state.results.map((r) => (r.id === action.id ? touch({ ...r, ...action.patch }) : r)),
+      };
+
+    case 'result/delete':
+      return { ...state, results: state.results.map((r) => (r.id === action.id ? bury(r) : r)) };
 
     case 'match/add':
       return { ...state, matches: [...state.matches, action.match] };
@@ -190,6 +207,9 @@ export interface NewCompetitionInput {
   ageGroup: string;
   color: string;
   notes: string;
+  /** Table points; 3 for a win and 1 for a draw when left out. */
+  pointsWin?: number;
+  pointsDraw?: number;
 }
 
 /** What finishing a competition records - the stats themselves come from its matches. */
@@ -268,6 +288,8 @@ export function buildTournament(input: NewTournamentInput, at: string): { compet
     teamId,
     location,
     matchLength: durationMinutes,
+    pointsWin: competitionInput.pointsWin ?? 3,
+    pointsDraw: competitionInput.pointsDraw ?? 1,
     createdAt: at,
     updatedAt: at,
     deletedAt: null,
@@ -295,6 +317,57 @@ export function buildTournament(input: NewTournamentInput, at: string): { compet
   return { competition, matches };
 }
 
+/** A game between two other teams, as the add-result form fills it in. */
+export interface NewResultInput {
+  competitionId: string;
+  home: string;
+  away: string;
+  /** Null for both until it has been played. */
+  homeGoals: number | null;
+  awayGoals: number | null;
+  date: string;
+  stage?: MatchStage | null;
+  stageDetail?: string;
+}
+
+/**
+ * Tidies whatever parts of a result are given: names trimmed, half a score
+ * treated as no score, and a group only kept alongside a stage.
+ */
+export function cleanResultPatch<T extends Partial<NewResultInput>>(input: T): T {
+  const out: Partial<NewResultInput> = { ...input };
+  if (input.home !== undefined) out.home = input.home.trim();
+  if (input.away !== undefined) out.away = input.away.trim();
+  if ('homeGoals' in input || 'awayGoals' in input) {
+    const both = input.homeGoals != null && input.awayGoals != null;
+    out.homeGoals = both ? input.homeGoals : null;
+    out.awayGoals = both ? input.awayGoals : null;
+  }
+  if ('stage' in input) {
+    out.stage = input.stage ?? null;
+    out.stageDetail = input.stage ? (input.stageDetail ?? '').trim() : '';
+  }
+  return out as T;
+}
+
+export function buildResult(input: NewResultInput, at: string): Result {
+  const clean = cleanResultPatch(input);
+  return {
+    id: createId('result'),
+    competitionId: clean.competitionId,
+    home: clean.home,
+    away: clean.away,
+    homeGoals: clean.homeGoals,
+    awayGoals: clean.awayGoals,
+    date: clean.date,
+    stage: clean.stage ?? null,
+    stageDetail: clean.stageDetail ?? '',
+    createdAt: at,
+    updatedAt: at,
+    deletedAt: null,
+  };
+}
+
 interface StoreValue {
   data: AppData;
   profile: Profile;
@@ -303,6 +376,8 @@ interface StoreValue {
   competitions: Competition[];
   teams: Team[];
   training: TrainingSession[];
+  /** Other teams' games, for competition tables. */
+  results: Result[];
   addMatch(input: NewMatchInput): Match;
   updateMatch(id: string, patch: Partial<Match>): void;
   deleteMatch(id: string): void;
@@ -323,6 +398,9 @@ interface StoreValue {
   addTraining(input: NewTrainingInput): TrainingSession;
   updateTraining(id: string, patch: Partial<TrainingSession>): void;
   deleteTraining(id: string): void;
+  addResult(input: NewResultInput): Result;
+  updateResult(id: string, patch: Partial<NewResultInput>): void;
+  deleteResult(id: string): void;
   addTeam(input: NewTeamInput): Team;
   updateTeam(id: string, patch: Partial<Team>): void;
   deleteTeam(id: string): void;
@@ -364,6 +442,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     const competitions = live(data.competitions);
     const teams = live(data.teams);
     const training = live(data.training);
+    const results = live(data.results);
 
     return {
       data,
@@ -373,6 +452,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       competitions,
       teams,
       training,
+      results,
 
       addMatch(input) {
         const match = buildMatch(input, now());
@@ -419,6 +499,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
           teamId: null,
           location: '',
           matchLength: 0,
+          pointsWin: input.pointsWin ?? 3,
+          pointsDraw: input.pointsDraw ?? 1,
           createdAt: now(),
           updatedAt: now(),
           deletedAt: null,
@@ -468,6 +550,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       deleteTraining(id) {
         dispatch({ type: 'training/delete', id });
+      },
+
+      addResult(input) {
+        const result = buildResult(input, now());
+        dispatch({ type: 'result/add', result });
+        return result;
+      },
+
+      updateResult(id, patch) {
+        dispatch({ type: 'result/update', id, patch: cleanResultPatch(patch) });
+      },
+
+      deleteResult(id) {
+        dispatch({ type: 'result/delete', id });
       },
 
       addTeam(input) {

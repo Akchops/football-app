@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { AGE_GROUPS, COMPETITION_COLORS, COMPETITION_TYPE_LABEL, type Competition, type CompetitionType } from '../types';
 import { seasonLabel } from '../lib/date';
+import { ACADEMY } from '../lib/features';
 import { Field, Sheet } from './ui';
 
 export interface CompetitionFormTarget {
@@ -27,6 +28,8 @@ export function CompetitionFormSheet({
   const [ageGroup, setAgeGroup] = useState('');
   const [color, setColor] = useState(COMPETITION_COLORS[0]);
   const [notes, setNotes] = useState('');
+  const [pointsWin, setPointsWin] = useState(3);
+  const [pointsDraw, setPointsDraw] = useState(1);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -39,6 +42,8 @@ export function CompetitionFormSheet({
       setAgeGroup(editing.ageGroup);
       setColor(editing.color);
       setNotes(editing.notes);
+      setPointsWin(editing.pointsWin);
+      setPointsDraw(editing.pointsDraw);
     } else {
       setName('');
       setType('league');
@@ -46,6 +51,8 @@ export function CompetitionFormSheet({
       setAgeGroup(profile.ageGroup);
       setColor(COMPETITION_COLORS[competitions.length % COMPETITION_COLORS.length]);
       setNotes('');
+      setPointsWin(3);
+      setPointsDraw(1);
     }
   }, [target, editing, competitions.length, profile.ageGroup]);
 
@@ -56,7 +63,8 @@ export function CompetitionFormSheet({
       setError('Give it a name, e.g. "Sunday League".');
       return;
     }
-    const payload = { name: name.trim(), type, season: season.trim(), ageGroup, color, notes: notes.trim() };
+    const points = ACADEMY ? { pointsWin, pointsDraw } : {};
+    const payload = { name: name.trim(), type, season: season.trim(), ageGroup, color, notes: notes.trim(), ...points };
     if (editing) updateCompetition(editing.id, payload);
     else addCompetition(payload);
     onClose();
@@ -130,6 +138,33 @@ export function CompetitionFormSheet({
           ))}
         </div>
       </Field>
+
+      {ACADEMY && type !== 'friendly' && (
+        <div className="row two">
+          <Field label="Points for a win" hint="For its table">
+            <input
+              className="input"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={10}
+              value={pointsWin}
+              onChange={(e) => setPointsWin(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+            />
+          </Field>
+          <Field label="Points for a draw">
+            <input
+              className="input"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={10}
+              value={pointsDraw}
+              onChange={(e) => setPointsDraw(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
+            />
+          </Field>
+        </div>
+      )}
 
       <Field label="Notes" hint="Optional">
         <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />

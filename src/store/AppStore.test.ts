@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMatch, buildTournament, reducer } from './AppStore';
+import { buildMatch, buildResult, buildTournament, cleanResultPatch, reducer } from './AppStore';
 import { emptyData, live } from './storage';
 import { emptyResult, type AppData, type Competition, type Match, type Team, type TrainingSession } from '../types';
 
@@ -16,7 +16,7 @@ function competition(id: string): Competition {
   return {
     id, name: `Comp ${id}`, type: 'league', season: '25/26', ageGroup: '', color: '#22c55e', notes: '',
     archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
-    createdAt: STAMP, updatedAt: STAMP, deletedAt: null,
+    pointsWin: 3, pointsDraw: 1, createdAt: STAMP, updatedAt: STAMP, deletedAt: null,
   };
 }
 
@@ -261,5 +261,47 @@ describe('building a match', () => {
   it('drops a detail that has no stage to go with it', () => {
     expect(buildMatch({ ...base, stage: null, stageDetail: 'Plate' }, STAMP).stageDetail).toBe('');
     expect(buildMatch({ ...base, stage: 'semi', stageDetail: ' Plate ' }, STAMP)).toMatchObject({ stage: 'semi', stageDetail: 'Plate' });
+  });
+});
+
+describe('other teams\' results', () => {
+  const input = {
+    competitionId: 'c1', home: ' Vale FC ', away: 'Moor ', homeGoals: 2, awayGoals: 1, date: '2026-09-12',
+    stage: 'group' as const, stageDetail: ' B ',
+  };
+
+  it('are saved tidy', () => {
+    expect(buildResult(input, STAMP)).toMatchObject({
+      home: 'Vale FC', away: 'Moor', homeGoals: 2, awayGoals: 1, stage: 'group', stageDetail: 'B', deletedAt: null,
+    });
+  });
+
+  it('treat half a score as no score, and drop a group without a stage', () => {
+    expect(buildResult({ ...input, awayGoals: null, stage: null }, STAMP)).toMatchObject({
+      homeGoals: null, awayGoals: null, stage: null, stageDetail: '',
+    });
+    expect(cleanResultPatch({ homeGoals: 3, awayGoals: 0 })).toEqual({ homeGoals: 3, awayGoals: 0 });
+    expect(cleanResultPatch({ home: ' Hilltop ' })).toEqual({ home: 'Hilltop' });
+  });
+
+  it('are edited and deleted like everything else, leaving a tombstone', () => {
+    const r = buildResult(input, STAMP);
+    let data = reducer(dataWith({}), { type: 'result/add', result: r });
+    data = reducer(data, { type: 'result/update', id: r.id, patch: { homeGoals: 3, awayGoals: 3 } });
+    expect(data.results[0]).toMatchObject({ homeGoals: 3, awayGoals: 3 });
+    expect(data.results[0].updatedAt).not.toBe(STAMP);
+
+    data = reducer(data, { type: 'result/delete', id: r.id });
+    expect(data.results).toHaveLength(1);
+    expect(live(data.results)).toEqual([]);
+  });
+
+  it('go when their competition is deleted, while its matches stay', () => {
+    const r = buildResult(input, STAMP);
+    const before = dataWith({ competitions: [competition('c1')], matches: [match('m1', { competitionId: 'c1' })], results: [r] });
+    const after = reducer(before, { type: 'competition/delete', id: 'c1' });
+    expect(live(after.results)).toEqual([]);
+    expect(live(after.matches)).toHaveLength(1);
+    expect(after.matches[0].competitionId).toBeNull();
   });
 });

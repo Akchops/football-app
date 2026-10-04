@@ -52,7 +52,7 @@ describe('matchToICS', () => {
     const comp = {
       id: 'c1', name: 'Easter 7s', type: 'tournament' as const, season: '', ageGroup: '', color: '#f59e0b', notes: '',
       archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
-      createdAt: '', updatedAt: '', deletedAt: null,
+      pointsWin: 3, pointsDraw: 1, createdAt: '', updatedAt: '', deletedAt: null,
     };
     const out = matchToICS(semi, team, comp, 60);
     expect(out).toContain('SUMMARY:Wanderers FC vs TBC · Plate semi-final');

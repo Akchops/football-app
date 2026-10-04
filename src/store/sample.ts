@@ -1,6 +1,6 @@
 import {
   COMPETITION_COLORS, TEAM_COLORS,
-  type AppData, type Competition, type Match, type MatchResult, type Team,
+  type AppData, type Competition, type Match, type MatchResult, type Result, type Team,
 } from '../types';
 import { toISODate, seasonLabel } from '../lib/date';
 import { createId, emptyData } from './storage';
@@ -28,25 +28,25 @@ export function buildSampleData(now: Date = new Date()): AppData {
   const league: Competition = {
     id: createId('comp'), name: 'Sunday League', type: 'league', season, ageGroup: 'U16',
     color: COMPETITION_COLORS[0], notes: 'Division 2', archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
-    createdAt: stamp, updatedAt: stamp, deletedAt: null,
+    pointsWin: 3, pointsDraw: 1, createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const cup: Competition = {
     id: createId('comp'), name: 'County Cup', type: 'cup', season, ageGroup: 'U16',
     color: COMPETITION_COLORS[2], notes: '', archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
-    createdAt: stamp, updatedAt: stamp, deletedAt: null,
+    pointsWin: 3, pointsDraw: 1, createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   const tournament: Competition = {
     id: createId('comp'), name: 'Easter 7s', type: 'tournament', season, ageGroup: 'U16',
     color: COMPETITION_COLORS[3], notes: 'Group stage + knockouts, all in one day', archived: false, placing: '',
     startDate: iso(3), teamId: club.id, location: 'Central Playing Fields', matchLength: 30,
-    createdAt: stamp, updatedAt: stamp, deletedAt: null,
+    pointsWin: 3, pointsDraw: 1, createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
   // Already finished - played a year up - so the demo shows a tournament kept with its stats.
   const springSevens: Competition = {
     id: createId('comp'), name: 'Spring 7s', type: 'tournament', season, ageGroup: 'U17',
     color: COMPETITION_COLORS[5], notes: 'Played up a year', archived: true, placing: 'Runners-up',
     startDate: iso(-35), teamId: club.id, location: 'Riverside Park', matchLength: 30,
-    createdAt: stamp, updatedAt: stamp, deletedAt: null,
+    pointsWin: 3, pointsDraw: 1, createdAt: stamp, updatedAt: stamp, deletedAt: null,
   };
 
   const result = (over: Partial<MatchResult>): MatchResult => ({
@@ -107,6 +107,20 @@ export function buildSampleData(now: Date = new Date()): AppData {
     make({ opponent: 'TBC', stage: 'quarter', date: iso(23), time: '13:00', venue: 'neutral', competitionId: cup.id }),
   ];
 
+  // The rest of the league, so its table is a whole table.
+  const other = (home: string, homeGoals: number, awayGoals: number, away: string, offsetDays: number): Result => ({
+    id: createId('result'), competitionId: league.id, home, away, homeGoals, awayGoals, date: iso(offsetDays),
+    stage: null, stageDetail: '', createdAt: stamp, updatedAt: stamp, deletedAt: null,
+  });
+  const results: Result[] = [
+    other('Riverside FC', 2, 2, 'Kingsway United', -27),
+    other('Northside Rangers', 1, 0, 'Old Boys', -26),
+    other('Kingsway United', 3, 1, 'Northside Rangers', -20),
+    other('Old Boys', 0, 2, 'Riverside FC', -13),
+    other('Northside Rangers', 2, 1, 'Riverside FC', -6),
+    other('Old Boys', 1, 1, 'Kingsway United', -5),
+  ];
+
   const birthYear = now.getFullYear() - 16;
 
   return {
@@ -125,5 +139,6 @@ export function buildSampleData(now: Date = new Date()): AppData {
     teams: [club, sundaySide],
     competitions: [league, cup, tournament, springSevens],
     matches,
+    results,
   };
 }

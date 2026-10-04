@@ -22,6 +22,9 @@ export interface Competition {
   teamId: string | null;
   location: string;
   matchLength: number;
+  /** Table points for a win and a draw - 3 and 1 unless a competition says otherwise. */
+  pointsWin: number;
+  pointsDraw: number;
   createdAt: string;
   /** Bumped on every edit; when two devices disagree, the newest one wins. */
   updatedAt: string;
@@ -210,6 +213,29 @@ export interface Match {
   deletedAt: string | null;
 }
 
+/**
+ * A game between two other teams in a competition - the rest of a league or a
+ * tournament group - kept so its table can be worked out. The player's own
+ * matches aren't stored here: they count in the table from the matches.
+ */
+export interface Result {
+  id: string;
+  competitionId: string;
+  home: string;
+  away: string;
+  /** Both null until it has been played - a fixture on the list, not yet a result. */
+  homeGoals: number | null;
+  awayGoals: number | null;
+  /** 'YYYY-MM-DD', or '' when not known. */
+  date: string;
+  /** In a tournament, the group it was played in ('group' and "B"); null in a league. */
+  stage: MatchStage | null;
+  stageDetail: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 /** The player this app is tracking. */
 export type TrainingType = 'team' | 'keeper' | 'gym' | 'individual' | 'recovery' | 'other';
 
@@ -288,6 +314,8 @@ export interface AppData {
   competitions: Competition[];
   matches: Match[];
   training: TrainingSession[];
+  /** Other teams' games, for competition tables. */
+  results: Result[];
 }
 
 export const COMPETITION_TYPE_LABEL: Record<CompetitionType, string> = {

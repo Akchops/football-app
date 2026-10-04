@@ -1,12 +1,12 @@
 import {
   DEFAULT_MATCH_LENGTH, DEFAULT_PROFILE, DEFAULT_SETTINGS, TEAM_COLORS, groupForPosition,
-  type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Profile, type Team,
-  type TrainingSession,
+  type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Profile, type Result,
+  type Team, type TrainingSession,
 } from '../types';
 import { toStage } from '../lib/stage';
 
 export const STORAGE_KEY = 'matchday.data.v1';
-export const DATA_VERSION = 6;
+export const DATA_VERSION = 7;
 
 export function emptyData(): AppData {
   return {
@@ -17,6 +17,7 @@ export function emptyData(): AppData {
     competitions: [],
     matches: [],
     training: [],
+    results: [],
   };
 }
 
@@ -111,8 +112,35 @@ export function normaliseCompetition(c: Competition): Competition {
     teamId: c.teamId ?? null,
     location: c.location ?? '',
     matchLength: c.matchLength ?? 0,
+    // v6 and earlier had no tables: the usual three points for a win, one for a draw.
+    pointsWin: typeof c.pointsWin === 'number' ? c.pointsWin : 3,
+    pointsDraw: typeof c.pointsDraw === 'number' ? c.pointsDraw : 1,
     updatedAt: c.updatedAt ?? c.createdAt ?? '',
     deletedAt: c.deletedAt ?? null,
+  };
+}
+
+/** A goal count as saved, or null - a score not entered yet, or one that makes no sense. */
+function goals(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+export function normaliseResult(r: Result): Result {
+  const homeGoals = goals(r.homeGoals);
+  const awayGoals = goals(r.awayGoals);
+  const stage = toStage(r.stage);
+  return {
+    ...r,
+    home: typeof r.home === 'string' ? r.home : '',
+    away: typeof r.away === 'string' ? r.away : '',
+    // Half a score is no score: both or neither.
+    homeGoals: homeGoals !== null && awayGoals !== null ? homeGoals : null,
+    awayGoals: homeGoals !== null && awayGoals !== null ? awayGoals : null,
+    date: typeof r.date === 'string' ? r.date : '',
+    stage,
+    stageDetail: stage && typeof r.stageDetail === 'string' ? r.stageDetail : '',
+    updatedAt: r.updatedAt ?? r.createdAt ?? '',
+    deletedAt: r.deletedAt ?? null,
   };
 }
 
@@ -196,6 +224,8 @@ export function parseData(raw: string | null): AppData {
       training: Array.isArray(parsed.training)
         ? (parsed.training as TrainingSession[]).map(normaliseTraining)
         : [],
+      // v6 and earlier kept only the player's own matches.
+      results: Array.isArray(parsed.results) ? (parsed.results as Result[]).map(normaliseResult) : [],
     };
   } catch {
     return emptyData();

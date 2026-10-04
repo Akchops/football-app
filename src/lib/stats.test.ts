@@ -52,7 +52,7 @@ function comp(id: string, over: Partial<Competition> = {}): Competition {
   return {
     id, name: `Comp ${id}`, type: 'tournament', season: '25/26', ageGroup: '', color: '#fff', notes: '',
     archived: false, placing: '', startDate: '', teamId: null, location: '', matchLength: 0,
-    createdAt: '', updatedAt: '', deletedAt: null, ...over,
+    pointsWin: 3, pointsDraw: 1, createdAt: '', updatedAt: '', deletedAt: null, ...over,
   };
 }
 

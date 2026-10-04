@@ -152,6 +152,17 @@ create table if not exists public.competitions (
   primary key (player_id, id)
 );
 
+-- Other teams' games in a competition, kept so its table can be worked out.
+create table if not exists public.results (
+  player_id      uuid not null references public.players(id) on delete cascade,
+  id             text not null,
+  data           jsonb not null,
+  updated_at     timestamptz not null,
+  deleted_at     timestamptz,
+  competition_id text generated always as (data ->> 'competitionId') stored,
+  primary key (player_id, id)
+);
+
 -- When each row last reached the server, by the server's clock (rule 3). Added
 -- as its own step so a database made from an earlier version of this file
 -- gains it too.
@@ -159,6 +170,7 @@ alter table public.matches           add column if not exists synced_at timestam
 alter table public.training_sessions add column if not exists synced_at timestamptz not null default clock_timestamp();
 alter table public.teams             add column if not exists synced_at timestamptz not null default clock_timestamp();
 alter table public.competitions      add column if not exists synced_at timestamptz not null default clock_timestamp();
+alter table public.results           add column if not exists synced_at timestamptz not null default clock_timestamp();
 
 -- Stamped on every insert and update, whatever the phone sent - a phone cannot
 -- set it, so it cannot get it wrong.
@@ -184,6 +196,9 @@ create trigger stamp_synced_at before insert or update on public.teams
 drop trigger if exists stamp_synced_at on public.competitions;
 create trigger stamp_synced_at before insert or update on public.competitions
   for each row execute function public.stamp_synced_at();
+drop trigger if exists stamp_synced_at on public.results;
+create trigger stamp_synced_at before insert or update on public.results
+  for each row execute function public.stamp_synced_at();
 
 -- "Everything for this player since synced_at X" is the query every sync runs.
 drop index if exists public.matches_since_idx;
@@ -194,6 +209,7 @@ create index if not exists matches_synced_idx on public.matches (player_id, sync
 create index if not exists training_synced_idx on public.training_sessions (player_id, synced_at);
 create index if not exists teams_synced_idx on public.teams (player_id, synced_at);
 create index if not exists competitions_synced_idx on public.competitions (player_id, synced_at);
+create index if not exists results_synced_idx on public.results (player_id, synced_at);
 create index if not exists matches_date_idx on public.matches (player_id, match_date);
 
 -- ---------------------------------------------------------------------------
@@ -248,6 +264,7 @@ alter table public.matches           enable row level security;
 alter table public.training_sessions enable row level security;
 alter table public.teams             enable row level security;
 alter table public.competitions      enable row level security;
+alter table public.results           enable row level security;
 
 drop policy if exists households_read on public.households;
 create policy households_read on public.households
@@ -322,6 +339,11 @@ create policy teams_all on public.teams
 
 drop policy if exists competitions_all on public.competitions;
 create policy competitions_all on public.competitions
+  for all using (public.owns_player(player_id))
+  with check (public.owns_player(player_id));
+
+drop policy if exists results_all on public.results;
+create policy results_all on public.results
   for all using (public.owns_player(player_id))
   with check (public.owns_player(player_id));
 
@@ -448,22 +470,24 @@ grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on
   public.households, public.household_members, public.household_invites,
   public.players, public.player_settings,
-  public.matches, public.training_sessions, public.teams, public.competitions
+  public.matches, public.training_sessions, public.teams, public.competitions, public.results
   to authenticated;
 
 revoke all on
   public.households, public.household_members, public.household_invites,
   public.players, public.player_settings,
-  public.matches, public.training_sessions, public.teams, public.competitions
+  public.matches, public.training_sessions, public.teams, public.competitions, public.results
   from anon;
 
 -- Which version of this file a project has, so a check can tell whether the
 -- latest one was run. Bump it with any change the app depends on.
+--   1  households, players and their records
+--   2  other teams' results, for competition tables
 create or replace function public.schema_version()
 returns integer
 language sql
 immutable
-as $$ select 1 $$;
+as $$ select 2 $$;
 
 revoke all on function public.schema_version() from public;
 grant execute on function public.schema_version() to anon, authenticated;

@@ -317,6 +317,28 @@ describe('two phones in one household', () => {
     }
   });
 
+  it('share other teams\' results for the tables', async () => {
+    const { brother, mum } = await family();
+    const at = '2026-09-20T10:00:00.000Z';
+    mum.act({
+      type: 'result/add',
+      result: {
+        id: 'result_1', competitionId: 'c1', home: 'Vale', away: 'Moor', homeGoals: 2, awayGoals: 0, date: '2026-09-20',
+        stage: null, stageDetail: '', createdAt: at, updatedAt: at, deletedAt: null,
+      },
+    });
+
+    await mum.sync();
+    await brother.sync();
+    expect(brother.data.results.map((r) => `${r.home} ${r.homeGoals}-${r.awayGoals} ${r.away}`)).toEqual(['Vale 2-0 Moor']);
+
+    // And a correction made on his phone reaches hers.
+    brother.act({ type: 'result/update', id: 'result_1', patch: { homeGoals: 2, awayGoals: 2 } });
+    await brother.sync();
+    await mum.sync();
+    expect(mum.data.results[0]).toMatchObject({ homeGoals: 2, awayGoals: 2 });
+  });
+
   it('see a match deleted on one disappear from the other', async () => {
     const { brother, mum } = await family();
     const gone = brother.data.matches.find((m) => m.opponent === 'Riverside Rovers')!;

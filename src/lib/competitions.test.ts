@@ -9,7 +9,7 @@ function tournament(over: Partial<Competition> = {}): Competition {
   return {
     id: 'harvest', name: 'Harvest Cup', type: 'tournament', season: '2026/27', ageGroup: 'U13', color: '#fff',
     notes: '', archived: false, placing: '', startDate: '2026-10-18', teamId: 'wanderers', location: 'Central Fields',
-    matchLength: 40, createdAt: '', updatedAt: '', deletedAt: null, ...over,
+    matchLength: 40, pointsWin: 3, pointsDraw: 1, createdAt: '', updatedAt: '', deletedAt: null, ...over,
   };
 }
 

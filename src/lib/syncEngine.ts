@@ -237,6 +237,7 @@ export async function syncOnce(h: SyncHooks): Promise<SyncResult> {
       training: merged ? merged.training : changes.training ?? [],
       teams: merged ? merged.teams : changes.teams ?? [],
       competitions: merged ? merged.competitions : changes.competitions ?? [],
+      results: merged ? merged.results : changes.results ?? [],
     };
     h.replaceLocal(joinedData);
     local = joinedData;

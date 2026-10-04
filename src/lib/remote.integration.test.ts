@@ -148,12 +148,21 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
       [email('mum'), 'adult', true],
     ]);
 
-    // With no signal: mum adds a session, the brother deletes a match and
-    // changes his age group. Then each syncs.
+    // With no signal: mum adds a session, the brother deletes a match,
+    // changes his age group and enters another team's result for the table.
+    // Then each syncs.
     mum.act({ type: 'training/add', session: session('Penalties') });
     const gone = brother.data.matches.find((x) => x.opponent === 'Riverside Rovers')!;
     brother.act({ type: 'match/delete', id: gone.id });
     brother.act({ type: 'profile/update', patch: { ageGroup: 'U17' } });
+    const at = new Date().toISOString();
+    brother.act({
+      type: 'result/add',
+      result: {
+        id: `result_${RUN}`, competitionId: 'c1', home: 'Vale', away: 'Moor', homeGoals: 3, awayGoals: 1, date: '2026-09-26',
+        stage: null, stageDetail: '', createdAt: at, updatedAt: at, deletedAt: null,
+      },
+    });
 
     await mum.sync();
     await brother.sync();
@@ -163,6 +172,7 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
       expect(phone.focuses()).toEqual(['Crosses', 'Penalties']);
       expect(phone.opponents()).toEqual(['Hillcrest Athletic']);
       expect(phone.data.profile.ageGroup).toBe('U17');
+      expect(phone.data.results.map((r) => `${r.home} ${r.homeGoals}-${r.awayGoals} ${r.away}`)).toEqual(['Vale 3-1 Moor']);
     }
 
     // The delete is on the server as a tombstone, not a missing row.
@@ -178,7 +188,7 @@ describe.skipIf(!URL)('the Supabase remote, against PostgREST and the real schem
     expect(peek.profile).toBeNull();
     await expect(
       strangerRemote.push(first.household!.playerId, {
-        rows: { matches: [match('Injected FC')], training: [], teams: [], competitions: [] },
+        rows: { matches: [match('Injected FC')], training: [], teams: [], competitions: [], results: [] },
       }),
     ).rejects.toThrow();
     expect(await strangerRemote.people(first.household!.id)).toEqual([]);

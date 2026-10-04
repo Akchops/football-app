@@ -141,3 +141,25 @@ describe('parseData', () => {
     expect(round2.matches[0].result?.metrics).toEqual({ goals: 1, assists: 2 });
   });
 });
+
+describe('tables', () => {
+  it('loads data from before tables with no other results, and the usual points', () => {
+    const data = parseData(V1_BACKUP);
+    expect(data.results).toEqual([]);
+    expect(data.competitions[0]).toMatchObject({ pointsWin: 3, pointsDraw: 1 });
+  });
+
+  it('cleans up a saved result that makes no sense', () => {
+    const saved = JSON.stringify({
+      ...emptyData(),
+      results: [
+        { id: 'r1', competitionId: 'c1', home: 'Vale', away: 'Moor', homeGoals: 2, awayGoals: null, date: '2026-09-12', stage: 'groups', stageDetail: 'B', createdAt: '2026-09-12T10:00:00Z' },
+        { id: 'r2', competitionId: 'c1', home: 'Vale', away: 'Moor', homeGoals: 1, awayGoals: 1, date: '2026-09-19', stage: 'group', stageDetail: 'B' },
+      ],
+    });
+    const [half, whole] = parseData(saved).results;
+    // Half a score is no score, a stage that isn't one is dropped, and so is its group.
+    expect(half).toMatchObject({ homeGoals: null, awayGoals: null, stage: null, stageDetail: '', updatedAt: '2026-09-12T10:00:00Z', deletedAt: null });
+    expect(whole).toMatchObject({ homeGoals: 1, awayGoals: 1, stage: 'group', stageDetail: 'B' });
+  });
+});

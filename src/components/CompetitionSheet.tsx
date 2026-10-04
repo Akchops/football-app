@@ -1,14 +1,23 @@
 import { useLayoutEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
-import { AGE_GROUPS, COMPETITION_TYPE_LABEL, PLACINGS, POSITION_GROUP_LABEL, type Competition, type Match } from '../types';
+import {
+  AGE_GROUPS, COMPETITION_TYPE_LABEL, PLACINGS, POSITION_GROUP_LABEL, type Competition, type Match, type Result,
+} from '../types';
 import { formatDateShort, formatTime, kickoffAt } from '../lib/date';
 import { positionStatCards } from '../lib/metrics';
 import { personalBests } from '../lib/records';
 import { scoreVerdict } from '../lib/score';
 import { computeStats, mainPositionGroup, placingLabel, recordSummary } from '../lib/stats';
 import { stageName } from '../lib/stage';
+import { ACADEMY } from '../lib/features';
+import { knownTeams, standings } from '../lib/standings';
 import { MatchCard } from './MatchCard';
+import { StandingsTable } from './StandingsTable';
+import { TableResultSheet, type TableResultTarget } from './TableResultSheet';
 import { Field, Section, Sheet, StatTile } from './ui';
+
+/** Other results listed before "Show all" - a whole season's can run to dozens. */
+const RECENT_RESULTS = 5;
 
 export interface CompetitionView {
   id: string;
@@ -38,7 +47,7 @@ export function CompetitionSheet({
   /** A fixture that has just come in - started from this competition's own details. */
   onAddMatch: (competition: Competition) => void;
 }) {
-  const { competitions, matches, teams, profile, colorOf, finishCompetition, reopenCompetition } = useStore();
+  const { competitions, matches, teams, results, profile, colorOf, finishCompetition, reopenCompetition } = useStore();
   const competition = view ? competitions.find((c) => c.id === view.id) ?? null : null;
 
   const [step, setStep] = useState<CompetitionView['step']>('summary');
@@ -61,6 +70,31 @@ export function CompetitionSheet({
   const group = useMemo(() => mainPositionGroup(own, profile.positionGroup), [own, profile.positionGroup]);
   const bests = useMemo(() => personalBests(own, group), [own, group]);
 
+  // The rest of the league or group, newest first, and the tables they make.
+  const otherResults = useMemo(
+    () =>
+      competition
+        ? results
+            .filter((r) => r.competitionId === competition.id)
+            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.createdAt < b.createdAt ? 1 : -1))
+        : [],
+    [competition, results],
+  );
+  const tables = useMemo(
+    () =>
+      competition
+        ? standings({
+            competition,
+            matches: own,
+            results: otherResults,
+            ourName: (m) => teams.find((t) => t.id === m.teamId)?.name || 'Your team',
+          })
+        : [],
+    [competition, own, otherResults, teams],
+  );
+  const [resultTarget, setResultTarget] = useState<TableResultTarget | null>(null);
+  const [allResults, setAllResults] = useState(false);
+
   // Every match for one team - the usual case - is worth naming.
   const teamIds = new Set(own.map((m) => m.teamId));
   const [onlyTeamId] = [...teamIds];
@@ -81,6 +115,10 @@ export function CompetitionSheet({
   useLayoutEffect(() => {
     if (view?.step === 'finish') startFinish();
     else setStep('summary');
+    // Never reopen on a result sheet left over from last time - Escape closes
+    // this page before the sheet on top of it can close itself.
+    setResultTarget(null);
+    setAllResults(false);
   }, [view]);
 
   if (!view || !competition) return null;
@@ -206,6 +244,22 @@ export function CompetitionSheet({
     );
   }
 
+  // A friendly has no table to speak of; everything else can.
+  const showTables = ACADEMY && competition.type !== 'friendly';
+  const ourNames = [
+    ...new Set(
+      [...own.map((m) => m.teamId), competition.teamId]
+        .map((id) => teams.find((t) => t.id === id)?.name ?? '')
+        .filter(Boolean),
+    ),
+  ];
+  // A new result starts in the player's own group - the one the rest of it is about.
+  const groupCounts = new Map<string, number>();
+  for (const m of own) if (m.stage === 'group' && m.stageDetail) groupCounts.set(m.stageDetail, (groupCounts.get(m.stageDetail) ?? 0) + 1);
+  const defaultGroup = [...groupCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+  const openResult = (result?: Result) =>
+    setResultTarget({ competition, result, defaultGroup, knownTeams: knownTeams(own, otherResults), ourNames });
+
   const positionCards = positionStatCards(group, {
     appearances: stats.appearances,
     played: stats.played,
@@ -216,6 +270,7 @@ export function CompetitionSheet({
   });
 
   return (
+    <>
     <Sheet
       open
       title={competition.name}
@@ -285,6 +340,52 @@ export function CompetitionSheet({
         </div>
       )}
 
+      {/* The table first: in a league it's what the page is opened for. */}
+      {showTables &&
+        tables.map((table) => (
+          <Section key={table.name || 'table'} title={table.name ? `${table.name} table` : 'Table'}>
+            <StandingsTable group={table} />
+          </Section>
+        ))}
+
+      {showTables && (
+        <Section
+          title="Other results"
+          action={
+            <button className="ghost-btn" onClick={() => openResult()}>
+              + Add result
+            </button>
+          }
+        >
+          {otherResults.length === 0 ? (
+            <p className="muted small">
+              Add the other teams&apos; results too — the whole table works itself out, with your own matches
+              counted from here.
+            </p>
+          ) : (
+            <div className="list">
+              {(allResults ? otherResults : otherResults.slice(0, RECENT_RESULTS)).map((r) => (
+                <button key={r.id} className="other-result" onClick={() => openResult(r)}>
+                  <span className="other-teams">
+                    {r.home} <strong>{r.homeGoals ?? '–'}–{r.awayGoals ?? '–'}</strong> {r.away}
+                  </span>
+                  <span className="muted small">
+                    {[r.date && formatDateShort(r.date), r.stage ? stageName(r.stage, r.stageDetail) : '']
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </button>
+              ))}
+              {otherResults.length > RECENT_RESULTS && (
+                <button className="link-btn" onClick={() => setAllResults((all) => !all)}>
+                  {allResults ? 'Show the latest only' : `Show all ${otherResults.length}`}
+                </button>
+              )}
+            </div>
+          )}
+        </Section>
+      )}
+
       {stats.appearances > 0 && (
         <Section title={`Your ${noun} · ${POSITION_GROUP_LABEL[group]}`}>
           <div className="tile-grid">
@@ -351,5 +452,7 @@ export function CompetitionSheet({
         </div>
       )}
     </Sheet>
+    <TableResultSheet target={resultTarget} onClose={() => setResultTarget(null)} />
+    </>
   );
 }
