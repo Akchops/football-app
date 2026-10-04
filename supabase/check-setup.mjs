@@ -7,11 +7,14 @@
 // Run from GitHub by .github/workflows/check-accounts.yml.
 
 /** What `schema_version()` in schema.sql returns. Bump both together. */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const TABLES = [
   'households', 'household_members', 'household_invites', 'players', 'player_settings',
   'matches', 'training_sessions', 'teams', 'competitions', 'results',
+  'profiles', 'academies', 'academy_members', 'academy_staff_invites', 'academy_squads', 'squad_coaches',
+  'academy_players', 'squad_players', 'academy_competitions', 'academy_results', 'academy_selections',
+  'academy_documents', 'app_admins', 'app_settings',
 ];
 
 const url = (process.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
