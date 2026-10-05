@@ -1688,12 +1688,13 @@ grant execute on function
 -- latest one was run. Bump it with any change the app depends on.
 --   1  households, players and their records
 --   2  other teams' results, for competition tables
---   3  academies
+--   3  academies, first draft
+--   4  academies: squads, linking, tables, team picks and verification
 create or replace function public.schema_version()
 returns integer
 language sql
 immutable
-as $$ select 3 $$;
+as $$ select 4 $$;
 
 revoke all on function public.schema_version() from public;
 grant execute on function public.schema_version() to anon, authenticated;

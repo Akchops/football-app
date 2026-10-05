@@ -1,9 +1,9 @@
 # Matchday backend
 
-The database behind signing in and sharing with family. Until this is set up the
-app works exactly as it always has — everything stays on the one phone, and the
-sign-in parts of the app stay hidden. Nothing here is required to run or build
-Matchday.
+The database behind signing in, sharing with family, and academies. Until this
+is set up the app works exactly as it always has — everything stays on the one
+phone, and the sign-in and academy parts of the app stay hidden. Nothing here is
+required to run or build Matchday.
 
 ## How it works, briefly
 
@@ -21,6 +21,11 @@ Matchday.
   while it is open, and a few seconds after any change. Offline changes wait on
   the phone and go when there is signal. Match photos and clips never leave the
   phone they are on.
+- **Academies** live here too: their staff and roles, squads, the players linked
+  to them, their competitions and tables, team picks and verification
+  documents. An academy reads a player's records only once the player's family
+  has said yes, only as far as each staff role allows, and never changes them.
+  Everyone is found by a username they pick; nobody sees anyone else's email.
 
 ## Files
 
@@ -85,6 +90,25 @@ Matchday.
 The one thing no check here can prove is that the emails arrive: the first
 sign-in is that test. If a code does not come, look in spam, then check steps 3
 and 4 — a link instead of a code means a template still has the old text.
+
+### Then: make yourself Matchday's admin
+
+Matchday's admins verify academies, and switch on "Academies must be verified
+before they can add players". Nothing in the app can make someone one — it is
+done here, once:
+
+1. Sign in to the app once with your own email, so your account exists.
+2. Supabase → **SQL Editor** → New query → run, with your email:
+
+   ```sql
+   insert into public.app_admins (user_id)
+   select id from auth.users where email = 'you@gmail.com';
+   ```
+
+Your Setup → Academies then has **Review academies**: academies waiting to be
+checked, their documents, Verify or Turn down with a note, and the approval
+switch. To stop being an admin, `delete from public.app_admins` with the same
+`where`.
 
 ### Optional: Google sign-in
 

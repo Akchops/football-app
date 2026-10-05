@@ -7,8 +7,9 @@ things that actually matter for that position. A keeper gets saves, clean
 sheets, goals conceded and save percentage. A defender gets tackles,
 interceptions, clearances and blocks.
 
-It runs in the browser and stores everything on the device — no account, no
-server, nothing uploaded.
+It runs in the browser and keeps everything on the device. Signing in is
+optional: it shares a player's matches with their family, and links them to an
+academy. Without it, nothing is uploaded.
 
 ## What it does
 
@@ -26,8 +27,10 @@ server, nothing uploaded.
   stats the whole app tracks
 - Every team you play for — add as many as you like. Each gets its own colour,
   and you can play a different position at each one
-- It's a local profile, not a login: there's no password and no account,
-  because there's no server. Everything can be changed later in Setup
+- It's a local profile, not a login, and everything can be changed later in
+  Setup. Signing in is a separate, optional step (see below)
+- Once academies are switched on, a new phone first asks who it's for: one
+  player (this setup), or an academy
 
 **Calendar (main screen)**
 - Month grid showing every match, with a count on any day holding more than one
@@ -178,6 +181,44 @@ server, nothing uploaded.
 - Demo data (a keeper across two clubs) to try the app, and a clear-everything
   button
 
+## Family and academies (optional, with an account)
+
+Both need the backend in [supabase/](supabase/README.md) to be set up; until it
+is, none of this shows.
+
+**Family.** Sign in with a code sent by email, invite the rest of the family,
+and everyone sees the same calendar - a change on one phone turns up on the
+others. Match photos and clips stay on the phone they're on.
+
+**Academies.** A club or academy runs its side of things in one place, on a
+phone or a laptop:
+- **Staff and roles** - owner, manager, coach, and an office admin role that
+  never sees players' stats. Everyone is found by a username, never an email
+- **Squads** - "U14 Elite", "Dubai Cup squad"; a player can be in several, and
+  each squad's coaches see its players
+- **Linking players** - invite by username, or the family types the academy's
+  join code. Either way the family sees exactly what the academy will see and
+  ticks consent ("I'm 13 or over, or I'm their parent or guardian") before
+  anything is shared. They can leave at any time, and the academy loses sight of
+  it at once. Players without the app go on the list by name
+- **Tables** - the academy's own leagues and tournaments, with every team's
+  results; the table works itself out, and linked families can read it
+- **Stats for picking teams** - leaderboards from players' own logs (marked as
+  self-logged), by season, competition, group stage or knockouts, position and
+  squad; a page per player; two or three side by side; and team picks to save,
+  share or print
+- **Verification** - an academy sends its registration and certificates, and
+  Matchday's admin checks them; verified academies carry a tick wherever their
+  name shows. A switch can require verification before an academy adds players
+
+The player's own app gains league and group **tables** for any competition too:
+enter other teams' results and the table, with your team marked, follows.
+
+Before real families and academies use accounts, the drafts in
+[docs/privacy.md](docs/privacy.md) and [docs/terms.md](docs/terms.md) need
+reviewing - it is children's data - and publishing where the app can link to
+them.
+
 ## The match score
 
 Each performance is rated out of 100 from the stats that matter in the position
@@ -286,7 +327,9 @@ the tab bar to five items.
 
 ## How it's put together
 
-- React + TypeScript + Vite, no backend
+- React + TypeScript + Vite. The app works entirely on the device; the optional
+  backend is Supabase (`supabase/`), whose access rules are the whole of what
+  keeps one family's or one academy's data from another, and are tested as such
 - `src/types.ts` — the data model, and the metric registry that says which stats
   belong to which position
 - `src/lib/date.ts` — date maths in the device's local timezone, plus age and
@@ -297,12 +340,20 @@ the tab bar to five items.
   decides when a match is waiting on a result
 - `src/store/` — a reducer over one `AppData` object mirrored to `localStorage`,
   a v1→v2 migration, and the IndexedDB media store
-- `src/components/` — one file per screen and per sheet
+- `src/lib/standings.ts` — league and group tables from the games themselves
+- `src/lib/sync.ts`, `src/lib/syncEngine.ts`, `src/lib/remote.ts` — keeping a
+  family's phones in step
+- `src/lib/academy.ts`, `src/lib/academyStats.ts` — the academy's server calls,
+  and its leaderboards and filters
+- `src/components/` — one file per screen and per sheet; the academy's are in
+  `src/components/academy/`
 
 The logic modules are the parts worth trusting, so they're covered by tests
-(`npm test`, 65 of them): date handling around month boundaries and local
-midnight, every stat the app reports, the scoring engine's position awareness,
-and the migration from the old data format.
+(`npm test`): date handling around month boundaries and local midnight, every
+stat the app reports, the scoring engine's position awareness, tables and
+tiebreaks, syncing between phones, the academy leaderboards, and the migration
+from old data formats. The server's access rules have their own checks in
+`supabase/`.
 
 ## Licence
 
@@ -323,8 +374,8 @@ Third-party components are used under their own licences, listed in
   problem that dedicated systems still get wrong. Short-clip coaching is
   genuinely useful and is what the Coach tab does; counting every save
   automatically is not something this app can do honestly.
-- Cloud backup and sync, so the data survives a lost phone
 - Push notifications (needs a server; calendar alarms cover reminders today)
 - Season filter on the stats page
-- Per-competition league table
+- Academies linked to each other sharing one competition, each entering its
+  own scores
 - Goalkeeper extras: distribution accuracy, sweeper-keeper actions by zone

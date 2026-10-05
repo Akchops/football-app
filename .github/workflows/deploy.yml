@@ -41,6 +41,10 @@ jobs:
           # the app has no accounts and keeps everything on the one phone.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # The academy release. On, unless the repository variable VITE_ACADEMY
+          # is set to false. Like signing in, it only shows once the Supabase
+          # project above is set up, with the latest supabase/schema.sql.
+          VITE_ACADEMY: ${{ vars.VITE_ACADEMY || 'true' }}
 
       # Static host with no server-side routing, so the 404 page serves the app.
       - run: cp dist/index.html dist/404.html
