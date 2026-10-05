@@ -8,6 +8,7 @@ import { Section, Sheet } from '../ui';
 import { CreateAcademyForm } from './AcademyDetails';
 import { AcademyHome, type AcademyTab } from './AcademyHome';
 import { AcademySettings } from './AcademySettings';
+import { AdminScreen } from './AdminScreen';
 import { AcademyLogo, StaffInviteCard, VerificationBadge } from './parts';
 import { PlayersScreen } from './PlayersScreen';
 import { StatsScreen } from './StatsScreen';
@@ -68,6 +69,8 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
       );
   } else if (!academy.username) {
     gate = <UsernameGate />;
+  } else if (academy.reviewing && academy.isAppAdmin) {
+    gate = <AdminScreen onBack={() => academy.setReviewing(false)} />;
   } else if (academy.creating) {
     gate = (
       <div className="screen">
@@ -336,6 +339,16 @@ function StartGate() {
           </>
         )}
       </Section>
+
+      {academy.isAppAdmin && (
+        <Section title="Matchday admin">
+          <div className="button-row">
+            <button className="ghost-btn" onClick={() => academy.setReviewing(true)}>
+              Review academies
+            </button>
+          </div>
+        </Section>
+      )}
 
       <Section title="Setting up a new academy?">
         {creating ? (

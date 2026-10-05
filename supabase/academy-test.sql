@@ -583,6 +583,23 @@ do $$ begin
   raise notice 'PASS: Matchday''s admin reviews and verifies it';
 end $$;
 
+-- Renaming a verified academy sends it back for another look; its contact details do not.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000005';
+do $$ begin
+  update public.academies set contact_email = 'office@riverside.test', age_groups = '{U12,U14,U16}' where id = public.t_get('aid')::uuid;
+  if (select verification from public.academies where id = public.t_get('aid')::uuid) <> 'verified' then
+    raise exception 'FAIL: changing the contact email lost the badge';
+  end if;
+  update public.academies set name = 'Manchester United Academy' where id = public.t_get('aid')::uuid;
+  if (select verification from public.academies where id = public.t_get('aid')::uuid) <> 'pending'
+     or (select verified_at from public.academies where id = public.t_get('aid')::uuid) is not null then
+    raise exception 'FAIL: a verified academy renamed itself and kept the badge';
+  end if;
+  raise notice 'PASS: a verified academy that changes its name goes back for review';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000a';
+select public.review_academy(public.t_get('aid')::uuid, true, 'Name change checked');
+
 -- With approval required, an unverified academy cannot take players.
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000001';
 do $$

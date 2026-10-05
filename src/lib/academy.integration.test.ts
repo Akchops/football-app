@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
 import { emptyData } from '../store/storage';
@@ -13,6 +14,16 @@ import { supabaseRemote } from './remote';
  */
 const URL = process.env.LOCAL_SUPABASE_URL ?? '';
 const KEY = process.env.LOCAL_SUPABASE_ANON_KEY ?? '';
+/**
+ * Nothing in the app can make someone one of Matchday's admins - it is done by
+ * hand in the database. With the local database's name given, the review test
+ * does that with psql; without it, that one test is skipped.
+ */
+const PG_DATABASE = process.env.LOCAL_PGDATABASE ?? '';
+const sql = (statement: string) =>
+  execFileSync('psql', ['-h', 'localhost', '-p', process.env.LOCAL_PGPORT ?? '5433', '-U', 'postgres', '-d', PG_DATABASE, '-qtAc', statement], {
+    encoding: 'utf8',
+  });
 
 /** Different names every run, so runs never trip over each other's usernames. */
 const RUN = Date.now().toString(36);
@@ -289,6 +300,59 @@ describe.skipIf(!URL)('academies, against PostgREST and the real schema', () => 
 
     await coach.api.deleteCompetition(comp);
     expect(await owner.api.competitions(id)).toEqual([]);
+    await owner.api.deleteAcademy(id);
+  });
+
+  it.skipIf(!PG_DATABASE)('verifies an academy from its documents, and holds back an unverified one when approval is required', async () => {
+    const owner = await person('own4');
+    const manager = await person('mgr4');
+    const admin = await person('adm4');
+    for (const p of [owner, manager, admin]) await p.api.claimUsername(p.name);
+    const id = await owner.api.createAcademy({ name: 'Castle Academy', town: 'York', country: 'England', contactEmail: '', ageGroups: [], logo: '' });
+    await owner.api.inviteStaff(id, manager.name, 'manager');
+    await manager.api.answerStaffInvite((await manager.api.staffInvitesForMe())[0].id, true);
+
+    // The owner sends a certificate; nobody else on the staff sees it.
+    await expect(owner.api.submitForReview(id)).rejects.toThrow(/at least one certificate/i);
+    const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    await expect(manager.api.uploadDocument(id, { kind: 'registration', fileName: 'reg.png', mime: 'image/png', data: png })).rejects.toThrow();
+    const doc = await owner.api.uploadDocument(id, { kind: 'registration', fileName: 'reg.png', mime: 'image/png', data: png });
+    expect((await owner.api.documents(id)).map((d) => [d.kind, d.fileName, d.mime])).toEqual([['registration', 'reg.png', 'image/png']]);
+    expect(await owner.api.documentData(doc)).toBe(png);
+    expect(await manager.api.documents(id)).toEqual([]);
+    await owner.api.submitForReview(id);
+    expect((await manager.api.staffAcademies()).find((a) => a.id === id)!.verification).toBe('pending');
+
+    // Only one of Matchday's admins can review it.
+    expect(await admin.api.isAppAdmin()).toBe(false);
+    await expect(admin.api.reviewAcademy(id, true, '')).rejects.toThrow(/only matchday/i);
+    sql(`insert into public.app_admins (user_id) values ('${admin.userId}') on conflict do nothing`);
+    try {
+      expect(await admin.api.isAppAdmin()).toBe(true);
+      const waiting = (await admin.api.academiesForReview()).find((a) => a.id === id)!;
+      expect(waiting).toMatchObject({ name: 'Castle Academy', verification: 'pending', owner: owner.name, documents: 1 });
+      expect(await admin.api.documentData(doc)).toBe(png);
+      await admin.api.reviewAcademy(id, true, ' Checked the registration ');
+      const verified = (await owner.api.staffAcademies())[0];
+      expect(verified).toMatchObject({ verification: 'verified', verificationNote: 'Checked the registration' });
+      expect(verified.verifiedAt).not.toBeNull();
+
+      // A rename sends it back for another look.
+      await owner.api.updateAcademy(id, { name: 'Castle Park Academy' });
+      expect((await owner.api.staffAcademies())[0].verification).toBe('pending');
+
+      // With approval required, an unverified academy cannot add players.
+      await expect(owner.api.setRequireVerification(true)).rejects.toThrow(/only matchday/i);
+      await admin.api.setRequireVerification(true);
+      expect(await owner.api.requireVerification()).toBe(true);
+      const kid = await family('kid4', 'Kid');
+      await expect(owner.api.invitePlayer(id, kid.name)).rejects.toThrow(/verified/i);
+      await admin.api.reviewAcademy(id, true, 'New name checked');
+      await owner.api.invitePlayer(id, kid.name);
+    } finally {
+      sql(`update public.app_settings set require_verification = false`);
+      sql(`delete from public.app_admins where user_id = '${admin.userId}'`);
+    }
     await owner.api.deleteAcademy(id);
   });
 });

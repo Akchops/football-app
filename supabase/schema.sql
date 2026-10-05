@@ -1572,6 +1572,32 @@ begin
 end;
 $$;
 
+-- The badge vouches for who the academy said it was. Changing that - its
+-- name, its town or country, its logo - sends it back for another look, so
+-- a verified academy cannot rename itself into someone else and keep the
+-- tick. Its contact email and age groups can change freely.
+create or replace function public.recheck_identity()
+returns trigger
+language plpgsql
+as $$
+begin
+  if old.verification = 'verified' and (
+       new.name is distinct from old.name or new.town is distinct from old.town
+       or new.country is distinct from old.country or new.logo is distinct from old.logo
+     ) then
+    new.verification := 'pending';
+    new.verification_note := 'Its name, place or logo changed - Matchday checks it again';
+    new.verified_at := null;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists academies_recheck_identity on public.academies;
+create trigger academies_recheck_identity
+  before update on public.academies
+  for each row execute function public.recheck_identity();
+
 -- For the admin screen: academies waiting, and every other one, newest first.
 create or replace function public.academies_for_review()
 returns table (id uuid, name text, town text, country text, contact_email text, verification text,

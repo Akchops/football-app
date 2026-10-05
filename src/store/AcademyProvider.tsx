@@ -32,6 +32,8 @@ interface Snapshot {
   playerInvites: PlayerInvite[];
   joinRequests: JoinRequest[];
   memberships: Membership[];
+  isAppAdmin: boolean;
+  requireVerification: boolean;
 }
 
 export interface AcademyValue {
@@ -56,6 +58,10 @@ export interface AcademyValue {
   joinRequests: JoinRequest[];
   /** Academies the family's player is linked to. */
   memberships: Membership[];
+  /** One of Matchday's own admins, who review academies. */
+  isAppAdmin: boolean;
+  /** Whether an academy must be verified before it can add players - the switch on Matchday's admin screen. */
+  requireVerification: boolean;
   /** The academy on screen: the one last chosen, or the first. */
   current: StaffAcademy | null;
   choose(academyId: string): void;
@@ -65,6 +71,9 @@ export interface AcademyValue {
   /** Whether the academy area is showing the form to set up another academy. */
   creating: boolean;
   setCreating(on: boolean): void;
+  /** Whether the academy area is showing Matchday's admin screen. */
+  reviewing: boolean;
+  setReviewing(on: boolean): void;
 }
 
 const MODE_KEY = 'matchday.mode.v1';
@@ -103,6 +112,8 @@ function readCache(userId: string): (Snapshot & { currentId: string | null }) | 
       playerInvites: list(parsed.playerInvites),
       joinRequests: list(parsed.joinRequests),
       memberships: list(parsed.memberships),
+      isAppAdmin: parsed.isAppAdmin === true,
+      requireVerification: parsed.requireVerification === true,
       currentId: parsed.currentId ?? null,
     };
   } catch {
@@ -153,12 +164,16 @@ const OFF: AcademyValue = {
   playerInvites: [],
   joinRequests: [],
   memberships: [],
+  isAppAdmin: false,
+  requireVerification: false,
   current: null,
   choose: () => {},
   refresh: async () => {},
   setUsername: () => {},
   creating: false,
   setCreating: () => {},
+  reviewing: false,
+  setReviewing: () => {},
 };
 
 const AcademyContext = createContext<AcademyValue>(OFF);
@@ -186,6 +201,7 @@ function AcademyOn({ children }: { children: ReactNode }) {
   const [error, setError] = useState('');
   const [api, setApi] = useState<AcademyApi | null>(null);
   const [creating, setCreating] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   // A refresh outlives the render that started it.
   const apiRef = useRef<AcademyApi | null>(null);
@@ -197,16 +213,21 @@ function AcademyOn({ children }: { children: ReactNode }) {
     if (!client || !who) return;
     setStatus('loading');
     try {
-      const [username, academies, invites, playerInvites, joinRequests, memberships] = await Promise.all([
-        client.username(),
-        client.staffAcademies(),
-        client.staffInvitesForMe(),
-        client.playerInvitesForMe(),
-        client.joinRequests(),
-        client.memberships(),
-      ]);
+      const [username, academies, invites, playerInvites, joinRequests, memberships, isAppAdmin, requireVerification] =
+        await Promise.all([
+          client.username(),
+          client.staffAcademies(),
+          client.staffInvitesForMe(),
+          client.playerInvitesForMe(),
+          client.joinRequests(),
+          client.memberships(),
+          client.isAppAdmin(),
+          client.requireVerification(),
+        ]);
       if (accountRef.current !== who) return;
-      setSnapshot({ userId: who, username, academies, invites, playerInvites, joinRequests, memberships });
+      setSnapshot({
+        userId: who, username, academies, invites, playerInvites, joinRequests, memberships, isAppAdmin, requireVerification,
+      });
       setError('');
       setStatus('ready');
     } catch (e) {
@@ -296,6 +317,8 @@ function AcademyOn({ children }: { children: ReactNode }) {
   const joinRequests = loaded ? snapshot.joinRequests : NO_REQUESTS;
   const memberships = loaded ? snapshot.memberships : NO_MEMBERSHIPS;
   const username = loaded ? snapshot.username : null;
+  const isAppAdmin = loaded ? snapshot.isAppAdmin : false;
+  const requireVerification = loaded ? snapshot.requireVerification : false;
   const current = academies.find((a) => a.id === currentId) ?? academies[0] ?? null;
 
   const value = useMemo<AcademyValue>(
@@ -313,16 +336,20 @@ function AcademyOn({ children }: { children: ReactNode }) {
       playerInvites,
       joinRequests,
       memberships,
+      isAppAdmin,
+      requireVerification,
       current,
       choose: setCurrentId,
       refresh,
       setUsername,
       creating,
       setCreating,
+      reviewing,
+      setReviewing,
     }),
     [
-      mode, setMode, api, status, error, loaded, username, academies, invites, playerInvites, joinRequests, memberships, current,
-      refresh, setUsername, creating,
+      mode, setMode, api, status, error, loaded, username, academies, invites, playerInvites, joinRequests, memberships,
+      isAppAdmin, requireVerification, current, refresh, setUsername, creating, reviewing,
     ],
   );
 

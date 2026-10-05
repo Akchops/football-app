@@ -41,6 +41,7 @@ export function SquadSelect({
 /** Everyone on the academy's books, its squads, and anyone asking to join. */
 export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
   const sync = useSync();
+  const { requireVerification } = useAcademy();
   const me = sync.account?.id ?? '';
   const roster = useRoster(academy);
   const [adding, setAdding] = useState(false);
@@ -92,6 +93,12 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
         </div>
       )}
       {loading && !roster.error && <p className="muted small">Loading…</p>}
+      {requireVerification && academy.verification !== 'verified' && (
+        <p className="notice warn">
+          Matchday needs to verify the academy before it can add players or accept requests to join.{' '}
+          {academy.role === 'owner' ? 'Send your documents from Settings → Verification.' : 'The owner sends the documents.'}
+        </p>
+      )}
 
       {requests.length > 0 && (
         <Section title={`Asking to join · ${requests.length}`}>

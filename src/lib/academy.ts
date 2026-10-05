@@ -27,6 +27,8 @@ export interface Academy {
   verification: Verification;
   /** Why it was not approved, when it was not. */
   verificationNote: string;
+  /** When Matchday verified it, or null. */
+  verifiedAt: string | null;
 }
 
 /** An academy someone works at, and as what. */
@@ -171,6 +173,46 @@ export interface Selection {
 
 export type SelectionInput = Omit<Selection, 'id' | 'updatedAt'>;
 
+export type DocumentKind = 'registration' | 'coaching' | 'safeguarding' | 'other';
+
+export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
+  registration: 'Registration',
+  coaching: 'Coaching qualifications',
+  safeguarding: 'Safeguarding certificate',
+  other: 'Something else',
+};
+
+/** A certificate sent for verification. Only the owner and Matchday's admins can see one. */
+export interface AcademyDocument {
+  id: string;
+  kind: DocumentKind;
+  fileName: string;
+  mime: 'image/jpeg' | 'image/png' | 'application/pdf';
+  createdAt: string;
+}
+
+export interface DocumentUpload {
+  kind: DocumentKind;
+  fileName: string;
+  mime: AcademyDocument['mime'];
+  /** A data URL. */
+  data: string;
+}
+
+/** An academy as Matchday's admins review it. */
+export interface ReviewItem {
+  id: string;
+  name: string;
+  town: string;
+  country: string;
+  contactEmail: string;
+  verification: Verification;
+  verificationNote: string;
+  owner: string;
+  documents: number;
+  createdAt: string;
+}
+
 export interface AcademyDetails {
   name: string;
   town: string;
@@ -231,6 +273,21 @@ export interface AcademyApi {
   selections(academyId: string): Promise<Selection[]>;
   saveSelection(academyId: string, input: SelectionInput, id?: string): Promise<string>;
   deleteSelection(id: string): Promise<void>;
+
+  // Verification.
+  documents(academyId: string): Promise<AcademyDocument[]>;
+  /** One document's file, as a data URL. */
+  documentData(id: string): Promise<string>;
+  uploadDocument(academyId: string, upload: DocumentUpload): Promise<string>;
+  removeDocument(id: string): Promise<void>;
+  submitForReview(academyId: string): Promise<void>;
+  /** Whether the signed-in person is one of Matchday's own admins. */
+  isAppAdmin(): Promise<boolean>;
+  /** Whether an academy must be verified before it can add players. */
+  requireVerification(): Promise<boolean>;
+  setRequireVerification(on: boolean): Promise<void>;
+  academiesForReview(): Promise<ReviewItem[]>;
+  reviewAcademy(academyId: string, approve: boolean, note: string): Promise<void>;
 
   // The family's side.
   playerInvitesForMe(): Promise<PlayerInvite[]>;
@@ -418,9 +475,11 @@ interface AcademyRow {
   join_code: string;
   verification: Verification;
   verification_note: string;
+  verified_at: string | null;
 }
 
-const ACADEMY_COLUMNS = 'id, name, town, country, contact_email, age_groups, logo, join_code, verification, verification_note';
+const ACADEMY_COLUMNS =
+  'id, name, town, country, contact_email, age_groups, logo, join_code, verification, verification_note, verified_at';
 
 function toAcademy(row: AcademyRow): Academy {
   return {
@@ -434,6 +493,7 @@ function toAcademy(row: AcademyRow): Academy {
     joinCode: row.join_code,
     verification: row.verification,
     verificationNote: row.verification_note ?? '',
+    verifiedAt: row.verified_at ?? null,
   };
 }
 
@@ -987,6 +1047,106 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
     async deleteSelection(id) {
       const rows = check((await sb.from('academy_selections').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
       changedOne(rows, "You can't delete this team pick.");
+    },
+
+    async documents(academyId) {
+      const rows = check(
+        (await sb
+          .from('academy_documents')
+          .select('id, kind, file_name, mime, created_at')
+          .eq('academy_id', academyId)
+          .order('created_at', { ascending: true })) as Result_<
+          { id: string; kind: DocumentKind; file_name: string; mime: AcademyDocument['mime']; created_at: string }[]
+        >,
+      );
+      return rows.map((r) => ({ id: r.id, kind: r.kind, fileName: r.file_name, mime: r.mime, createdAt: r.created_at }));
+    },
+
+    async documentData(id) {
+      const row = check(
+        (await sb.from('academy_documents').select('data').eq('id', id).single()) as Result_<{ data: string }>,
+      );
+      return row.data;
+    },
+
+    async uploadDocument(academyId, upload) {
+      const row = check(
+        (await sb
+          .from('academy_documents')
+          .insert({
+            academy_id: academyId,
+            kind: upload.kind,
+            file_name: upload.fileName.slice(0, 200),
+            mime: upload.mime,
+            data: upload.data,
+            uploaded_by: userId,
+          })
+          .select('id')
+          .single()) as Result_<{ id: string }>,
+      );
+      return row.id;
+    },
+
+    async removeDocument(id) {
+      const rows = check((await sb.from('academy_documents').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
+      changedOne(rows, 'Only the owner can remove a certificate.');
+    },
+
+    async submitForReview(academyId) {
+      check((await sb.rpc('submit_for_review', { aid: academyId })) as Result_<unknown>);
+    },
+
+    async isAppAdmin() {
+      return Boolean(check((await sb.rpc('is_app_admin')) as Result_<boolean>));
+    },
+
+    async requireVerification() {
+      const row = check(
+        (await sb.from('app_settings').select('require_verification').maybeSingle()) as Result_<{ require_verification: boolean } | null>,
+      );
+      return row?.require_verification ?? false;
+    },
+
+    async setRequireVerification(on) {
+      const rows = check(
+        (await sb.from('app_settings').update({ require_verification: on }).eq('id', true).select('id')) as Result_<{ id: boolean }[]>,
+      );
+      changedOne(rows, "Only Matchday's admins can change that.");
+    },
+
+    async academiesForReview() {
+      const rows = check(
+        (await sb.rpc('academies_for_review')) as Result_<
+          {
+            id: string;
+            name: string;
+            town: string;
+            country: string;
+            contact_email: string;
+            verification: Verification;
+            verification_note: string;
+            owner: string;
+            documents: number;
+            created_at: string;
+          }[]
+        >,
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        town: r.town ?? '',
+        country: r.country ?? '',
+        contactEmail: r.contact_email ?? '',
+        verification: r.verification,
+        verificationNote: r.verification_note ?? '',
+        owner: r.owner ?? '',
+        documents: r.documents ?? 0,
+        createdAt: r.created_at,
+      }));
+    },
+
+    async reviewAcademy(academyId, approve, note) {
+      check((await sb.rpc('review_academy', { aid: academyId, approve, note: note.trim() })) as Result_<unknown>);
     },
 
     async playerInvitesForMe() {

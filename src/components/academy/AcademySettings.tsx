@@ -5,6 +5,7 @@ import { useSync } from '../../store/SyncProvider';
 import { Section } from '../ui';
 import { AcademyDetailsFields, detailsOf, detailsProblem } from './AcademyDetails';
 import { UsernameForm } from './UsernameForm';
+import { VerificationSection } from './Verification';
 
 function same(a: AcademyDetails, b: AcademyDetails): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -12,7 +13,7 @@ function same(a: AcademyDetails, b: AcademyDetails): boolean {
 
 /** The academy's details, the person's own account, and leaving or deleting. */
 export function AcademySettings({ academy, hasPlayer }: { academy: StaffAcademy; hasPlayer: boolean }) {
-  const { api, refresh, username, setMode } = useAcademy();
+  const { api, refresh, username, setMode, isAppAdmin, setReviewing } = useAcademy();
   const sync = useSync();
   const saved = detailsOf(academy);
   const [draft, setDraft] = useState<AcademyDetails>(saved);
@@ -123,6 +124,19 @@ export function AcademySettings({ academy, hasPlayer }: { academy: StaffAcademy;
           </>
         )}
       </Section>
+
+      <VerificationSection academy={academy} />
+
+      {isAppAdmin && (
+        <Section title="Matchday admin">
+          <p className="muted small">You review academies for Matchday.</p>
+          <div className="button-row">
+            <button className="ghost-btn" onClick={() => setReviewing(true)}>
+              Review academies
+            </button>
+          </div>
+        </Section>
+      )}
 
       <Section title="You">
         {changingName ? (

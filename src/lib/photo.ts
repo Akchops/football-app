@@ -79,3 +79,66 @@ export function toLogoDataUrl(file: File): Promise<string | null> {
     img.src = url;
   });
 }
+
+/** Longest edge of a photographed certificate - still readable, a fraction of the size. */
+const DOCUMENT_EDGE = 1600;
+/** PDFs are sent as they are, up to this size. */
+export const PDF_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * A certificate ready to send: a photo shrunk to a JPEG that is still easy to
+ * read, or a PDF as it is if it is small enough. Null with a reason otherwise.
+ */
+export async function toDocument(
+  file: File,
+): Promise<{ data: string; mime: 'image/jpeg' | 'application/pdf' } | { error: string }> {
+  if (file.type === 'application/pdf') {
+    if (file.size > PDF_MAX_BYTES) return { error: 'That PDF is over 2 MB. Try a smaller scan, or a photo of each page.' };
+    const data = await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+    return data ? { data, mime: 'application/pdf' } : { error: "That PDF couldn't be read." };
+  }
+  if (!file.type.startsWith('image/')) return { error: 'Send a photo or a PDF.' };
+  const data = await new Promise<string | null>((resolve) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    const done = (value: string | null) => {
+      URL.revokeObjectURL(url);
+      resolve(value);
+    };
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, DOCUMENT_EDGE / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return done(null);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        done(canvas.toDataURL('image/jpeg', 0.8));
+      } catch {
+        done(null);
+      }
+    };
+    img.onerror = () => done(null);
+    img.src = url;
+  });
+  return data ? { data, mime: 'image/jpeg' } : { error: "That picture couldn't be read - try a JPEG or PNG." };
+}
+
+/** Opens a file kept as a data URL in a new tab. Browsers refuse to open data URLs directly, so it goes as a blob. */
+export function openDataUrl(dataUrl: string): void {
+  const [head, body] = dataUrl.split(',', 2);
+  const mime = /data:([^;]+)/.exec(head)?.[1] ?? 'application/octet-stream';
+  const bytes = Uint8Array.from(atob(body ?? ''), (c) => c.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  window.open(url, '_blank', 'noopener');
+  // Long enough for the new tab to load it.
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

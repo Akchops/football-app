@@ -135,6 +135,18 @@ export function AcademySection() {
           {academy.academies.length > 0 ? 'Set up another academy' : 'Run an academy? Set one up'}
         </button>
       )}
+
+      {academy.isAppAdmin && (
+        <button
+          className="link-btn"
+          onClick={() => {
+            academy.setReviewing(true);
+            academy.setMode('academy');
+          }}
+        >
+          Review academies (Matchday admin)
+        </button>
+      )}
     </Section>
   );
 }

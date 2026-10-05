@@ -8,7 +8,7 @@ export type AcademyTab = 'home' | 'players' | 'tables' | 'stats' | 'staff' | 'se
 
 /** The academy at a glance: who it is, its join code, and what to do next. */
 export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (tab: AcademyTab) => void }) {
-  const { api } = useAcademy();
+  const { api, requireVerification } = useAcademy();
   const staff = useLoad(api ? () => api.staff(academy.id) : null, academy.id);
   const pending = useLoad(api ? () => api.pendingStaff(academy.id) : null, academy.id);
   const squads = useLoad(api ? () => api.squads(academy.id) : null, academy.id);
@@ -49,6 +49,24 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
 
       {academy.verification === 'rejected' && academy.verificationNote && (
         <p className="notice warn">Matchday couldn&apos;t verify the academy: {academy.verificationNote}</p>
+      )}
+
+      {requireVerification && academy.verification !== 'verified' && (
+        <p className="notice warn">
+          Matchday needs to verify the academy before it can add players.{' '}
+          {academy.role === 'owner' ? 'Send your documents from Settings.' : 'The owner sends the documents.'}
+        </p>
+      )}
+      {academy.role === 'owner' && (academy.verification === 'unverified' || academy.verification === 'rejected') && (
+        <button className="summary-row" onClick={() => onGo('settings')}>
+          <span>
+            <strong>Get verified</strong>
+            <span className="muted small"> - send Matchday your registration and certificates for the badge</span>
+          </span>
+          <span className="chev" aria-hidden="true">
+            ›
+          </span>
+        </button>
       )}
 
       <JoinCode academy={academy} />

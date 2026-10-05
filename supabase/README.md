@@ -135,8 +135,9 @@ the squads they coach but cannot pull in a player already linked elsewhere,
 and someone moved off coaching loses those squads at once; saying no or
 leaving takes a player out of every squad; nobody at an academy can write a
 player's records; usernames are unique ignoring case; an old join code stops
-working once a new one is made; an owner cannot verify their own academy; and
-with approval required, an unverified academy cannot take on any player.
+working once a new one is made; an owner cannot verify their own academy; a
+verified academy that changes its name, place or logo goes back for review;
+and with approval required, an unverified academy cannot take on any player.
 
 The two files can be run in either order, and again, on the same database.
 
@@ -161,8 +162,10 @@ postgrest /tmp/postgrest.conf &
 JWT_SECRET=local-only-jwt-secret-that-is-long-enough-1234 POSTGREST_URL=http://localhost:3001 \
   PGHOST=localhost PGPORT=5433 PGDATABASE=postgres PGUSER=postgres node supabase/local-api.mjs &
 
-# 3. The sync and academy tests against it, through the real supabase-js client:
-LOCAL_SUPABASE_URL=http://localhost:54321 LOCAL_SUPABASE_ANON_KEY=<printed key> \
+# 3. The sync and academy tests against it, through the real supabase-js client.
+#    LOCAL_PGDATABASE lets the verification test make someone a Matchday admin
+#    with psql, as is done by hand for real; without it that one test is skipped.
+LOCAL_SUPABASE_URL=http://localhost:54321 LOCAL_SUPABASE_ANON_KEY=<printed key> LOCAL_PGDATABASE=postgres \
   npx vitest run src/lib/remote.integration.test.ts src/lib/academy.integration.test.ts
 
 # 4. Or the app itself, signed in against it (add VITE_ACADEMY=true for the academy area):
