@@ -3,17 +3,19 @@ import { ROLE_LABEL, VERIFICATION_LABEL } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { SignInForm } from '../AccountSettings';
-import { BallIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon } from '../icons';
+import { BallIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon } from '../icons';
 import { Section, Sheet } from '../ui';
 import { CreateAcademyForm } from './AcademyDetails';
 import { AcademyHome, type AcademyTab } from './AcademyHome';
 import { AcademySettings } from './AcademySettings';
 import { AcademyLogo, StaffInviteCard, VerificationBadge } from './parts';
+import { PlayersScreen } from './PlayersScreen';
 import { StaffScreen } from './StaffScreen';
 import { UsernameForm } from './UsernameForm';
 
 const TABS: { id: AcademyTab; label: string; Icon: () => JSX.Element }[] = [
   { id: 'home', label: 'Home', Icon: HomeIcon },
+  { id: 'players', label: 'Players', Icon: ShirtIcon },
   { id: 'staff', label: 'Staff', Icon: PeopleIcon },
 ];
 
@@ -127,6 +129,7 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
           (current && (
             <>
               {tab === 'home' && <AcademyHome academy={current} onGo={setTab} />}
+              {tab === 'players' && <PlayersScreen academy={current} />}
               {tab === 'staff' && <StaffScreen academy={current} />}
               {tab === 'settings' && <AcademySettings academy={current} hasPlayer={hasPlayer} />}
             </>

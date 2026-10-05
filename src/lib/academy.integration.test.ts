@@ -1,6 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
+import { emptyData } from '../store/storage';
 import { academyApi, type AcademyApi } from './academy';
+import { supabaseRemote } from './remote';
 
 /**
  * The academy calls against a real API layer: PostgREST in front of Postgres
@@ -15,7 +17,7 @@ const KEY = process.env.LOCAL_SUPABASE_ANON_KEY ?? '';
 /** Different names every run, so runs never trip over each other's usernames. */
 const RUN = Date.now().toString(36);
 
-async function person(who: string): Promise<{ api: AcademyApi; name: string }> {
+async function person(who: string): Promise<{ api: AcademyApi; name: string; sb: SupabaseClient; userId: string }> {
   const sb = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const email = `${who}.${RUN}@example.com`;
   const sent = await sb.auth.signInWithOtp({ email });
@@ -23,7 +25,27 @@ async function person(who: string): Promise<{ api: AcademyApi; name: string }> {
   const { data, error } = await sb.auth.verifyOtp({ email, token: '123456', type: 'email' });
   if (error) throw error;
   const api = academyApi(sb, data.user!.id);
-  return { api, name: `${who}_${RUN}` };
+  return { api, name: `${who}_${RUN}`, sb, userId: data.user!.id };
+}
+
+/** A family on Matchday: a household with its player and one match, and a username to be found by. */
+async function family(who: string, playerName: string) {
+  const p = await person(who);
+  const data = emptyData();
+  data.profile = { ...data.profile, name: playerName, position: 'GK', ageGroup: 'U16' };
+  const household = await supabaseRemote(p.sb, p.userId).createHousehold(`${playerName}'s family`, data.profile, data.settings);
+  const at = new Date().toISOString();
+  const match = await p.sb.from('matches').insert({ player_id: household.playerId, id: `m_${who}_${RUN}`, data: { opponent: 'Vale' }, updated_at: at });
+  if (match.error) throw match.error;
+  await p.api.claimUsername(p.name);
+  return { ...p, playerId: household.playerId };
+}
+
+/** How many of a player's matches someone can read. */
+async function visibleMatches(sb: SupabaseClient, playerId: string): Promise<number> {
+  const { data, error } = await sb.from('matches').select('id').eq('player_id', playerId);
+  if (error) throw error;
+  return data.length;
 }
 
 /** A 1x1 PNG, standing in for a logo. */
@@ -119,5 +141,87 @@ describe.skipIf(!URL)('academies, against PostgREST and the real schema', () => 
     await coach.api.deleteAcademy(id);
     expect(await coach.api.staffAcademies()).toEqual([]);
     expect(await owner.api.staffAcademies()).toEqual([]);
+  });
+
+  it('links players with their family\'s yes, keeps coaches to their squads, and lets families leave', async () => {
+    const owner = await person('own2');
+    const coach = await person('cch2');
+    await owner.api.claimUsername(owner.name);
+    await coach.api.claimUsername(coach.name);
+    const id = await owner.api.createAcademy({ name: 'Vale Academy', town: 'York', country: '', contactEmail: '', ageGroups: [], logo: '' });
+    await owner.api.inviteStaff(id, coach.name, 'coach');
+    await coach.api.answerStaffInvite((await coach.api.staffInvitesForMe())[0].id, true);
+
+    // Two squads; the coach takes the elite one.
+    const elite = await owner.api.createSquad(id, 'U16 Elite', 'U16');
+    const dev = await owner.api.createSquad(id, 'U14 Development', 'U14');
+    await owner.api.setSquadCoach(elite, coach.userId, true);
+    await owner.api.setSquadCoach(elite, coach.userId, true); // twice is not an error
+    expect((await coach.api.squads(id)).map((s) => [s.name, s.coachIds])).toEqual([
+      ['U16 Elite', [coach.userId]],
+      ['U14 Development', []],
+    ]);
+
+    // Arjun's family is invited, by the username of anyone in it, straight into the elite squad.
+    const arjun = await family('par2', 'Arjun');
+    await expect(coach.api.invitePlayer(id, arjun.name, { squadId: dev })).rejects.toThrow(/squads you coach/);
+    const link = await coach.api.invitePlayer(id, `@${arjun.name}`, { squadId: elite });
+    expect(await visibleMatches(coach.sb, arjun.playerId)).toBe(0);
+
+    const [invite] = await arjun.api.playerInvitesForMe();
+    expect(invite).toMatchObject({ id: link, academyName: 'Vale Academy', town: 'York', invitedBy: coach.name, verification: 'unverified' });
+    await expect(arjun.api.answerPlayerInvite(link, true, false)).rejects.toThrow(/agree to share/i);
+    await arjun.api.answerPlayerInvite(link, true, true);
+    expect(await visibleMatches(coach.sb, arjun.playerId)).toBe(1);
+
+    // Sam's family asks with the code, typed any old way; only someone who can add to that squad says yes.
+    const sam = await family('sam2', 'Sam');
+    const code = (await owner.api.staffAcademies()).find((a) => a.id === id)!.joinCode;
+    await expect(sam.api.joinByCode(code, false)).rejects.toThrow(/agree to share/i);
+    const request = await sam.api.joinByCode(` ${code.slice(0, 3).toLowerCase()} ${code.slice(3)}`, true);
+    expect((await sam.api.joinRequests()).map((r) => r.academyName)).toEqual(['Vale Academy']);
+    await expect(coach.api.answerJoinRequest(request, true, dev)).rejects.toThrow(/squads you coach/);
+    await owner.api.answerJoinRequest(request, true, dev);
+    expect(await sam.api.joinRequests()).toEqual([]);
+    expect(await visibleMatches(coach.sb, sam.playerId)).toBe(0); // not the coach's squad
+    expect(await visibleMatches(owner.sb, sam.playerId)).toBe(1);
+
+    // A name with no app, into the coach's own squad; never a linked player from another squad.
+    const nathan = await coach.api.addRosterPlayer(id, { name: ' Nathan ', position: 'CM', ageGroup: 'U16' });
+    await coach.api.setSquadMember(elite, nathan, true);
+    await expect(coach.api.setSquadMember(elite, request, true)).rejects.toThrow();
+    await expect(coach.api.setSquadMember(dev, request, false)).rejects.toThrow(/squad's coach/);
+
+    const players = await coach.api.players(id);
+    expect(players.map((p) => [p.name, p.status, p.playerId !== null])).toEqual([
+      ['Arjun', 'linked', true],
+      ['Nathan', 'roster', false],
+      ['Sam', 'linked', true],
+    ]);
+    const squads = await coach.api.squads(id);
+    expect(squads.find((s) => s.id === elite)!.memberIds.sort()).toEqual([link, nathan].sort());
+
+    // What Arjun's family sees: the academy, his squad and his squad mates' names.
+    expect(await arjun.api.memberships()).toEqual([
+      {
+        linkId: link, academyId: id, academyName: 'Vale Academy', verification: 'unverified', town: 'York', logo: '',
+        squads: [{ id: elite, name: 'U16 Elite', mates: ['Nathan'] }],
+      },
+    ]);
+
+    // Only the owner and managers take someone off the books.
+    await expect(coach.api.removePlayer(nathan)).rejects.toThrow(/only the owner or a manager/i);
+    await owner.api.removePlayer(nathan);
+
+    // Arjun's family leaves: the academy keeps his name, marked as left, and sees nothing.
+    await arjun.api.leaveAcademy(link);
+    expect(await visibleMatches(coach.sb, arjun.playerId)).toBe(0);
+    expect(await visibleMatches(owner.sb, arjun.playerId)).toBe(0);
+    expect(await arjun.api.memberships()).toEqual([]);
+    const after = await owner.api.players(id);
+    expect(after.find((p) => p.id === link)).toMatchObject({ status: 'left', playerId: null });
+    expect((await owner.api.squads(id)).find((s) => s.id === elite)!.memberIds).toEqual([]);
+
+    await owner.api.deleteAcademy(id);
   });
 });

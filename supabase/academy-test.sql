@@ -74,7 +74,8 @@ insert into auth.users (id, email) values
   ('0a000000-0000-0000-0000-000000000007', 'parent@family.test'),
   ('0a000000-0000-0000-0000-000000000008', 'sam@other.test'),
   ('0a000000-0000-0000-0000-000000000009', 'stranger@nowhere.test'),
-  ('0a000000-0000-0000-0000-00000000000a', 'admin@matchday.test');
+  ('0a000000-0000-0000-0000-00000000000a', 'admin@matchday.test'),
+  ('0a000000-0000-0000-0000-00000000000b', 'priya@third.test');
 insert into public.app_admins (user_id) values ('0a000000-0000-0000-0000-00000000000a') on conflict do nothing;
 update public.app_settings set require_verification = false;
 
@@ -111,6 +112,18 @@ begin
   perform public.t_set('pid_sam', pid::text);
 end $$;
 
+-- Priya, a third family, who comes and goes.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000b';
+do $$
+declare hid uuid; pid uuid;
+begin
+  hid := public.create_household('Priya''s family');
+  insert into public.players (household_id, data, updated_at)
+    values (hid, '{"name":"Priya","position":"ST","ageGroup":"U14"}', now()) returning id into pid;
+  insert into public.matches (player_id, id, data, updated_at) values (pid, 'm_p1', '{"opponent":"Castle"}', now());
+  perform public.t_set('pid_priya', pid::text);
+end $$;
+
 -- ===========================================================================
 -- Usernames.
 -- ===========================================================================
@@ -139,6 +152,7 @@ set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003'; select publi
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004'; select public.claim_username('coach_two');
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000005'; select public.claim_username('office_ad');
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000009'; select public.claim_username('stranger_s');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000b'; select public.claim_username('priya_w');
 
 select public.t_refused($$select public.user_by_username('arjun_gk')$$, 'permission denied',
   'nobody can turn a username into an account id directly');
@@ -407,6 +421,111 @@ begin
   end if;
   if (select count(*) from public.my_academies()) <> 1 then raise exception 'FAIL: sees squads they are not in'; end if;
   raise notice 'PASS: a player sees their squad and squad mates'' names, and only that';
+end $$;
+
+-- ===========================================================================
+-- Squads: who puts players in them.
+-- ===========================================================================
+-- A coach brings new players into the squad they coach - and only that one.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+do $$
+declare kid uuid;
+begin
+  insert into public.academy_players (academy_id, display_name, status) values (public.t_get('aid')::uuid, 'Roster Ravi', 'roster')
+    returning id into kid;
+  insert into public.squad_players values (public.t_get('elite')::uuid, kid);
+  perform public.t_set('ravi', kid::text);
+  raise notice 'PASS: a coach adds a name with no app to the squad they coach';
+end $$;
+select public.t_refused(format($$insert into public.squad_players values (%L, %L)$$, public.t_get('elite'), public.t_get('link_sam')),
+  'row-level security', 'a coach cannot pull a linked player from another squad into theirs');
+select public.t_refused(format($$insert into public.squad_players values (%L, %L)$$, public.t_get('dev'), public.t_get('ravi')),
+  'row-level security', 'a coach cannot add players to a squad they do not coach');
+do $$
+declare n int;
+begin
+  delete from public.squad_players where squad_id = public.t_get('dev')::uuid;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL: a coach emptied another coach''s squad'; end if;
+  delete from public.squad_players where squad_id = public.t_get('elite')::uuid and academy_player_id = public.t_get('ravi')::uuid;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: a coach could not take a player out of their own squad'; end if;
+  raise notice 'PASS: a coach takes players out of their own squad, and nobody else''s';
+end $$;
+
+-- A coach moved to the admin role keeps no squad powers, even if still listed as its coach.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000001';
+select public.set_staff_role(public.t_get('aid')::uuid, '0a000000-0000-0000-0000-000000000004', 'admin');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004';
+select public.t_refused(format($$insert into public.squad_players values (%L, %L)$$, public.t_get('dev'), public.t_get('ravi')),
+  'row-level security', 'someone moved from coach to admin cannot add to their old squad');
+select public.t_expect(format($$select * from public.matches where player_id = %L$$, public.t_get('pid_sam')), 0,
+  'nor see its players');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000001';
+select public.set_staff_role(public.t_get('aid')::uuid, '0a000000-0000-0000-0000-000000000004', 'coach');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+
+-- Inviting straight into a squad: only one the coach coaches.
+select public.t_refused(format($$select public.invite_player(%L, 'priya_w', null, %L)$$, public.t_get('aid'), public.t_get('dev')),
+  'squads you coach', 'a coach cannot invite someone into another coach''s squad');
+do $$ begin
+  perform public.t_set('link_priya', public.invite_player(public.t_get('aid')::uuid, 'priya_w', null, public.t_get('elite')::uuid)::text);
+  if not exists (select 1 from public.squad_players where academy_player_id = public.t_get('link_priya')::uuid and squad_id = public.t_get('elite')::uuid) then
+    raise exception 'FAIL: the invite did not put her in the squad';
+  end if;
+  raise notice 'PASS: a coach invites a player straight into their squad';
+end $$;
+select public.t_expect(format($$select * from public.matches where player_id = %L$$, public.t_get('pid_priya')), 0,
+  'in the squad but only invited: her matches stay hidden');
+
+-- Her family says no; she is out of the squad again.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000b';
+select public.answer_player_invite(public.t_get('link_priya')::uuid, false, false);
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+select public.t_expect(format($$select * from public.squad_players where academy_player_id = %L$$, public.t_get('link_priya')), 0,
+  'saying no takes the player out of the squad they were invited into');
+
+-- Later she asks to join with the code, and sees her request waiting; a stranger does not.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000b';
+do $$ begin
+  perform public.t_set('req_priya', public.join_by_code(public.t_get('code'), true)::text);
+  if (select academy_name from public.my_join_requests()) <> 'Riverside Academy' then raise exception 'FAIL: request not shown to the family'; end if;
+  raise notice 'PASS: a family sees the request it has sent, by academy name';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000009';
+select public.t_expect($$select * from public.my_join_requests()$$, 0, 'nobody else sees a family''s requests');
+
+-- Coach two says yes into the squad they coach - not coach one's.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004';
+select public.t_refused(format($$select public.answer_join_request(%L, true, %L)$$, public.t_get('req_priya'), public.t_get('elite')),
+  'squads you coach', 'a coach cannot accept someone into another coach''s squad');
+select public.answer_join_request(public.t_get('req_priya')::uuid, true, public.t_get('dev')::uuid);
+select public.t_expect(format($$select * from public.matches where player_id = %L$$, public.t_get('pid_priya')), 1,
+  'accepted into a squad, she is seen by that squad''s coach');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+select public.t_expect(format($$select * from public.matches where player_id = %L$$, public.t_get('pid_priya')), 0,
+  'and not by the coach of another squad');
+
+-- She leaves: out of every squad, and out of sight.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000b';
+select public.leave_academy(public.t_get('req_priya')::uuid);
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004';
+select public.t_expect(format($$select * from public.squad_players where academy_player_id = %L$$, public.t_get('req_priya')), 0,
+  'leaving takes the player out of every squad');
+select public.t_expect(format($$select * from public.matches where player_id = %L$$, public.t_get('pid_priya')), 0,
+  'after leaving, her coach sees nothing');
+
+-- A request can be taken back before anyone answers it; it simply goes.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000b';
+do $$
+declare rid uuid;
+begin
+  rid := public.join_by_code(public.t_get('code'), true);
+  perform public.leave_academy(rid);
+  if exists (select 1 from public.academy_players where id = rid) or exists (select 1 from public.my_join_requests()) then
+    raise exception 'FAIL: the withdrawn request is still there';
+  end if;
+  raise notice 'PASS: a family takes back a request before it is answered';
 end $$;
 
 -- ===========================================================================

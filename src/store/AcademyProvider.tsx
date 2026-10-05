@@ -1,13 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { academyApi, describeAcademyError, type AcademyApi, type StaffAcademy, type StaffInvite } from '../lib/academy';
+import {
+  academyApi, describeAcademyError, type AcademyApi, type JoinRequest, type Membership, type PlayerInvite, type StaffAcademy,
+  type StaffInvite,
+} from '../lib/academy';
 import { ACADEMY } from '../lib/features';
 import { supabase } from '../lib/supabase';
 import { useSync } from './SyncProvider';
 
 /**
  * Who the signed-in person is to academies: their username, the academies
- * they work at, and staff invites waiting for them - plus which half of the
- * app this phone shows, the player's or the academy's.
+ * they work at and staff invites waiting for them; for a family, the
+ * academies their player is in, invites to join one and requests sent - plus
+ * which half of the app this phone shows, the player's or the academy's.
  *
  * Unlike a player's matches, an academy lives on the server: everyone on its
  * staff works on the one copy. This keeps the last answer on the phone, so the
@@ -25,6 +29,9 @@ interface Snapshot {
   username: string | null;
   academies: StaffAcademy[];
   invites: StaffInvite[];
+  playerInvites: PlayerInvite[];
+  joinRequests: JoinRequest[];
+  memberships: Membership[];
 }
 
 export interface AcademyValue {
@@ -39,8 +46,16 @@ export interface AcademyValue {
   /** Whether the fields below are known for whoever is signed in - from the server, or this phone's copy. */
   loaded: boolean;
   username: string | null;
+  /** Academies this person works at. */
   academies: StaffAcademy[];
+  /** Invites to work at one. */
   invites: StaffInvite[];
+  /** Academies asking to add the family's player. */
+  playerInvites: PlayerInvite[];
+  /** Requests the family has sent with a join code. */
+  joinRequests: JoinRequest[];
+  /** Academies the family's player is linked to. */
+  memberships: Membership[];
   /** The academy on screen: the one last chosen, or the first. */
   current: StaffAcademy | null;
   choose(academyId: string): void;
@@ -77,9 +92,19 @@ function readCache(userId: string): (Snapshot & { currentId: string | null }) | 
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Snapshot & { currentId: string | null };
-    if (parsed?.userId !== userId || !Array.isArray(parsed.academies) || !Array.isArray(parsed.invites)) return null;
-    return parsed;
+    const parsed = JSON.parse(raw) as Partial<Snapshot> & { currentId?: string | null };
+    if (parsed?.userId !== userId || !Array.isArray(parsed.academies)) return null;
+    const list = <T,>(value: T[] | undefined): T[] => (Array.isArray(value) ? value : []);
+    return {
+      userId,
+      username: typeof parsed.username === 'string' ? parsed.username : null,
+      academies: parsed.academies,
+      invites: list(parsed.invites),
+      playerInvites: list(parsed.playerInvites),
+      joinRequests: list(parsed.joinRequests),
+      memberships: list(parsed.memberships),
+      currentId: parsed.currentId ?? null,
+    };
   } catch {
     return null;
   }
@@ -93,7 +118,8 @@ function writeCache(snapshot: Snapshot, currentId: string | null): void {
     // academy area just needs signal to open.
     try {
       const academies = snapshot.academies.map((a) => ({ ...a, logo: '' }));
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ ...snapshot, academies, currentId }));
+      const memberships = snapshot.memberships.map((m) => ({ ...m, logo: '' }));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ...snapshot, academies, memberships, currentId }));
     } catch {
       // As above.
     }
@@ -124,6 +150,9 @@ const OFF: AcademyValue = {
   username: null,
   academies: [],
   invites: [],
+  playerInvites: [],
+  joinRequests: [],
+  memberships: [],
   current: null,
   choose: () => {},
   refresh: async () => {},
@@ -136,6 +165,9 @@ const AcademyContext = createContext<AcademyValue>(OFF);
 
 const NONE: StaffAcademy[] = [];
 const NO_INVITES: StaffInvite[] = [];
+const NO_PLAYER_INVITES: PlayerInvite[] = [];
+const NO_REQUESTS: JoinRequest[] = [];
+const NO_MEMBERSHIPS: Membership[] = [];
 
 export function AcademyProvider({ children }: { children: ReactNode }) {
   const sync = useSync();
@@ -165,13 +197,16 @@ function AcademyOn({ children }: { children: ReactNode }) {
     if (!client || !who) return;
     setStatus('loading');
     try {
-      const [username, academies, invites] = await Promise.all([
+      const [username, academies, invites, playerInvites, joinRequests, memberships] = await Promise.all([
         client.username(),
         client.staffAcademies(),
         client.staffInvitesForMe(),
+        client.playerInvitesForMe(),
+        client.joinRequests(),
+        client.memberships(),
       ]);
       if (accountRef.current !== who) return;
-      setSnapshot({ userId: who, username, academies, invites });
+      setSnapshot({ userId: who, username, academies, invites, playerInvites, joinRequests, memberships });
       setError('');
       setStatus('ready');
     } catch (e) {
@@ -195,8 +230,14 @@ function AcademyOn({ children }: { children: ReactNode }) {
       return;
     }
     const cached = readCache(accountId);
-    setSnapshot(cached ? { userId: cached.userId, username: cached.username, academies: cached.academies, invites: cached.invites } : null);
-    setCurrentId(cached?.currentId ?? null);
+    if (cached) {
+      const { currentId: cachedCurrent, ...rest } = cached;
+      setSnapshot(rest);
+      setCurrentId(cachedCurrent);
+    } else {
+      setSnapshot(null);
+      setCurrentId(null);
+    }
 
     let live = true;
     supabase()
@@ -251,6 +292,9 @@ function AcademyOn({ children }: { children: ReactNode }) {
   const loaded = snapshot !== null && snapshot.userId === accountId;
   const academies = loaded ? snapshot.academies : NONE;
   const invites = loaded ? snapshot.invites : NO_INVITES;
+  const playerInvites = loaded ? snapshot.playerInvites : NO_PLAYER_INVITES;
+  const joinRequests = loaded ? snapshot.joinRequests : NO_REQUESTS;
+  const memberships = loaded ? snapshot.memberships : NO_MEMBERSHIPS;
   const username = loaded ? snapshot.username : null;
   const current = academies.find((a) => a.id === currentId) ?? academies[0] ?? null;
 
@@ -266,6 +310,9 @@ function AcademyOn({ children }: { children: ReactNode }) {
       username,
       academies,
       invites,
+      playerInvites,
+      joinRequests,
+      memberships,
       current,
       choose: setCurrentId,
       refresh,
@@ -273,7 +320,10 @@ function AcademyOn({ children }: { children: ReactNode }) {
       creating,
       setCreating,
     }),
-    [mode, setMode, api, status, error, loaded, username, academies, invites, current, refresh, setUsername, creating],
+    [
+      mode, setMode, api, status, error, loaded, username, academies, invites, playerInvites, joinRequests, memberships, current,
+      refresh, setUsername, creating,
+    ],
   );
 
   return <AcademyContext.Provider value={value}>{children}</AcademyContext.Provider>;

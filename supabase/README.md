@@ -130,7 +130,10 @@ The academy checks end with `ALL ACADEMY CHECKS PASSED`. Among them: a
 player's records stay hidden until their family says yes, and again the moment
 they leave; a coach sees only the squads they coach; the office admin role
 looks after staff and the academy's details but sees no player's stats, and
-cannot promote itself or touch a manager; nobody at an academy can write a
+cannot promote itself or touch a manager; a coach brings new players into
+the squads they coach but cannot pull in a player already linked elsewhere,
+and someone moved off coaching loses those squads at once; saying no or
+leaving takes a player out of every squad; nobody at an academy can write a
 player's records; usernames are unique ignoring case; an old join code stops
 working once a new one is made; an owner cannot verify their own academy; and
 with approval required, an unverified academy cannot take on any player.

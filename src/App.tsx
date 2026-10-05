@@ -143,7 +143,7 @@ function Shell() {
               {pending.length} to log
             </button>
           )}
-          {ACADEMY && academy.invites.length > 0 && tab !== 'setup' && (
+          {ACADEMY && academy.invites.length + academy.playerInvites.length > 0 && tab !== 'setup' && (
             <button className="pending-pill with-icon" onClick={() => setTab('setup')} aria-label="Academy invite">
               <ShieldIcon />
               Invite

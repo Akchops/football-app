@@ -4,21 +4,32 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { Section } from '../ui';
 import { AcademyLogo, VerificationBadge, useLoad } from './parts';
 
-export type AcademyTab = 'home' | 'staff' | 'settings';
+export type AcademyTab = 'home' | 'players' | 'staff' | 'settings';
 
 /** The academy at a glance: who it is, its join code, and what to do next. */
 export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (tab: AcademyTab) => void }) {
   const { api } = useAcademy();
   const staff = useLoad(api ? () => api.staff(academy.id) : null, academy.id);
   const pending = useLoad(api ? () => api.pendingStaff(academy.id) : null, academy.id);
+  const squads = useLoad(api ? () => api.squads(academy.id) : null, academy.id);
+  const players = useLoad(api ? () => api.players(academy.id) : null, academy.id);
 
   const where = [academy.town, academy.country].filter(Boolean).join(', ');
   const staffCount = staff.data?.length ?? null;
   const invited = pending.data?.length ?? 0;
+  const squadCount = squads.data?.length ?? null;
+  const onBooks = players.data?.filter((p) => p.status === 'linked' || p.status === 'invited' || p.status === 'roster') ?? null;
+  const asking = players.data?.filter((p) => p.status === 'requested').length ?? 0;
 
   const steps: { label: string; done: boolean; go: AcademyTab | null }[] = [{ label: 'Set up the academy', done: true, go: null }];
   if (can(academy.role, 'invite-staff')) {
     steps.push({ label: 'Invite your coaches and staff', done: (staffCount ?? 0) > 1 || invited > 0, go: 'staff' });
+  }
+  if (can(academy.role, 'run-squads')) {
+    steps.push({ label: 'Make your squads', done: (squadCount ?? 0) > 0, go: 'players' });
+  }
+  if (can(academy.role, 'add-players')) {
+    steps.push({ label: 'Add your players', done: (onBooks?.length ?? 0) > 0, go: 'players' });
   }
   const allDone = steps.every((s) => s.done);
 
@@ -41,6 +52,20 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
       )}
 
       <JoinCode academy={academy} />
+
+      <Section title="Players">
+        <button className="summary-row" onClick={() => onGo('players')}>
+          <span>
+            {onBooks === null || squadCount === null
+              ? players.error || squads.error || 'Loading…'
+              : `${onBooks.length} player${onBooks.length === 1 ? '' : 's'} · ${squadCount} squad${squadCount === 1 ? '' : 's'}`}
+            {asking > 0 && <strong className="summary-alert"> · {asking} asking to join</strong>}
+          </span>
+          <span className="chev" aria-hidden="true">
+            ›
+          </span>
+        </button>
+      </Section>
 
       <Section title="Staff">
         <button className="summary-row" onClick={() => onGo('staff')}>

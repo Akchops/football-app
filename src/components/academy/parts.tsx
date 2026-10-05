@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ROLE_BLURB, ROLE_LABEL, VERIFICATION_LABEL, describeAcademyError, type StaffInvite, type StaffRole, type Verification,
+  PLAYER_STATUS_LABEL, ROLE_BLURB, ROLE_LABEL, VERIFICATION_LABEL, describeAcademyError, type PlayerStatus, type StaffInvite,
+  type StaffRole, type Verification,
 } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 
@@ -16,6 +17,11 @@ export function VerificationBadge({ status }: { status: Verification }) {
 
 export function RoleChip({ role }: { role: StaffRole }) {
   return <span className={`role-chip role-${role}`}>{ROLE_LABEL[role]}</span>;
+}
+
+/** Where a player stands with the academy: linked, invited, asking, a name with no app. */
+export function StatusChip({ status }: { status: PlayerStatus }) {
+  return <span className={`status-chip status-${status}`}>{PLAYER_STATUS_LABEL[status]}</span>;
 }
 
 /** The academy's logo, or its initials on a plain tile when it has none. */

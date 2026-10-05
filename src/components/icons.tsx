@@ -101,3 +101,11 @@ export function PeopleIcon() {
     </svg>
   );
 }
+
+export function ShirtIcon() {
+  return (
+    <svg {...base}>
+      <path d="M8.5 3.5L4 6l1.6 4 2-.9V20.5h8.8V9.1l2 .9L20 6l-4.5-2.5c-.6 1.6-2 2.6-3.5 2.6s-2.9-1-3.5-2.6z" />
+    </svg>
+  );
+}

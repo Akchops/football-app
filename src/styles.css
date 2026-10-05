@@ -2015,3 +2015,105 @@ button:disabled:active { transform: none; }
   .academy-app.with-nav .tab-label { font-size: 14px; }
   .academy-app.with-nav .screen { max-width: 760px; }
 }
+
+/* ---------- academy players and squads ---------- */
+.status-chip {
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  flex: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.status-chip.status-linked { color: var(--win); border-color: rgba(41, 209, 124, 0.45); background: rgba(41, 209, 124, 0.08); }
+.status-chip.status-invited,
+.status-chip.status-requested { color: var(--draw); border-color: rgba(240, 180, 41, 0.45); }
+.status-chip.status-left,
+.status-chip.status-declined { opacity: 0.75; }
+
+.squad-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+@media (min-width: 640px) { .squad-list { grid-template-columns: 1fr 1fr; } }
+.squad-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.squad-card-main { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+
+.player-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.player-list > li { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line-soft); min-height: 48px; }
+.player-list > li:last-child { border-bottom: 0; }
+.player-list.compact > li { min-height: 44px; }
+.player-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 8px 0;
+  text-align: left;
+}
+.player-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.player-row-main strong { overflow-wrap: anywhere; }
+
+.request-card,
+.membership-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.request-card { border-color: rgba(240, 180, 41, 0.4); }
+.request-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.membership-head { display: flex; align-items: center; gap: 10px; }
+.membership-card .danger-link { align-self: flex-start; }
+
+.request-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.summary-alert { color: var(--draw); }
+
+.toggle-row.consent { align-items: flex-start; font-weight: 600; line-height: 1.4; }
+.toggle-row.consent input { margin-top: 1px; flex: none; }
+
+.code-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  text-transform: uppercase;
+  max-width: 220px;
+}
+
+.section-divider { border-top: 1px solid var(--line-soft); margin: 4px 0; }

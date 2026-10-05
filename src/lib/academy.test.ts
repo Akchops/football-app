@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  RESERVED_USERNAMES, USERNAME_PATTERN, can, canRemove, cleanUsername, describeAcademyError, rolesToGive,
-  usernameProblem,
+  RESERVED_USERNAMES, USERNAME_PATTERN, can, canRemove, canTakeOutOf, cleanJoinCode, cleanUsername, describeAcademyError,
+  rolesToGive, squadsToAddTo, usernameProblem, type Squad,
 } from './academy';
 
 describe('usernames', () => {
@@ -94,5 +94,51 @@ describe('describeAcademyError', () => {
     expect(describeAcademyError(new Error('permission denied for table academies'))).toMatch(/permission/);
     expect(describeAcademyError(new Error('JWT expired'))).toMatch(/sign out and in again/i);
     expect(describeAcademyError('')).toMatch(/went wrong/);
+  });
+});
+
+describe('squads', () => {
+  const squad = (id: string, coachIds: string[]): Squad => ({ id, name: id, ageGroup: '', coachIds, memberIds: [] });
+  const squads = [squad('elite', ['c1']), squad('dev', ['c2']), squad('cup', ['c1', 'c2'])];
+
+  it('let the owner and managers put anyone in any squad', () => {
+    expect(squadsToAddTo('owner', 'o', squads).map((s) => s.id)).toEqual(['elite', 'dev', 'cup']);
+    expect(squadsToAddTo('manager', 'm', squads, { status: 'linked' }).map((s) => s.id)).toEqual(['elite', 'dev', 'cup']);
+  });
+
+  it('let a coach bring new players into the squads they coach only', () => {
+    expect(squadsToAddTo('coach', 'c1', squads).map((s) => s.id)).toEqual(['elite', 'cup']);
+    expect(squadsToAddTo('coach', 'c1', squads, { status: 'roster' }).map((s) => s.id)).toEqual(['elite', 'cup']);
+    expect(squadsToAddTo('coach', 'c1', squads, { status: 'requested' }).map((s) => s.id)).toEqual(['elite', 'cup']);
+  });
+
+  it('never let a coach pull in a linked player, whose stats that would open', () => {
+    expect(squadsToAddTo('coach', 'c1', squads, { status: 'linked' })).toEqual([]);
+  });
+
+  it('give the admin role no squads at all', () => {
+    expect(squadsToAddTo('admin', 'a', squads)).toEqual([]);
+    expect(can('admin', 'add-players')).toBe(false);
+    expect(can('admin', 'run-squads')).toBe(false);
+  });
+
+  it('let a squad\'s own coach take players out of it', () => {
+    expect(canTakeOutOf('coach', 'c1', squads[0])).toBe(true);
+    expect(canTakeOutOf('coach', 'c1', squads[1])).toBe(false);
+    expect(canTakeOutOf('manager', 'm', squads[1])).toBe(true);
+    expect(canTakeOutOf('admin', 'a', squads[0])).toBe(false);
+  });
+
+  it('keep taking players off the books for the owner and managers', () => {
+    expect(can('manager', 'remove-players')).toBe(true);
+    expect(can('coach', 'remove-players')).toBe(false);
+    expect(can('coach', 'add-players')).toBe(true);
+  });
+});
+
+describe('join codes', () => {
+  it('are read however they are typed', () => {
+    expect(cleanJoinCode(' fn2 2qz ')).toBe('FN22QZ');
+    expect(cleanJoinCode('fn-22-qz-extra')).toBe('FN22QZ');
   });
 });

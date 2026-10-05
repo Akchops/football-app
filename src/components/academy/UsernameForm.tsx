@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { cleanUsername, describeAcademyError, usernameProblem } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 
@@ -22,6 +22,7 @@ export function UsernameForm({
   onCancel?: () => void;
 }) {
   const academy = useAcademy();
+  const id = useId();
   const current = academy.username;
   const [value, setValue] = useState(current ?? '');
   const [check, setCheck] = useState<Check | null>(null);
@@ -80,13 +81,17 @@ export function UsernameForm({
 
   return (
     <div className="detail-block">
-      <label className="field">
-        <span className="field-label">{label}</span>
+      {/* The hint changes as they type, so it sits outside the label and is announced on its own. */}
+      <div className="field">
+        <label className="field-label" htmlFor={`${id}-input`}>
+          {label}
+        </label>
         <span className="username-input">
           <span className="at" aria-hidden="true">
             @
           </span>
           <input
+            id={`${id}-input`}
             className="input"
             value={value}
             onChange={(e) => setValue(e.target.value.replace(/\s+/g, ''))}
@@ -98,13 +103,13 @@ export function UsernameForm({
             spellCheck={false}
             maxLength={21}
             autoFocus={autoFocus}
-            aria-describedby="username-hint"
+            aria-describedby={`${id}-hint`}
           />
         </span>
-        <span id="username-hint" className={hint.tone ? `field-hint ${hint.tone}` : 'field-hint'} role="status">
+        <span id={`${id}-hint`} className={hint.tone ? `field-hint ${hint.tone}` : 'field-hint'} role="status">
           {hint.text}
         </span>
-      </label>
+      </div>
       {error && <p className="notice warn">{error}</p>}
       <div className="button-row">
         <button className="primary-btn" disabled={blocked} onClick={() => void save()}>

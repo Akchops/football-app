@@ -57,6 +57,68 @@ export interface StaffInvite {
   invitedBy: string;
 }
 
+export type PlayerStatus = 'roster' | 'invited' | 'requested' | 'linked' | 'declined' | 'left';
+
+/** A group of players - "U14 Elite", "Dubai Cup squad". A player can be in several. */
+export interface Squad {
+  id: string;
+  name: string;
+  ageGroup: string;
+  coachIds: string[];
+  /** Ids of the academy's players (AcademyPlayer.id) in it. */
+  memberIds: string[];
+}
+
+/** Someone on an academy's books. */
+export interface AcademyPlayer {
+  id: string;
+  /** Their Matchday player while invited, asking or linked; null for a name with no app, or once they leave. */
+  playerId: string | null;
+  name: string;
+  position: string;
+  ageGroup: string;
+  status: PlayerStatus;
+  createdAt: string;
+  /** When the family said yes. */
+  consentAt: string | null;
+}
+
+export interface AcademyPlayerDetails {
+  name: string;
+  position: string;
+  ageGroup: string;
+}
+
+/** An academy asking to add the family's player. */
+export interface PlayerInvite {
+  id: string;
+  academyId: string;
+  academyName: string;
+  town: string;
+  verification: Verification;
+  invitedBy: string;
+}
+
+/** A request to join that the family has sent, not yet answered. */
+export interface JoinRequest {
+  id: string;
+  academyId: string;
+  academyName: string;
+  town: string;
+  verification: Verification;
+}
+
+/** An academy the family's player is linked to, and the squads they are in there. */
+export interface Membership {
+  linkId: string;
+  academyId: string;
+  academyName: string;
+  verification: Verification;
+  town: string;
+  logo: string;
+  squads: { id: string; name: string; mates: string[] }[];
+}
+
 export interface AcademyDetails {
   name: string;
   town: string;
@@ -86,6 +148,30 @@ export interface AcademyApi {
   setStaffRole(academyId: string, userId: string, role: StaffRole): Promise<void>;
   removeStaff(academyId: string, userId: string): Promise<void>;
   transferOwnership(academyId: string, userId: string): Promise<void>;
+
+  squads(academyId: string): Promise<Squad[]>;
+  createSquad(academyId: string, name: string, ageGroup: string): Promise<string>;
+  updateSquad(id: string, patch: { name?: string; ageGroup?: string }): Promise<void>;
+  deleteSquad(id: string): Promise<void>;
+  setSquadCoach(squadId: string, userId: string, on: boolean): Promise<void>;
+  setSquadMember(squadId: string, academyPlayerId: string, on: boolean): Promise<void>;
+  players(academyId: string): Promise<AcademyPlayer[]>;
+  /** A name with no app, so squad lists are complete. */
+  addRosterPlayer(academyId: string, details: AcademyPlayerDetails): Promise<string>;
+  updatePlayer(id: string, patch: Partial<AcademyPlayerDetails>): Promise<void>;
+  removePlayer(id: string): Promise<void>;
+  /** Asks a player's family, by the username of anyone in it. Optionally links a name already on the books, or puts them in a squad. */
+  invitePlayer(academyId: string, username: string, options?: { rosterId?: string; squadId?: string }): Promise<string>;
+  answerJoinRequest(requestId: string, accept: boolean, squadId?: string): Promise<void>;
+
+  // The family's side.
+  playerInvitesForMe(): Promise<PlayerInvite[]>;
+  answerPlayerInvite(inviteId: string, accept: boolean, consent: boolean): Promise<void>;
+  joinByCode(code: string, consent: boolean): Promise<string>;
+  joinRequests(): Promise<JoinRequest[]>;
+  memberships(): Promise<Membership[]>;
+  /** Leaves an academy, or takes back a request to join one. */
+  leaveAcademy(linkId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +217,20 @@ export const ROLE_BLURB: Record<StaffRole, string> = {
   admin: "The office side: staff and the academy's details. Never sees a player's stats.",
 };
 
+export const PLAYER_STATUS_LABEL: Record<PlayerStatus, string> = {
+  linked: 'Linked',
+  invited: 'Invited',
+  requested: 'Asking to join',
+  roster: 'No app',
+  declined: 'Said no',
+  left: 'Left',
+};
+
+/** A join code as typed: capitals, no spaces. Codes never use 0, O, 1 or I. */
+export function cleanJoinCode(input: string): string {
+  return input.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+
 export const VERIFICATION_LABEL: Record<Verification, string> = {
   unverified: 'Not verified',
   pending: 'Under review',
@@ -145,7 +245,13 @@ export type AcademyAction =
   | 'new-join-code'
   | 'delete'
   | 'hand-over'
-  | 'verify';
+  | 'verify'
+  /** Make, rename and delete squads, choose their coaches, and move anyone between them. */
+  | 'run-squads'
+  /** Invite players, add names, answer requests to join - into squads they coach. */
+  | 'add-players'
+  /** Take a player off the academy's books altogether. */
+  | 'remove-players';
 
 const ALLOWED: Record<AcademyAction, StaffRole[]> = {
   'edit-details': ['owner', 'manager', 'admin'],
@@ -154,7 +260,26 @@ const ALLOWED: Record<AcademyAction, StaffRole[]> = {
   delete: ['owner'],
   'hand-over': ['owner'],
   verify: ['owner'],
+  'run-squads': ['owner', 'manager'],
+  'add-players': ['owner', 'manager', 'coach'],
+  'remove-players': ['owner', 'manager'],
 };
+
+/**
+ * The squads someone may put a player in: every squad for the owner and
+ * managers; for a coach, the ones they coach - and, for a player already
+ * linked, none, since that would open the player's stats to them.
+ */
+export function squadsToAddTo(role: StaffRole, myUserId: string, squads: Squad[], player?: Pick<AcademyPlayer, 'status'>): Squad[] {
+  if (can(role, 'run-squads')) return squads;
+  if (role !== 'coach' || player?.status === 'linked') return [];
+  return squads.filter((s) => s.coachIds.includes(myUserId));
+}
+
+/** Whether someone may take a player out of a squad: the owner and managers, or that squad's coach. */
+export function canTakeOutOf(role: StaffRole, myUserId: string, squad: Squad): boolean {
+  return can(role, 'run-squads') || (role === 'coach' && squad.coachIds.includes(myUserId));
+}
 
 export function can(role: StaffRole | null | undefined, action: AcademyAction): boolean {
   return role ? ALLOWED[action].includes(role) : false;
@@ -239,6 +364,20 @@ function toAcademy(row: AcademyRow): Academy {
     verification: row.verification,
     verificationNote: row.verification_note ?? '',
   };
+}
+
+function playerRow(patch: Partial<AcademyPlayerDetails>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.display_name = patch.name.trim();
+  if (patch.position !== undefined) row.position = patch.position;
+  if (patch.ageGroup !== undefined) row.age_group = patch.ageGroup;
+  return row;
+}
+
+/** A row that is already there counts as added. */
+function insertedOrThere(result: Result<unknown>): void {
+  if (result.error?.code === '23505') return;
+  check(result);
 }
 
 function toRow(patch: Partial<AcademyDetails>): Record<string, unknown> {
@@ -386,6 +525,232 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
 
     async transferOwnership(academyId, member) {
       check((await sb.rpc('transfer_ownership', { aid: academyId, member })) as Result<unknown>);
+    },
+
+    async squads(academyId) {
+      const rows = check(
+        (await sb
+          .from('academy_squads')
+          .select('id, name, age_group, created_at, squad_coaches(user_id), squad_players(academy_player_id)')
+          .eq('academy_id', academyId)
+          .order('created_at', { ascending: true })) as Result<
+          {
+            id: string;
+            name: string;
+            age_group: string;
+            squad_coaches: { user_id: string }[] | null;
+            squad_players: { academy_player_id: string }[] | null;
+          }[]
+        >,
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        ageGroup: r.age_group ?? '',
+        coachIds: (r.squad_coaches ?? []).map((c) => c.user_id),
+        memberIds: (r.squad_players ?? []).map((p) => p.academy_player_id),
+      }));
+    },
+
+    async createSquad(academyId, name, ageGroup) {
+      const row = check(
+        (await sb
+          .from('academy_squads')
+          .insert({ academy_id: academyId, name: name.trim(), age_group: ageGroup })
+          .select('id')
+          .single()) as Result<{ id: string }>,
+      );
+      return row.id;
+    },
+
+    async updateSquad(id, patch) {
+      const row: Record<string, unknown> = {};
+      if (patch.name !== undefined) row.name = patch.name.trim();
+      if (patch.ageGroup !== undefined) row.age_group = patch.ageGroup;
+      const rows = check((await sb.from('academy_squads').update(row).eq('id', id).select('id')) as Result<{ id: string }[]>);
+      changedOne(rows, 'Only the owner or a manager can change a squad.');
+    },
+
+    async deleteSquad(id) {
+      const rows = check((await sb.from('academy_squads').delete().eq('id', id).select('id')) as Result<{ id: string }[]>);
+      changedOne(rows, 'Only the owner or a manager can delete a squad.');
+    },
+
+    async setSquadCoach(squadId, member, on) {
+      if (on) {
+        insertedOrThere((await sb.from('squad_coaches').insert({ squad_id: squadId, user_id: member })) as Result<unknown>);
+      } else {
+        check((await sb.from('squad_coaches').delete().eq('squad_id', squadId).eq('user_id', member)) as Result<unknown>);
+      }
+    },
+
+    async setSquadMember(squadId, academyPlayerId, on) {
+      if (on) {
+        insertedOrThere(
+          (await sb.from('squad_players').insert({ squad_id: squadId, academy_player_id: academyPlayerId })) as Result<unknown>,
+        );
+      } else {
+        const rows = check(
+          (await sb
+            .from('squad_players')
+            .delete()
+            .eq('squad_id', squadId)
+            .eq('academy_player_id', academyPlayerId)
+            .select('squad_id')) as Result<{ squad_id: string }[]>,
+        );
+        changedOne(rows, "Only the owner, a manager or the squad's coach can take someone out of it.");
+      }
+    },
+
+    async players(academyId) {
+      const rows = check(
+        (await sb
+          .from('academy_players')
+          .select('id, player_id, display_name, position, age_group, status, created_at, consent_at')
+          .eq('academy_id', academyId)
+          .order('display_name', { ascending: true })) as Result<
+          {
+            id: string;
+            player_id: string | null;
+            display_name: string;
+            position: string;
+            age_group: string;
+            status: PlayerStatus;
+            created_at: string;
+            consent_at: string | null;
+          }[]
+        >,
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        playerId: r.player_id,
+        name: r.display_name,
+        position: r.position ?? '',
+        ageGroup: r.age_group ?? '',
+        status: r.status,
+        createdAt: r.created_at,
+        consentAt: r.consent_at,
+      }));
+    },
+
+    async addRosterPlayer(academyId, details) {
+      const row = check(
+        (await sb
+          .from('academy_players')
+          .insert({ academy_id: academyId, status: 'roster', ...playerRow(details) })
+          .select('id')
+          .single()) as Result<{ id: string }>,
+      );
+      return row.id;
+    },
+
+    async updatePlayer(id, patch) {
+      const rows = check(
+        (await sb.from('academy_players').update(playerRow(patch)).eq('id', id).select('id')) as Result<{ id: string }[]>,
+      );
+      changedOne(rows, "You can't change this player's details.");
+    },
+
+    async removePlayer(id) {
+      const rows = check((await sb.from('academy_players').delete().eq('id', id).select('id')) as Result<{ id: string }[]>);
+      changedOne(rows, 'Only the owner or a manager can take a player off the books.');
+    },
+
+    async invitePlayer(academyId, username, options = {}) {
+      return check(
+        (await sb.rpc('invite_player', {
+          aid: academyId,
+          username: cleanUsername(username),
+          roster_id: options.rosterId ?? null,
+          squad: options.squadId ?? null,
+        })) as Result<string>,
+      );
+    },
+
+    async answerJoinRequest(requestId, accept, squadId) {
+      check(
+        (await sb.rpc('answer_join_request', { request_id: requestId, accept, squad: squadId ?? null })) as Result<unknown>,
+      );
+    },
+
+    async playerInvitesForMe() {
+      const rows = check(
+        (await sb.rpc('my_player_invites')) as Result<
+          { id: string; academy_id: string; academy_name: string; verification: Verification; town: string; invited_by: string }[]
+        >,
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        academyId: r.academy_id,
+        academyName: r.academy_name,
+        town: r.town ?? '',
+        verification: r.verification,
+        invitedBy: r.invited_by ?? '',
+      }));
+    },
+
+    async answerPlayerInvite(inviteId, accept, consent) {
+      check((await sb.rpc('answer_player_invite', { invite_id: inviteId, accept, consent })) as Result<unknown>);
+    },
+
+    async joinByCode(code, consent) {
+      return check((await sb.rpc('join_by_code', { code: cleanJoinCode(code), consent })) as Result<string>);
+    },
+
+    async joinRequests() {
+      const rows = check(
+        (await sb.rpc('my_join_requests')) as Result<
+          { id: string; academy_id: string; academy_name: string; town: string; verification: Verification }[]
+        >,
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        academyId: r.academy_id,
+        academyName: r.academy_name,
+        town: r.town ?? '',
+        verification: r.verification,
+      }));
+    },
+
+    async memberships() {
+      const rows = check(
+        (await sb.rpc('my_academies')) as Result<
+          {
+            link_id: string;
+            academy_id: string;
+            academy_name: string;
+            verification: Verification;
+            town: string;
+            logo: string;
+            squad_id: string | null;
+            squad_name: string | null;
+            mates: string[] | null;
+          }[]
+        >,
+      );
+      // One row per squad the player is in; one membership per academy.
+      const byLink = new Map<string, Membership>();
+      for (const r of rows) {
+        let m = byLink.get(r.link_id);
+        if (!m) {
+          m = {
+            linkId: r.link_id,
+            academyId: r.academy_id,
+            academyName: r.academy_name,
+            verification: r.verification,
+            town: r.town ?? '',
+            logo: r.logo ?? '',
+            squads: [],
+          };
+          byLink.set(r.link_id, m);
+        }
+        if (r.squad_id) m.squads.push({ id: r.squad_id, name: r.squad_name ?? '', mates: r.mates ?? [] });
+      }
+      return [...byLink.values()];
+    },
+
+    async leaveAcademy(linkId) {
+      check((await sb.rpc('leave_academy', { link_id: linkId })) as Result<unknown>);
     },
   };
   return api;

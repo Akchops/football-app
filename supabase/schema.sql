@@ -727,6 +727,22 @@ as $$
   select coalesce(public.academy_role(aid) in ('owner', 'manager', 'coach'), false);
 $$;
 
+-- Whether the caller coaches this squad, and still coaches at its academy.
+create or replace function public.coaches_squad(sid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (
+    select 1
+    from public.squad_coaches sc
+    join public.academy_squads s on s.id = sc.squad_id
+    where sc.squad_id = sid and sc.user_id = auth.uid() and public.coaches_at(s.academy_id)
+  );
+$$;
+
 -- The office side: the academy's details and its staff. Owners, managers, and
 -- the admin role - who never see a player's stats.
 create or replace function public.manages_staff(aid uuid)
@@ -895,6 +911,21 @@ create policy squad_players_write on public.squad_players
     join public.academy_players ap on ap.id = academy_player_id and ap.academy_id = s.academy_id
     where s.id = squad_id and public.runs_academy(s.academy_id)
   ));
+-- A coach brings new players into the squads they coach: a name with no app,
+-- or someone invited or asking to join. Not a player already linked, whose
+-- stats being in the squad would open to them - moving those is for the
+-- owner and managers.
+drop policy if exists squad_players_coach_add on public.squad_players;
+create policy squad_players_coach_add on public.squad_players
+  for insert with check (public.coaches_squad(squad_id) and exists (
+    select 1
+    from public.academy_squads s
+    join public.academy_players ap on ap.id = academy_player_id and ap.academy_id = s.academy_id
+    where s.id = squad_id and ap.status in ('roster', 'invited', 'requested')
+  ));
+drop policy if exists squad_players_coach_remove on public.squad_players;
+create policy squad_players_coach_remove on public.squad_players
+  for delete using (public.coaches_squad(squad_id));
 
 drop policy if exists competitions_read on public.academy_competitions;
 create policy competitions_read on public.academy_competitions
@@ -1273,8 +1304,10 @@ as $$
 $$;
 
 -- The academy invites a player by username. Their family says yes or no.
--- Pass a roster row to link a name already on the books.
-create or replace function public.invite_player(aid uuid, username text, roster_id uuid default null)
+-- Pass a roster row to link a name already on the books, and a squad to put
+-- them straight into one. Dropped first because it gained the squad.
+drop function if exists public.invite_player(uuid, text, uuid);
+create or replace function public.invite_player(aid uuid, username text, roster_id uuid default null, squad uuid default null)
 returns uuid
 language plpgsql
 security definer
@@ -1287,6 +1320,14 @@ declare
   apid uuid;
 begin
   if not public.coaches_at(aid) then raise exception 'Only coaching staff can add players'; end if;
+  if squad is not null then
+    if not exists (select 1 from public.academy_squads s where s.id = squad and s.academy_id = aid) then
+      raise exception 'That squad is not at this academy';
+    end if;
+    if not (public.runs_academy(aid) or public.coaches_squad(squad)) then
+      raise exception 'You can only add players to squads you coach';
+    end if;
+  end if;
   if not public.can_take_players(aid) then raise exception 'This academy needs to be verified before it can add players'; end if;
   if target is null then raise exception 'No one has that username'; end if;
   pid := public.player_of(target);
@@ -1310,6 +1351,9 @@ begin
     from public.players p where p.id = pid
     returning id into apid;
   end if;
+  if squad is not null then
+    insert into public.squad_players (squad_id, academy_player_id) values (squad, apid) on conflict do nothing;
+  end if;
   return apid;
 end;
 $$;
@@ -1327,8 +1371,8 @@ declare
   pid uuid := public.player_of(auth.uid());
   apid uuid;
 begin
-  if auth.uid() is null then raise exception 'must be signed in'; end if;
-  if not consent then raise exception 'Agree to share your matches and stats with the academy first'; end if;
+  if auth.uid() is null then raise exception 'Sign in first'; end if;
+  if not coalesce(consent, false) then raise exception 'Agree to share your matches and stats with the academy first'; end if;
   select id into aid from public.academies where join_code = upper(btrim(coalesce(code, '')));
   if aid is null then raise exception 'No academy has that code'; end if;
   if pid is null then raise exception 'Sign in on your own phone first, so there is a player to link'; end if;
@@ -1373,8 +1417,8 @@ declare
   rec public.academy_players;
 begin
   select * into rec from public.academy_players where id = invite_id and status = 'invited';
-  if not found or not public.owns_player(rec.player_id) then raise exception 'invite not found'; end if;
-  if accept and not consent then raise exception 'Agree to share your matches and stats with the academy first'; end if;
+  if not found or not public.owns_player(rec.player_id) then raise exception 'That invite has gone - the academy may have cancelled it'; end if;
+  if accept and not coalesce(consent, false) then raise exception 'Agree to share your matches and stats with the academy first'; end if;
   if accept and not public.can_take_players(rec.academy_id) then
     raise exception 'This academy is not verified yet, so it cannot take players';
   end if;
@@ -1384,11 +1428,14 @@ begin
          consent_at = case when accept then now() else null end,
          player_id = case when accept then player_id else null end
    where id = rec.id;
+  if not accept then delete from public.squad_players where academy_player_id = rec.id; end if;
 end;
 $$;
 
--- The academy's answer to someone asking to join.
-create or replace function public.answer_join_request(request_id uuid, accept boolean)
+-- The academy's answer to someone asking to join, and which squad they go
+-- into. Dropped first because it gained the squad.
+drop function if exists public.answer_join_request(uuid, boolean);
+create or replace function public.answer_join_request(request_id uuid, accept boolean, squad uuid default null)
 returns void
 language plpgsql
 security definer
@@ -1398,7 +1445,15 @@ declare
   rec public.academy_players;
 begin
   select * into rec from public.academy_players where id = request_id and status = 'requested';
-  if not found or not public.coaches_at(rec.academy_id) then raise exception 'request not found'; end if;
+  if not found or not public.coaches_at(rec.academy_id) then raise exception 'That request has gone - they may have cancelled it'; end if;
+  if accept and squad is not null then
+    if not exists (select 1 from public.academy_squads s where s.id = squad and s.academy_id = rec.academy_id) then
+      raise exception 'That squad is not at this academy';
+    end if;
+    if not (public.runs_academy(rec.academy_id) or public.coaches_squad(squad)) then
+      raise exception 'You can only add players to squads you coach';
+    end if;
+  end if;
   if accept and not public.can_take_players(rec.academy_id) then
     raise exception 'This academy needs to be verified before it can add players';
   end if;
@@ -1406,11 +1461,16 @@ begin
      set status = case when accept then 'linked' else 'declined' end,
          player_id = case when accept then player_id else null end
    where id = rec.id;
+  if accept and squad is not null then
+    insert into public.squad_players (squad_id, academy_player_id) values (squad, rec.id) on conflict do nothing;
+  end if;
+  if not accept then delete from public.squad_players where academy_player_id = rec.id; end if;
 end;
 $$;
 
--- The family leaves. The academy keeps the name on its books, marked as left,
--- and loses sight of the player's records at once.
+-- The family leaves, or takes back a request to join. Leaving, the academy
+-- keeps the name on its books, marked as left, out of every squad - and loses
+-- sight of the player's records at once. A request taken back just goes.
 create or replace function public.leave_academy(link_id uuid)
 returns void
 language plpgsql
@@ -1421,9 +1481,33 @@ declare
   rec public.academy_players;
 begin
   select * into rec from public.academy_players where id = link_id;
-  if not found or rec.player_id is null or not public.owns_player(rec.player_id) then raise exception 'not found'; end if;
-  update public.academy_players set status = 'left', player_id = null where id = rec.id;
+  if not found or rec.player_id is null or not public.owns_player(rec.player_id) then
+    raise exception 'That has already gone';
+  end if;
+  delete from public.squad_players where academy_player_id = rec.id;
+  if rec.status = 'requested' then
+    delete from public.academy_players where id = rec.id;
+  else
+    update public.academy_players
+       set status = case when rec.status = 'invited' then 'declined' else 'left' end, player_id = null
+     where id = rec.id;
+  end if;
 end;
+$$;
+
+-- Requests to join that the caller's family has sent and no academy has answered.
+create or replace function public.my_join_requests()
+returns table (id uuid, academy_id uuid, academy_name text, town text, verification text)
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select ap.id, a.id, a.name, a.town, a.verification
+  from public.academy_players ap
+  join public.academies a on a.id = ap.academy_id
+  where ap.status = 'requested' and public.owns_player(ap.player_id)
+  order by ap.created_at desc;
 $$;
 
 -- What a family sees of its academies: the academy, the player's squads and
@@ -1549,28 +1633,28 @@ revoke all on function
 -- The helper checks run inside the rules; the actions are called by the app.
 revoke all on function
   public.is_app_admin(), public.academy_role(uuid), public.is_academy_staff(uuid), public.runs_academy(uuid),
-  public.coaches_at(uuid), public.manages_staff(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid),
+  public.coaches_at(uuid), public.coaches_squad(uuid), public.manages_staff(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid),
   public.player_of(uuid), public.user_by_username(text), public.can_take_players(uuid),
   public.username_available(text), public.claim_username(text),
   public.create_academy(text, text, text, text, text[]), public.new_join_code(uuid), public.invite_staff(uuid, text, text),
   public.my_staff_invites(), public.pending_staff(uuid), public.answer_staff_invite(uuid, boolean), public.academy_staff(uuid),
   public.set_staff_role(uuid, uuid, text), public.remove_staff(uuid, uuid), public.transfer_ownership(uuid, uuid),
-  public.invite_player(uuid, text, uuid), public.join_by_code(text, boolean), public.my_player_invites(),
-  public.answer_player_invite(uuid, boolean, boolean), public.answer_join_request(uuid, boolean),
-  public.leave_academy(uuid), public.my_academies(), public.submit_for_review(uuid),
+  public.invite_player(uuid, text, uuid, uuid), public.join_by_code(text, boolean), public.my_player_invites(),
+  public.answer_player_invite(uuid, boolean, boolean), public.answer_join_request(uuid, boolean, uuid),
+  public.leave_academy(uuid), public.my_join_requests(), public.my_academies(), public.submit_for_review(uuid),
   public.review_academy(uuid, boolean, text), public.academies_for_review()
   from public, anon;
 
 grant execute on function
   public.is_app_admin(), public.academy_role(uuid), public.is_academy_staff(uuid), public.runs_academy(uuid),
-  public.coaches_at(uuid), public.manages_staff(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid),
+  public.coaches_at(uuid), public.coaches_squad(uuid), public.manages_staff(uuid), public.can_view_player(uuid), public.is_linked_to_academy(uuid),
   public.username_available(text), public.claim_username(text),
   public.create_academy(text, text, text, text, text[]), public.new_join_code(uuid), public.invite_staff(uuid, text, text),
   public.my_staff_invites(), public.pending_staff(uuid), public.answer_staff_invite(uuid, boolean), public.academy_staff(uuid),
   public.set_staff_role(uuid, uuid, text), public.remove_staff(uuid, uuid), public.transfer_ownership(uuid, uuid),
-  public.invite_player(uuid, text, uuid), public.join_by_code(text, boolean), public.my_player_invites(),
-  public.answer_player_invite(uuid, boolean, boolean), public.answer_join_request(uuid, boolean),
-  public.leave_academy(uuid), public.my_academies(), public.submit_for_review(uuid),
+  public.invite_player(uuid, text, uuid, uuid), public.join_by_code(text, boolean), public.my_player_invites(),
+  public.answer_player_invite(uuid, boolean, boolean), public.answer_join_request(uuid, boolean, uuid),
+  public.leave_academy(uuid), public.my_join_requests(), public.my_academies(), public.submit_for_review(uuid),
   public.review_academy(uuid, boolean, text), public.academies_for_review()
   to authenticated;
 
