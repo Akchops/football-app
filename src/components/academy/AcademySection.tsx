@@ -4,6 +4,7 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { useStore } from '../../store/AppStore';
 import { useSync } from '../../store/SyncProvider';
 import { Section } from '../ui';
+import { FamilyTablesSheet } from './FamilyTables';
 import { AcademyLogo, StaffInviteCard, VerificationBadge } from './parts';
 import { UsernameForm } from './UsernameForm';
 
@@ -210,6 +211,7 @@ function MembershipCard({ membership, name }: { membership: Membership; name: st
   const academy = useAcademy();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [tables, setTables] = useState(false);
 
   const leave = async () => {
     if (!academy.api) return;
@@ -254,9 +256,15 @@ function MembershipCard({ membership, name }: { membership: Membership; name: st
         ))
       )}
       {error && <p className="notice warn">{error}</p>}
-      <button className="danger-link" disabled={busy} onClick={() => void leave()}>
-        Leave {membership.academyName}
-      </button>
+      <div className="button-row">
+        <button className="ghost-btn" onClick={() => setTables(true)}>
+          Tables
+        </button>
+        <button className="danger-link" disabled={busy} onClick={() => void leave()}>
+          Leave {membership.academyName}
+        </button>
+      </div>
+      <FamilyTablesSheet membership={tables ? membership : null} onClose={() => setTables(false)} />
     </div>
   );
 }

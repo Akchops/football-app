@@ -4,7 +4,7 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { Section } from '../ui';
 import { AcademyLogo, VerificationBadge, useLoad } from './parts';
 
-export type AcademyTab = 'home' | 'players' | 'staff' | 'settings';
+export type AcademyTab = 'home' | 'players' | 'tables' | 'stats' | 'staff' | 'settings';
 
 /** The academy at a glance: who it is, its join code, and what to do next. */
 export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (tab: AcademyTab) => void }) {

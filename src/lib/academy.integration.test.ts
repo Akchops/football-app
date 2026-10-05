@@ -224,4 +224,71 @@ describe.skipIf(!URL)('academies, against PostgREST and the real schema', () => 
 
     await owner.api.deleteAcademy(id);
   });
+
+  it('keeps tables and team picks for the academy, and opens players\' records only as far as each role allows', async () => {
+    const owner = await person('own3');
+    const coach = await person('cch3');
+    await owner.api.claimUsername(owner.name);
+    await coach.api.claimUsername(coach.name);
+    const id = await owner.api.createAcademy({ name: 'Moor Academy', town: '', country: '', contactEmail: '', ageGroups: [], logo: '' });
+    await owner.api.inviteStaff(id, coach.name, 'coach');
+    await coach.api.answerStaffInvite((await coach.api.staffInvitesForMe())[0].id, true);
+    const elite = await owner.api.createSquad(id, 'Elite', 'U16');
+    const dev = await owner.api.createSquad(id, 'Development', 'U14');
+    await owner.api.setSquadCoach(elite, coach.userId, true);
+
+    // Two families, linked into different squads, each with a league and a game in it.
+    const linkInto = async (who: string, name: string, squad: string) => {
+      const fam = await family(who, name);
+      const at = new Date().toISOString();
+      const league = { id: `c_${who}_${RUN}`, name: 'Yorkshire U16 League', type: 'league', updatedAt: at, deletedAt: null };
+      const add = await fam.sb.from('competitions').insert({ player_id: fam.playerId, id: league.id, data: league, updated_at: at });
+      if (add.error) throw add.error;
+      const link = await owner.api.invitePlayer(id, fam.name, { squadId: squad });
+      await fam.api.answerPlayerInvite(link, true, true);
+      return { ...fam, link };
+    };
+    const kai = await linkInto('kai3', 'Kai', elite);
+    const ben = await linkInto('ben3', 'Ben', dev);
+
+    // The owner reads both players' records; the coach only the one in their squad.
+    const all = await owner.api.playerRecords([kai.playerId, ben.playerId]);
+    expect(all.map((r) => [r.profile?.name, r.matches.length, r.competitions.map((c) => c.name)]).sort()).toEqual([
+      ['Ben', 1, ['Yorkshire U16 League']],
+      ['Kai', 1, ['Yorkshire U16 League']],
+    ]);
+    const mine = await coach.api.playerRecords([kai.playerId, ben.playerId]);
+    expect(mine.map((r) => r.profile?.name)).toEqual(['Kai']);
+    expect(await owner.api.playerRecords([])).toEqual([]);
+
+    // The coach keeps the academy's own table.
+    const comp = await coach.api.saveCompetition(id, {
+      squadId: elite, name: 'Yorkshire U16 League', type: 'league', season: '2026/27', teamName: 'Moor', pointsWin: 3, pointsDraw: 1,
+    });
+    const first = await coach.api.addResult(comp, { home: 'Moor', away: 'Vale', homeGoals: 2, awayGoals: 1, date: '2026-09-06', stage: null, stageDetail: '' });
+    await coach.api.addResult(comp, { home: 'Castle', away: 'Moor', homeGoals: null, awayGoals: 3, date: '2026-09-13', stage: null, stageDetail: 'ignored' });
+    await coach.api.updateResult(first, { home: 'Moor', away: 'Vale', homeGoals: 3, awayGoals: 1, date: '2026-09-06', stage: null, stageDetail: '' });
+    const games = await coach.api.results(comp);
+    expect(games.map((g) => `${g.home} ${g.homeGoals ?? '-'}-${g.awayGoals ?? '-'} ${g.away}`)).toEqual(['Castle --- Moor', 'Moor 3-1 Vale']);
+    expect((await coach.api.competitions(id)).map((c) => [c.name, c.teamName, c.squadId])).toEqual([['Yorkshire U16 League', 'Moor', elite]]);
+
+    // A linked family reads the academy's tables; it cannot change them.
+    expect((await kai.api.competitions(id)).map((c) => c.name)).toEqual(['Yorkshire U16 League']);
+    expect(await kai.api.results(comp)).toHaveLength(2);
+    await expect(kai.api.addResult(comp, { home: 'A', away: 'B', homeGoals: 1, awayGoals: 0, date: '', stage: null, stageDetail: '' })).rejects.toThrow();
+    await expect(kai.api.deleteResult(first)).rejects.toThrow(/can't delete/);
+
+    // Team picks keep their order, and change.
+    const pick = await coach.api.saveSelection(id, { name: 'Dubai Cup 2027', squadId: elite, playerIds: [kai.link, ben.link], notes: ' Meet 8am ' });
+    expect((await owner.api.selections(id)).map((s) => [s.name, s.playerIds, s.notes])).toEqual([['Dubai Cup 2027', [kai.link, ben.link], 'Meet 8am']]);
+    await owner.api.saveSelection(id, { name: 'Dubai Cup 2027', squadId: elite, playerIds: [ben.link], notes: '' }, pick);
+    expect((await coach.api.selections(id))[0].playerIds).toEqual([ben.link]);
+    await expect(kai.api.deleteSelection(pick)).rejects.toThrow(/can't delete/);
+    await coach.api.deleteSelection(pick);
+    expect(await owner.api.selections(id)).toEqual([]);
+
+    await coach.api.deleteCompetition(comp);
+    expect(await owner.api.competitions(id)).toEqual([]);
+    await owner.api.deleteAcademy(id);
+  });
 });

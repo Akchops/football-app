@@ -1,12 +1,23 @@
 import { useLayoutEffect, useState } from 'react';
-import { useStore } from '../store/AppStore';
-import type { Competition, Result } from '../types';
+import { useStore, type NewResultInput } from '../store/AppStore';
+import type { Competition, MatchStage, Result } from '../types';
 import { todayISO } from '../lib/date';
+import { STAGES, STAGE_LABEL } from '../lib/stage';
 import { teamKey } from '../lib/standings';
 import { Field, Sheet, Stepper } from './ui';
 
+/**
+ * Where results go. The player app keeps them on the phone; an academy's go to
+ * the server, which can fail - so each may be a promise, and a refusal is shown.
+ */
+export interface ResultSaver {
+  add(input: NewResultInput): unknown;
+  update(id: string, input: NewResultInput): unknown;
+  remove(id: string): unknown;
+}
+
 export interface TableResultTarget {
-  competition: Competition;
+  competition: Pick<Competition, 'id' | 'name' | 'type'> & { startDate?: string };
   /** Set when editing one already entered. */
   result?: Result;
   /** The group a new one starts in - the player's own, in a tournament. */
@@ -22,8 +33,21 @@ export interface TableResultTarget {
  * typing up a whole round quickly - "Save and add another" keeps the date and
  * group and clears the rest.
  */
-export function TableResultSheet({ target, onClose }: { target: TableResultTarget | null; onClose: () => void }) {
-  const { addResult, updateResult, deleteResult } = useStore();
+export function TableResultSheet({
+  target,
+  onClose,
+  saver,
+  knockouts = false,
+}: {
+  target: TableResultTarget | null;
+  onClose: () => void;
+  /** Somewhere other than this phone to keep them. */
+  saver?: ResultSaver;
+  /** Offer knockout rounds as well as groups - for a competition's full record, not just its table. */
+  knockouts?: boolean;
+}) {
+  const store = useStore();
+  const save_ = saver ?? { add: store.addResult, update: store.updateResult, remove: store.deleteResult };
   const editing = target?.result ?? null;
 
   const [home, setHome] = useState('');
@@ -32,8 +56,10 @@ export function TableResultSheet({ target, onClose }: { target: TableResultTarge
   const [awayGoals, setAwayGoals] = useState(0);
   const [date, setDate] = useState(todayISO());
   const [group, setGroup] = useState('');
+  const [stage, setStage] = useState<MatchStage | ''>('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(0);
+  const [busy, setBusy] = useState(false);
 
   // Before paint, so the sheet never shows the last result's teams for a moment.
   useLayoutEffect(() => {
@@ -44,9 +70,11 @@ export function TableResultSheet({ target, onClose }: { target: TableResultTarge
     setHomeGoals(r?.homeGoals ?? 0);
     setAwayGoals(r?.awayGoals ?? 0);
     setDate(r?.date || target.competition.startDate || todayISO());
-    setGroup(r ? r.stageDetail : target.defaultGroup);
+    setGroup(r ? (r.stage === 'group' || r.stage === null ? r.stageDetail : '') : target.defaultGroup);
+    setStage(r ? (r.stage ?? '') : target.competition.type === 'tournament' ? 'group' : '');
     setError('');
     setSaved(0);
+    setBusy(false);
   }, [target]);
 
   if (!target) return null;
@@ -65,24 +93,36 @@ export function TableResultSheet({ target, onClose }: { target: TableResultTarge
     return '';
   };
 
-  const save = (another: boolean) => {
+  // With knockouts offered, the stage is chosen; otherwise a group name makes it a group game.
+  const chosenStage: MatchStage | null = knockouts ? stage || null : grouped && group.trim() ? 'group' : null;
+  const showGroup = grouped && (!knockouts || stage === 'group');
+
+  const save = async (another: boolean) => {
     const wrong = problem();
     if (wrong) {
       setError(wrong);
       return;
     }
-    const input = {
+    const input: NewResultInput = {
       competitionId: competition.id,
       home,
       away,
       homeGoals,
       awayGoals,
       date,
-      stage: grouped && group.trim() ? ('group' as const) : null,
-      stageDetail: group,
+      stage: chosenStage,
+      stageDetail: chosenStage === 'group' ? group : '',
     };
-    if (editing) updateResult(editing.id, input);
-    else addResult(input);
+    setBusy(true);
+    setError('');
+    try {
+      await (editing ? save_.update(editing.id, input) : save_.add(input));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
     if (another && !editing) {
       // Same day, same group - the next game of the round.
       setHome('');
@@ -104,11 +144,11 @@ export function TableResultSheet({ target, onClose }: { target: TableResultTarge
       onClose={onClose}
       footer={
         <>
-          <button className="ghost-btn wide" onClick={() => (editing ? onClose() : save(true))}>
+          <button className="ghost-btn wide" disabled={busy} onClick={() => (editing ? onClose() : void save(true))}>
             {editing ? 'Cancel' : 'Save & add another'}
           </button>
-          <button className="primary-btn wide" onClick={() => save(false)}>
-            Save
+          <button className="primary-btn wide" disabled={busy} onClick={() => void save(false)}>
+            {busy ? 'Saving…' : 'Save'}
           </button>
         </>
       }
@@ -149,11 +189,24 @@ export function TableResultSheet({ target, onClose }: { target: TableResultTarge
         <input className="input" list={listId} value={away} onChange={(e) => setAway(e.target.value)} placeholder="e.g. Castle Park" />
       </Field>
 
-      <div className={grouped ? 'row two' : undefined}>
+      {knockouts && grouped && (
+        <Field label="Stage">
+          <select className="input" value={stage} onChange={(e) => setStage(e.target.value as MatchStage | '')}>
+            <option value="">Not part of a stage</option>
+            {STAGES.map((s) => (
+              <option key={s} value={s}>
+                {STAGE_LABEL[s]}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
+      <div className={showGroup ? 'row two' : undefined}>
         <Field label="Date">
           <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
-        {grouped && (
+        {showGroup && (
           <Field label="Group" hint="Optional">
             <input className="input" value={group} onChange={(e) => setGroup(e.target.value)} placeholder="e.g. B" />
           </Field>
@@ -163,9 +216,16 @@ export function TableResultSheet({ target, onClose }: { target: TableResultTarge
       {editing && (
         <button
           className="danger-link"
-          onClick={() => {
-            deleteResult(editing.id);
-            onClose();
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await save_.remove(editing.id);
+              onClose();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : String(e));
+              setBusy(false);
+            }
           }}
         >
           Delete this result

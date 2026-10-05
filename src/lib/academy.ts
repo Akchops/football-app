@@ -1,4 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Competition, CompetitionType, Match, MatchStage, Profile, Result } from '../types';
+import { cleanDetail, toStage } from './stage';
+import { fromServer, profileFromServer } from './sync';
 
 /**
  * Academies, through Supabase. Like remote.ts, every call runs as the
@@ -119,6 +122,55 @@ export interface Membership {
   squads: { id: string; name: string; mates: string[] }[];
 }
 
+/** One of the academy's own competitions, for its tables. */
+export interface AcademyCompetition {
+  id: string;
+  academyId: string;
+  /** The squad that plays in it, if one does. */
+  squadId: string | null;
+  name: string;
+  type: CompetitionType;
+  season: string;
+  /** What the academy's side is called in this competition's table. */
+  teamName: string;
+  pointsWin: number;
+  pointsDraw: number;
+}
+
+export type AcademyCompetitionInput = Omit<AcademyCompetition, 'id' | 'academyId'>;
+
+/** A game in an academy competition - the academy's own or anyone else's. */
+export interface AcademyResultInput {
+  home: string;
+  away: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  date: string;
+  stage: MatchStage | null;
+  stageDetail: string;
+}
+
+/** What an academy can read of one linked player's Matchday: never more than their family sees. */
+export interface PlayerRecords {
+  playerId: string;
+  profile: Profile | null;
+  matches: Match[];
+  competitions: Competition[];
+}
+
+/** A team pick: a named list of players, in order. */
+export interface Selection {
+  id: string;
+  squadId: string | null;
+  name: string;
+  /** AcademyPlayer ids, in the order picked. */
+  playerIds: string[];
+  notes: string;
+  updatedAt: string;
+}
+
+export type SelectionInput = Omit<Selection, 'id' | 'updatedAt'>;
+
 export interface AcademyDetails {
   name: string;
   town: string;
@@ -163,6 +215,22 @@ export interface AcademyApi {
   /** Asks a player's family, by the username of anyone in it. Optionally links a name already on the books, or puts them in a squad. */
   invitePlayer(academyId: string, username: string, options?: { rosterId?: string; squadId?: string }): Promise<string>;
   answerJoinRequest(requestId: string, accept: boolean, squadId?: string): Promise<void>;
+
+  competitions(academyId: string): Promise<AcademyCompetition[]>;
+  /** Makes a competition, or with an id, changes one. */
+  saveCompetition(academyId: string, input: AcademyCompetitionInput, id?: string): Promise<string>;
+  deleteCompetition(id: string): Promise<void>;
+  /** A competition's games, shaped as the app's other-team results so the same tables read them. */
+  results(competitionId: string): Promise<Result[]>;
+  addResult(competitionId: string, input: AcademyResultInput): Promise<string>;
+  updateResult(id: string, input: AcademyResultInput): Promise<void>;
+  deleteResult(id: string): Promise<void>;
+
+  /** Linked players' own records, as far as the rules let the viewer see: a coach gets only their squads'. */
+  playerRecords(playerIds: string[]): Promise<PlayerRecords[]>;
+  selections(academyId: string): Promise<Selection[]>;
+  saveSelection(academyId: string, input: SelectionInput, id?: string): Promise<string>;
+  deleteSelection(id: string): Promise<void>;
 
   // The family's side.
   playerInvitesForMe(): Promise<PlayerInvite[]>;
@@ -251,7 +319,9 @@ export type AcademyAction =
   /** Invite players, add names, answer requests to join - into squads they coach. */
   | 'add-players'
   /** Take a player off the academy's books altogether. */
-  | 'remove-players';
+  | 'remove-players'
+  /** Competitions, results and team picks - and players' stats. */
+  | 'coach';
 
 const ALLOWED: Record<AcademyAction, StaffRole[]> = {
   'edit-details': ['owner', 'manager', 'admin'],
@@ -263,6 +333,7 @@ const ALLOWED: Record<AcademyAction, StaffRole[]> = {
   'run-squads': ['owner', 'manager'],
   'add-players': ['owner', 'manager', 'coach'],
   'remove-players': ['owner', 'manager'],
+  coach: ['owner', 'manager', 'coach'],
 };
 
 /**
@@ -324,9 +395,9 @@ export function describeAcademyError(e: unknown): string {
 // The server.
 // ---------------------------------------------------------------------------
 
-type Result<T> = { data: T | null; error: { message: string; code?: string } | null };
+type Result_<T> = { data: T | null; error: { message: string; code?: string } | null };
 
-function check<T>(result: Result<T>): T {
+function check<T>(result: Result_<T>): T {
   if (result.error) throw Object.assign(new Error(result.error.message), { code: result.error.code });
   return result.data as T;
 }
@@ -374,8 +445,92 @@ function playerRow(patch: Partial<AcademyPlayerDetails>): Record<string, unknown
   return row;
 }
 
+interface CompetitionRow {
+  id: string;
+  academy_id: string;
+  squad_id: string | null;
+  name: string;
+  type: CompetitionType;
+  season: string;
+  team_name: string;
+  points_win: number;
+  points_draw: number;
+}
+
+function toCompetition(r: CompetitionRow): AcademyCompetition {
+  return {
+    id: r.id,
+    academyId: r.academy_id,
+    squadId: r.squad_id,
+    name: r.name,
+    type: r.type,
+    season: r.season ?? '',
+    teamName: r.team_name ?? '',
+    pointsWin: r.points_win,
+    pointsDraw: r.points_draw,
+  };
+}
+
+function competitionRow(input: AcademyCompetitionInput): Record<string, unknown> {
+  return {
+    squad_id: input.squadId,
+    name: input.name.trim(),
+    type: input.type,
+    season: input.season.trim(),
+    team_name: input.teamName.trim(),
+    points_win: input.pointsWin,
+    points_draw: input.pointsDraw,
+  };
+}
+
+interface ResultRow {
+  id: string;
+  competition_id: string;
+  home: string;
+  away: string;
+  home_goals: number | null;
+  away_goals: number | null;
+  date: string;
+  stage: string | null;
+  stage_detail: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function toResult(r: ResultRow): Result {
+  const stage = toStage(r.stage);
+  return {
+    id: r.id,
+    competitionId: r.competition_id,
+    home: r.home,
+    away: r.away,
+    homeGoals: r.home_goals,
+    awayGoals: r.away_goals,
+    date: r.date ?? '',
+    stage,
+    stageDetail: stage ? cleanDetail(stage, r.stage_detail ?? '') : '',
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    deletedAt: null,
+  };
+}
+
+function resultRow(input: AcademyResultInput): Record<string, unknown> {
+  // Half a score is no score: both or neither, as the table needs.
+  const scored = input.homeGoals !== null && input.awayGoals !== null;
+  return {
+    home: input.home.trim(),
+    away: input.away.trim(),
+    home_goals: scored ? input.homeGoals : null,
+    away_goals: scored ? input.awayGoals : null,
+    date: input.date,
+    stage: input.stage,
+    stage_detail: input.stage ? input.stageDetail.trim() : '',
+  };
+}
+
 /** A row that is already there counts as added. */
-function insertedOrThere(result: Result<unknown>): void {
+function insertedOrThere(result: Result_<unknown>): void {
   if (result.error?.code === '23505') return;
   check(result);
 }
@@ -395,7 +550,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
   const api: AcademyApi = {
     async username() {
       const row = check(
-        (await sb.from('profiles').select('username').eq('user_id', userId).maybeSingle()) as Result<{
+        (await sb.from('profiles').select('username').eq('user_id', userId).maybeSingle()) as Result_<{
           username: string;
         } | null>,
       );
@@ -403,11 +558,11 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
     },
 
     async usernameAvailable(name) {
-      return Boolean(check((await sb.rpc('username_available', { name: cleanUsername(name) })) as Result<boolean>));
+      return Boolean(check((await sb.rpc('username_available', { name: cleanUsername(name) })) as Result_<boolean>));
     },
 
     async claimUsername(name) {
-      return check((await sb.rpc('claim_username', { name: cleanUsername(name) })) as Result<string>);
+      return check((await sb.rpc('claim_username', { name: cleanUsername(name) })) as Result_<string>);
     },
 
     async staffAcademies() {
@@ -416,7 +571,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
           .from('academy_members')
           .select(`role, created_at, academies(${ACADEMY_COLUMNS})`)
           .eq('user_id', userId)
-          .order('created_at', { ascending: true })) as Result<
+          .order('created_at', { ascending: true })) as Result_<
           { role: StaffRole; academies: AcademyRow | AcademyRow[] | null }[]
         >,
       );
@@ -434,7 +589,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
           country: details.country.trim(),
           contact_email: details.contactEmail.trim(),
           age_groups: details.ageGroups,
-        })) as Result<string>,
+        })) as Result_<string>,
       );
       // The logo is the one thing too big to want in a function call's arguments.
       if (details.logo) await api.updateAcademy(id, { logo: details.logo });
@@ -443,23 +598,23 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
 
     async updateAcademy(id, patch) {
       const rows = check(
-        (await sb.from('academies').update(toRow(patch)).eq('id', id).select('id')) as Result<{ id: string }[]>,
+        (await sb.from('academies').update(toRow(patch)).eq('id', id).select('id')) as Result_<{ id: string }[]>,
       );
       changedOne(rows, "You can't change this academy's details.");
     },
 
     async deleteAcademy(id) {
-      const rows = check((await sb.from('academies').delete().eq('id', id).select('id')) as Result<{ id: string }[]>);
+      const rows = check((await sb.from('academies').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
       changedOne(rows, 'Only the owner can delete the academy.');
     },
 
     async newJoinCode(id) {
-      return check((await sb.rpc('new_join_code', { aid: id })) as Result<string>);
+      return check((await sb.rpc('new_join_code', { aid: id })) as Result_<string>);
     },
 
     async staffInvitesForMe() {
       const rows = check(
-        (await sb.rpc('my_staff_invites')) as Result<
+        (await sb.rpc('my_staff_invites')) as Result_<
           {
             id: string;
             academy_id: string;
@@ -483,12 +638,12 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
     },
 
     async answerStaffInvite(inviteId, accept) {
-      check((await sb.rpc('answer_staff_invite', { invite_id: inviteId, accept })) as Result<unknown>);
+      check((await sb.rpc('answer_staff_invite', { invite_id: inviteId, accept })) as Result_<unknown>);
     },
 
     async staff(academyId) {
       const rows = check(
-        (await sb.rpc('academy_staff', { aid: academyId })) as Result<
+        (await sb.rpc('academy_staff', { aid: academyId })) as Result_<
           { user_id: string; username: string; role: StaffRole; is_me: boolean }[]
         >,
       );
@@ -497,7 +652,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
 
     async pendingStaff(academyId) {
       const rows = check(
-        (await sb.rpc('pending_staff', { aid: academyId })) as Result<
+        (await sb.rpc('pending_staff', { aid: academyId })) as Result_<
           { id: string; username: string; role: StaffRole; invited_by: string }[]
         >,
       );
@@ -505,26 +660,26 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
     },
 
     async inviteStaff(academyId, username, role) {
-      check((await sb.rpc('invite_staff', { aid: academyId, username: cleanUsername(username), role })) as Result<unknown>);
+      check((await sb.rpc('invite_staff', { aid: academyId, username: cleanUsername(username), role })) as Result_<unknown>);
     },
 
     async cancelStaffInvite(inviteId) {
       const rows = check(
-        (await sb.from('academy_staff_invites').delete().eq('id', inviteId).select('id')) as Result<{ id: string }[]>,
+        (await sb.from('academy_staff_invites').delete().eq('id', inviteId).select('id')) as Result_<{ id: string }[]>,
       );
       changedOne(rows, 'That invite has already been answered or cancelled.');
     },
 
     async setStaffRole(academyId, member, role) {
-      check((await sb.rpc('set_staff_role', { aid: academyId, member, role })) as Result<unknown>);
+      check((await sb.rpc('set_staff_role', { aid: academyId, member, role })) as Result_<unknown>);
     },
 
     async removeStaff(academyId, member) {
-      check((await sb.rpc('remove_staff', { aid: academyId, member })) as Result<unknown>);
+      check((await sb.rpc('remove_staff', { aid: academyId, member })) as Result_<unknown>);
     },
 
     async transferOwnership(academyId, member) {
-      check((await sb.rpc('transfer_ownership', { aid: academyId, member })) as Result<unknown>);
+      check((await sb.rpc('transfer_ownership', { aid: academyId, member })) as Result_<unknown>);
     },
 
     async squads(academyId) {
@@ -533,7 +688,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
           .from('academy_squads')
           .select('id, name, age_group, created_at, squad_coaches(user_id), squad_players(academy_player_id)')
           .eq('academy_id', academyId)
-          .order('created_at', { ascending: true })) as Result<
+          .order('created_at', { ascending: true })) as Result_<
           {
             id: string;
             name: string;
@@ -558,7 +713,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
           .from('academy_squads')
           .insert({ academy_id: academyId, name: name.trim(), age_group: ageGroup })
           .select('id')
-          .single()) as Result<{ id: string }>,
+          .single()) as Result_<{ id: string }>,
       );
       return row.id;
     },
@@ -567,27 +722,27 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
       const row: Record<string, unknown> = {};
       if (patch.name !== undefined) row.name = patch.name.trim();
       if (patch.ageGroup !== undefined) row.age_group = patch.ageGroup;
-      const rows = check((await sb.from('academy_squads').update(row).eq('id', id).select('id')) as Result<{ id: string }[]>);
+      const rows = check((await sb.from('academy_squads').update(row).eq('id', id).select('id')) as Result_<{ id: string }[]>);
       changedOne(rows, 'Only the owner or a manager can change a squad.');
     },
 
     async deleteSquad(id) {
-      const rows = check((await sb.from('academy_squads').delete().eq('id', id).select('id')) as Result<{ id: string }[]>);
+      const rows = check((await sb.from('academy_squads').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
       changedOne(rows, 'Only the owner or a manager can delete a squad.');
     },
 
     async setSquadCoach(squadId, member, on) {
       if (on) {
-        insertedOrThere((await sb.from('squad_coaches').insert({ squad_id: squadId, user_id: member })) as Result<unknown>);
+        insertedOrThere((await sb.from('squad_coaches').insert({ squad_id: squadId, user_id: member })) as Result_<unknown>);
       } else {
-        check((await sb.from('squad_coaches').delete().eq('squad_id', squadId).eq('user_id', member)) as Result<unknown>);
+        check((await sb.from('squad_coaches').delete().eq('squad_id', squadId).eq('user_id', member)) as Result_<unknown>);
       }
     },
 
     async setSquadMember(squadId, academyPlayerId, on) {
       if (on) {
         insertedOrThere(
-          (await sb.from('squad_players').insert({ squad_id: squadId, academy_player_id: academyPlayerId })) as Result<unknown>,
+          (await sb.from('squad_players').insert({ squad_id: squadId, academy_player_id: academyPlayerId })) as Result_<unknown>,
         );
       } else {
         const rows = check(
@@ -596,7 +751,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
             .delete()
             .eq('squad_id', squadId)
             .eq('academy_player_id', academyPlayerId)
-            .select('squad_id')) as Result<{ squad_id: string }[]>,
+            .select('squad_id')) as Result_<{ squad_id: string }[]>,
         );
         changedOne(rows, "Only the owner, a manager or the squad's coach can take someone out of it.");
       }
@@ -608,7 +763,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
           .from('academy_players')
           .select('id, player_id, display_name, position, age_group, status, created_at, consent_at')
           .eq('academy_id', academyId)
-          .order('display_name', { ascending: true })) as Result<
+          .order('display_name', { ascending: true })) as Result_<
           {
             id: string;
             player_id: string | null;
@@ -639,20 +794,20 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
           .from('academy_players')
           .insert({ academy_id: academyId, status: 'roster', ...playerRow(details) })
           .select('id')
-          .single()) as Result<{ id: string }>,
+          .single()) as Result_<{ id: string }>,
       );
       return row.id;
     },
 
     async updatePlayer(id, patch) {
       const rows = check(
-        (await sb.from('academy_players').update(playerRow(patch)).eq('id', id).select('id')) as Result<{ id: string }[]>,
+        (await sb.from('academy_players').update(playerRow(patch)).eq('id', id).select('id')) as Result_<{ id: string }[]>,
       );
       changedOne(rows, "You can't change this player's details.");
     },
 
     async removePlayer(id) {
-      const rows = check((await sb.from('academy_players').delete().eq('id', id).select('id')) as Result<{ id: string }[]>);
+      const rows = check((await sb.from('academy_players').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
       changedOne(rows, 'Only the owner or a manager can take a player off the books.');
     },
 
@@ -663,19 +818,180 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
           username: cleanUsername(username),
           roster_id: options.rosterId ?? null,
           squad: options.squadId ?? null,
-        })) as Result<string>,
+        })) as Result_<string>,
       );
     },
 
     async answerJoinRequest(requestId, accept, squadId) {
       check(
-        (await sb.rpc('answer_join_request', { request_id: requestId, accept, squad: squadId ?? null })) as Result<unknown>,
+        (await sb.rpc('answer_join_request', { request_id: requestId, accept, squad: squadId ?? null })) as Result_<unknown>,
       );
+    },
+
+    async competitions(academyId) {
+      const rows = check(
+        (await sb
+          .from('academy_competitions')
+          .select('id, academy_id, squad_id, name, type, season, team_name, points_win, points_draw')
+          .eq('academy_id', academyId)
+          .order('created_at', { ascending: false })) as Result_<CompetitionRow[]>,
+      );
+      return rows.map(toCompetition);
+    },
+
+    async saveCompetition(academyId, input, id) {
+      if (id) {
+        const rows = check(
+          (await sb.from('academy_competitions').update(competitionRow(input)).eq('id', id).select('id')) as Result_<
+            { id: string }[]
+          >,
+        );
+        changedOne(rows, "You can't change this competition.");
+        return id;
+      }
+      const row = check(
+        (await sb
+          .from('academy_competitions')
+          .insert({ academy_id: academyId, ...competitionRow(input) })
+          .select('id')
+          .single()) as Result_<{ id: string }>,
+      );
+      return row.id;
+    },
+
+    async deleteCompetition(id) {
+      const rows = check((await sb.from('academy_competitions').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
+      changedOne(rows, "You can't delete this competition.");
+    },
+
+    async results(competitionId) {
+      const rows = check(
+        (await sb
+          .from('academy_results')
+          .select('id, competition_id, home, away, home_goals, away_goals, date, stage, stage_detail, created_at, updated_at')
+          .eq('competition_id', competitionId)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false })) as Result_<ResultRow[]>,
+      );
+      return rows.map(toResult);
+    },
+
+    async addResult(competitionId, input) {
+      const row = check(
+        (await sb
+          .from('academy_results')
+          .insert({ competition_id: competitionId, ...resultRow(input) })
+          .select('id')
+          .single()) as Result_<{ id: string }>,
+      );
+      return row.id;
+    },
+
+    async updateResult(id, input) {
+      const rows = check(
+        (await sb
+          .from('academy_results')
+          .update({ ...resultRow(input), updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .select('id')) as Result_<{ id: string }[]>,
+      );
+      changedOne(rows, "You can't change this result.");
+    },
+
+    async deleteResult(id) {
+      const rows = check((await sb.from('academy_results').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
+      changedOne(rows, "You can't delete this result.");
+    },
+
+    async playerRecords(playerIds) {
+      const ids = [...new Set(playerIds)];
+      if (ids.length === 0) return [];
+      const PAGE = 1000;
+      // Every row, a page at a time - PostgREST caps one answer at 1000.
+      const all = async (table: string): Promise<{ player_id: string; data: unknown }[]> => {
+        const out: { player_id: string; data: unknown }[] = [];
+        for (let from = 0; ; from += PAGE) {
+          const page = check(
+            (await sb
+              .from(table)
+              .select('player_id, data')
+              .in('player_id', ids)
+              .is('deleted_at', null)
+              .order('player_id')
+              .order('id')
+              .range(from, from + PAGE - 1)) as Result_<{ player_id: string; data: unknown }[]>,
+          );
+          out.push(...page);
+          if (page.length < PAGE) return out;
+        }
+      };
+      const [profiles, matches, competitions] = await Promise.all([
+        sb.from('players').select('id, data').in('id', ids) as unknown as Promise<Result_<{ id: string; data: unknown }[]>>,
+        all('matches'),
+        all('competitions'),
+      ]);
+      const byPlayer = new Map<string, PlayerRecords>(
+        check(profiles).map((p) => [p.id, { playerId: p.id, profile: profileFromServer(p.data), matches: [], competitions: [] }]),
+      );
+      // Records come only for players the rules opened; anything else is left out rather than shown empty.
+      for (const row of matches) byPlayer.get(row.player_id)?.matches.push(fromServer('matches', row.data));
+      for (const row of competitions) byPlayer.get(row.player_id)?.competitions.push(fromServer('competitions', row.data));
+      return [...byPlayer.values()];
+    },
+
+    async selections(academyId) {
+      const rows = check(
+        (await sb
+          .from('academy_selections')
+          .select('id, squad_id, name, academy_player_ids, notes, updated_at')
+          .eq('academy_id', academyId)
+          .order('updated_at', { ascending: false })) as Result_<
+          { id: string; squad_id: string | null; name: string; academy_player_ids: string[] | null; notes: string; updated_at: string }[]
+        >,
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        squadId: r.squad_id,
+        name: r.name,
+        playerIds: r.academy_player_ids ?? [],
+        notes: r.notes ?? '',
+        updatedAt: r.updated_at,
+      }));
+    },
+
+    async saveSelection(academyId, input, id) {
+      const row = {
+        squad_id: input.squadId,
+        name: input.name.trim(),
+        academy_player_ids: input.playerIds,
+        notes: input.notes.trim(),
+        updated_at: new Date().toISOString(),
+      };
+      if (id) {
+        const rows = check(
+          (await sb.from('academy_selections').update(row).eq('id', id).select('id')) as Result_<{ id: string }[]>,
+        );
+        changedOne(rows, "You can't change this team pick.");
+        return id;
+      }
+      const made = check(
+        (await sb
+          .from('academy_selections')
+          .insert({ academy_id: academyId, created_by: userId, ...row })
+          .select('id')
+          .single()) as Result_<{ id: string }>,
+      );
+      return made.id;
+    },
+
+    async deleteSelection(id) {
+      const rows = check((await sb.from('academy_selections').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
+      changedOne(rows, "You can't delete this team pick.");
     },
 
     async playerInvitesForMe() {
       const rows = check(
-        (await sb.rpc('my_player_invites')) as Result<
+        (await sb.rpc('my_player_invites')) as Result_<
           { id: string; academy_id: string; academy_name: string; verification: Verification; town: string; invited_by: string }[]
         >,
       );
@@ -690,16 +1006,16 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
     },
 
     async answerPlayerInvite(inviteId, accept, consent) {
-      check((await sb.rpc('answer_player_invite', { invite_id: inviteId, accept, consent })) as Result<unknown>);
+      check((await sb.rpc('answer_player_invite', { invite_id: inviteId, accept, consent })) as Result_<unknown>);
     },
 
     async joinByCode(code, consent) {
-      return check((await sb.rpc('join_by_code', { code: cleanJoinCode(code), consent })) as Result<string>);
+      return check((await sb.rpc('join_by_code', { code: cleanJoinCode(code), consent })) as Result_<string>);
     },
 
     async joinRequests() {
       const rows = check(
-        (await sb.rpc('my_join_requests')) as Result<
+        (await sb.rpc('my_join_requests')) as Result_<
           { id: string; academy_id: string; academy_name: string; town: string; verification: Verification }[]
         >,
       );
@@ -714,7 +1030,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
 
     async memberships() {
       const rows = check(
-        (await sb.rpc('my_academies')) as Result<
+        (await sb.rpc('my_academies')) as Result_<
           {
             link_id: string;
             academy_id: string;
@@ -750,7 +1066,7 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
     },
 
     async leaveAcademy(linkId) {
-      check((await sb.rpc('leave_academy', { link_id: linkId })) as Result<unknown>);
+      check((await sb.rpc('leave_academy', { link_id: linkId })) as Result_<unknown>);
     },
   };
   return api;

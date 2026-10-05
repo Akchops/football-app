@@ -176,6 +176,20 @@ describe('a cup', () => {
   });
 });
 
+describe('an academy\'s table', () => {
+  it('marks the academy\'s side by name when every game is entered as a result', () => {
+    const [group] = standings({
+      competition: league,
+      matches: [],
+      results: [result('Riverside', 2, 1, 'Vale FC'), result('Moor', 0, 0, 'Riverside Academy FC'), result('Vale', 3, 0, 'Moor')],
+      ourName: () => '',
+      ourTeams: ['Riverside Academy', 'TBC'],
+    });
+    expect(group.rows.filter((r) => r.ours).map((r) => r.team)).toEqual(['Riverside']);
+    expect(group.rows.find((r) => r.team === 'Riverside')).toMatchObject({ played: 2, points: 4 });
+  });
+});
+
 describe('knownTeams', () => {
   it('lists every team named so far, once each, leaving out TBC', () => {
     expect(knownTeams([ours('Vale FC', 1, 0), ours('TBC', 0, 0)], [result('Vale', 1, 0, 'Hilltop')])).toEqual(['Hilltop', 'Vale FC']);

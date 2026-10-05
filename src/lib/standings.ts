@@ -41,6 +41,8 @@ export interface TableInput {
   results: Result[];
   /** The player's team, as named in the table, for one of their matches. */
   ourName: (match: Match) => string;
+  /** Teams to mark as ours by name - an academy's side, whose games are all entered as results. */
+  ourTeams?: string[];
 }
 
 /** One game, as a table sees it. */
@@ -83,7 +85,7 @@ const unknown = (name: string) => name.trim() === '' || name.trim().toLowerCase(
 function gamesFrom(input: TableInput): { games: Game[]; ours: Set<string> } {
   const { competition, matches, results, ourName } = input;
   const games: Game[] = [];
-  const ours = new Set<string>();
+  const ours = new Set<string>((input.ourTeams ?? []).filter((name) => !unknown(name)).map(teamKey));
   // Which own games are already counted, so the same game entered again as a
   // result isn't counted twice: our team, the other team and the day.
   const owned: { pair: string; date: string }[] = [];

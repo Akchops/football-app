@@ -1,23 +1,32 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ROLE_LABEL, VERIFICATION_LABEL } from '../../lib/academy';
+import { ROLE_LABEL, VERIFICATION_LABEL, can, type StaffRole } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { SignInForm } from '../AccountSettings';
-import { BallIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon } from '../icons';
+import { BallIcon, ChartIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon } from '../icons';
 import { Section, Sheet } from '../ui';
 import { CreateAcademyForm } from './AcademyDetails';
 import { AcademyHome, type AcademyTab } from './AcademyHome';
 import { AcademySettings } from './AcademySettings';
 import { AcademyLogo, StaffInviteCard, VerificationBadge } from './parts';
 import { PlayersScreen } from './PlayersScreen';
+import { StatsScreen } from './StatsScreen';
+import { TablesScreen } from './TablesScreen';
 import { StaffScreen } from './StaffScreen';
 import { UsernameForm } from './UsernameForm';
 
 const TABS: { id: AcademyTab; label: string; Icon: () => JSX.Element }[] = [
   { id: 'home', label: 'Home', Icon: HomeIcon },
   { id: 'players', label: 'Players', Icon: ShirtIcon },
+  { id: 'tables', label: 'Tables', Icon: TableIcon },
+  { id: 'stats', label: 'Stats', Icon: ChartIcon },
   { id: 'staff', label: 'Staff', Icon: PeopleIcon },
 ];
+
+/** The admin role works on the office side and never sees players' stats, so has no Stats tab. */
+function tabsFor(role: StaffRole) {
+  return TABS.filter((t) => t.id !== 'stats' || can(role, 'coach'));
+}
 
 /**
  * The academy's half of the app. Loaded only when someone opens it, so the
@@ -130,6 +139,8 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
             <>
               {tab === 'home' && <AcademyHome academy={current} onGo={setTab} />}
               {tab === 'players' && <PlayersScreen academy={current} />}
+              {tab === 'tables' && <TablesScreen academy={current} />}
+              {tab === 'stats' && can(current.role, 'coach') && <StatsScreen academy={current} />}
               {tab === 'staff' && <StaffScreen academy={current} />}
               {tab === 'settings' && <AcademySettings academy={current} hasPlayer={hasPlayer} />}
             </>
@@ -137,8 +148,8 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
       </main>
 
       {current && !gate && (
-        <nav className="tabbar" style={{ gridTemplateColumns: `repeat(${TABS.length}, 1fr)` }}>
-          {TABS.map((t) => (
+        <nav className="tabbar" style={{ gridTemplateColumns: `repeat(${tabsFor(current.role).length}, 1fr)` }}>
+          {tabsFor(current.role).map((t) => (
             <button
               key={t.id}
               className={tab === t.id ? 'tab on' : 'tab'}

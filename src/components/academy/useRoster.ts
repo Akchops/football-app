@@ -40,6 +40,6 @@ export function isActive(player: AcademyPlayer): boolean {
 }
 
 /** "GK · U16" - whatever is known about a player, for a line under their name. */
-export function playerFacts(player: AcademyPlayer, extra: string[] = []): string {
+export function playerFacts(player: Pick<AcademyPlayer, 'position' | 'ageGroup'>, extra: string[] = []): string {
   return [player.position, player.ageGroup, ...extra].filter(Boolean).join(' · ');
 }
