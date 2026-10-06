@@ -38,6 +38,14 @@ export default defineConfig(({ mode }) => {
           background_color: '#0b1220',
           theme_color: '#0b1220',
           categories: ['sports', 'health', 'productivity'],
+          // Puts Matchday in Android's share sheet: share the coach's message
+          // from WhatsApp and it opens as a new match, read from the message.
+          // See src/lib/shareTarget.ts. (iPhones don't offer this to web apps.)
+          share_target: {
+            action: './',
+            method: 'GET',
+            params: { title: 'shared_title', text: 'shared_text', url: 'shared_url' },
+          },
           icons: [
             { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
             { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -53,6 +61,8 @@ export default defineConfig(({ mode }) => {
         globIgnores: ['**/gemini-*.js', '**/claude-*.js'],
           navigateFallback: 'index.html',
           cleanupOutdatedCaches: true,
+          // Match reminders: showing a push and opening the app from it (public/push-sw.js).
+          importScripts: ['push-sw.js'],
         },
         devOptions: { enabled: false },
       }),

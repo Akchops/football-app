@@ -8,8 +8,11 @@
  */
 
 import { describeFailure, generate } from './gemini';
+import { handlePush, type PushEnv } from './push';
 
-export interface Env {
+export { PushStore } from './push';
+
+export interface Env extends PushEnv {
   GEMINI_API_KEY: string;
   /** Comma-separated origins allowed to call this worker. */
   ALLOWED_ORIGINS: string;
@@ -205,6 +208,21 @@ export default {
     const allowed = env.ALLOWED_ORIGINS.split(',').map((o) => o.trim());
     if (!allowed.includes('*') && (!origin || !allowed.includes(origin))) {
       return json({ error: 'This coach only serves the Matchday app.' }, 403, headers);
+    }
+
+    // Match reminders: small, and nothing to do with the coach's daily allowance.
+    const path = new URL(request.url).pathname;
+    if (path.includes('/push/')) {
+      if (Number(request.headers.get('content-length') ?? '0') > 64 * 1024) {
+        return json({ error: 'Too much in one go.' }, 413, headers);
+      }
+      let body: Record<string, unknown>;
+      try {
+        body = (await request.json()) as Record<string, unknown>;
+      } catch {
+        return json({ error: 'Bad request.' }, 400, headers);
+      }
+      return handlePush(path, body, env, (reply, status) => json(reply, status, headers));
     }
 
     const length = Number(request.headers.get('content-length') ?? '0');

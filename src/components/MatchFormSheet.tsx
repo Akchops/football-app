@@ -1,10 +1,12 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useStore, type NewMatchInput } from '../store/AppStore';
-import { MATCH_LENGTHS, type Match, type MatchStage, type Venue } from '../types';
-import { todayISO } from '../lib/date';
-import { pastGrounds } from '../lib/fixtures';
+import { MATCH_LENGTHS, VENUE_LABEL, type Match, type MatchStage, type Venue } from '../types';
+import { formatDateShort, formatTime, todayISO } from '../lib/date';
+import { nextMatchFor } from '../lib/competitions';
+import { pastGrounds, type ParsedFixture } from '../lib/fixtures';
+import { asScheduleRows, monthFirstLocale, readFixtureMessage, type MessageFixture } from '../lib/fixtureMessage';
 import { suggestedOpponents } from '../lib/standings';
-import { STAGES, STAGE_LABEL, detailPrompt, toStage } from '../lib/stage';
+import { STAGES, STAGE_LABEL, detailPrompt, stageName, toStage } from '../lib/stage';
 import { DurationPicker, Field, Segmented, Sheet } from './ui';
 
 export interface MatchFormTarget {
@@ -13,7 +15,41 @@ export interface MatchFormTarget {
   dateISO?: string;
   /** Where a new match starts - e.g. one added to a tournament from its page. */
   preset?: Partial<NewMatchInput>;
+  /** A message shared into the app from another one - read into the form as it opens. */
+  sharedText?: string;
 }
+
+/** Several games in one pasted message, handed on to be checked together. */
+export interface MessageImport {
+  fixtures: ParsedFixture[];
+  summary: string;
+  teamId: string | null;
+  competitionId: string | null;
+}
+
+type FormValues = {
+  opponent: string;
+  date: string;
+  time: string;
+  competitionId: string;
+  teamId: string;
+  venue: Venue;
+  durationMinutes: number;
+  location: string;
+  notes: string;
+  stage: MatchStage | null;
+  stageDetail: string;
+};
+
+/** What reading a message did, said under the box it was pasted into. */
+type PasteNote =
+  | { kind: 'filled'; filled: string[] }
+  | { kind: 'none' }
+  | { kind: 'many'; found: MessageFixture[] }
+  | { kind: 'blocked' };
+
+// Older browsers and some webviews can't read the clipboard at all - long-press and Paste still works there.
+const CAN_READ_CLIPBOARD = typeof navigator !== 'undefined' && typeof navigator.clipboard?.readText === 'function';
 
 const VENUE_OPTIONS: { value: Venue; label: string }[] = [
   { value: 'home', label: 'Home' },
@@ -25,11 +61,14 @@ export function MatchFormSheet({
   target,
   onClose,
   onCreated,
+  onMany,
 }: {
   target: MatchFormTarget | null;
   onClose: () => void;
   /** Fired with the new match so the caller can follow up - e.g. ask for the result of a match that has already been played. */
   onCreated?: (match: Match) => void;
+  /** A pasted message held a whole list of games: check and add them together instead. */
+  onMany?: (games: MessageImport) => void;
 }) {
   const { addMatch, updateMatch, competitions, teams, settings, matches, results } = useStore();
   const editing = target?.mode === 'edit' ? target.match ?? null : null;
@@ -51,12 +90,149 @@ export function MatchFormSheet({
   const [teamTouched, setTeamTouched] = useState(false);
   const opponentListId = useId();
   const groundListId = useId();
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasted, setPasted] = useState('');
+  const [pasteNote, setPasteNote] = useState<PasteNote | null>(null);
+  const pasteTimer = useRef<number>();
+
+  const values: FormValues = {
+    opponent, date, time, competitionId, teamId, venue, durationMinutes, location, notes, stage, stageDetail,
+  };
+  // The latest form, for a paste read a moment after it was typed.
+  const latest = useRef(values);
+  latest.current = values;
+
+  const setAll = (v: FormValues) => {
+    setOpponent(v.opponent);
+    setDate(v.date);
+    setTime(v.time);
+    setCompetitionId(v.competitionId);
+    setTeamId(v.teamId);
+    setVenue(v.venue);
+    setDurationMinutes(v.durationMinutes);
+    setLocation(v.location);
+    setNotes(v.notes);
+    setStage(v.stage);
+    setStageDetail(v.stageDetail);
+  };
+
+  /**
+   * The form as a message says it should be, on top of what's there. A
+   * competition the message names comes first, so the message's own details
+   * win over the ones the competition would start a match with.
+   */
+  const fromMessage = (text: string, base: FormValues): { values: FormValues; note: PasteNote } => {
+    const today = todayISO();
+    const found = readFixtureMessage(text, {
+      today,
+      teamNames: teams.map((t) => t.name),
+      competitions: competitions.filter((c) => !c.archived).map(({ id, name }) => ({ id, name })),
+      monthFirst: monthFirstLocale(),
+    });
+    if (found.length === 0) return { values: base, note: { kind: 'none' } };
+    if (found.length > 1) return { values: base, note: { kind: 'many', found } };
+
+    const [game] = found;
+    const v = { ...base };
+    const filled: string[] = [];
+    // Named in the message, or a tournament already on that day.
+    const competition =
+      competitions.find((c) => c.id === game.competitionId) ??
+      (base.competitionId === '' && game.date
+        ? competitions.find(
+            (c) =>
+              !c.archived &&
+              c.type === 'tournament' &&
+              (c.startDate === game.date || matches.some((m) => m.competitionId === c.id && m.date === game.date)),
+          )
+        : undefined);
+    if (competition && competition.id !== base.competitionId) {
+      const next = nextMatchFor(competition, matches, teams, settings, today);
+      Object.assign(v, {
+        competitionId: competition.id,
+        teamId: next.teamId ?? v.teamId,
+        date: next.date,
+        time: next.time,
+        venue: next.venue,
+        location: next.location || v.location,
+        durationMinutes: next.durationMinutes,
+        stage: next.stage,
+        stageDetail: next.stageDetail,
+      });
+      filled.push(competition.name);
+    }
+    if (game.date) {
+      v.date = game.date;
+      filled.push(formatDateShort(game.date));
+    }
+    if (game.time) {
+      v.time = game.time;
+      filled.push(`kick-off ${formatTime(game.time)}`);
+    }
+    if (game.opponent) {
+      v.opponent = game.opponent;
+      filled.push(game.opponent);
+    }
+    if (game.venue) {
+      v.venue = game.venue;
+      filled.push(VENUE_LABEL[game.venue].toLowerCase());
+    }
+    if (game.location) {
+      v.location = game.location;
+      filled.push(game.location);
+    }
+    if (game.stage) {
+      v.stage = game.stage;
+      v.stageDetail = game.stageDetail;
+      filled.push(stageName(game.stage, game.stageDetail));
+    }
+    if (game.durationMinutes) {
+      v.durationMinutes = game.durationMinutes;
+      filled.push(`${game.durationMinutes} min`);
+    }
+    if (game.meet) {
+      const line = `Meet ${formatTime(game.meet)}`;
+      if (!v.notes.includes(line)) v.notes = [line, v.notes].filter(Boolean).join('\n');
+      filled.push(`meet ${formatTime(game.meet)}`);
+    }
+    return { values: v, note: { kind: 'filled', filled } };
+  };
+
+  const readPasted = (text: string) => {
+    if (!text.trim()) return setPasteNote(null);
+    const read = fromMessage(text, latest.current);
+    setAll(read.values);
+    if (read.values.durationMinutes !== latest.current.durationMinutes) setLengthTouched(true);
+    setPasteNote(read.note);
+    setError('');
+  };
+
+  const onPastedChange = (text: string) => {
+    setPasted(text);
+    window.clearTimeout(pasteTimer.current);
+    pasteTimer.current = window.setTimeout(() => readPasted(text), 250);
+  };
+
+  const pasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setPasted(text);
+      readPasted(text);
+    } catch {
+      setPasteNote({ kind: 'blocked' });
+    }
+  };
+
+  useEffect(() => () => window.clearTimeout(pasteTimer.current), []);
 
   useEffect(() => {
     if (!target) return;
     setError('');
     setLengthTouched(false);
     setTeamTouched(false);
+    setPasteOpen(Boolean(target.sharedText));
+    setPasted(target.sharedText ?? '');
+    setPasteNote(null);
     if (target.match) {
       const m = target.match;
       setOpponent(m.opponent);
@@ -72,31 +248,39 @@ export function MatchFormSheet({
       setStageDetail(m.stageDetail);
     } else {
       const preset = target.preset ?? {};
-      setOpponent(preset.opponent ?? '');
-      setDate(preset.date ?? target.dateISO ?? todayISO());
-      setTime(preset.time ?? settings.defaultKickoff);
       // Default to the only competition still running when there is just one - one less tap.
       const running = competitions.filter((c) => !c.archived);
       const chosenId =
         preset.competitionId !== undefined ? preset.competitionId ?? '' : running.length === 1 ? running[0].id : '';
       const chosen = competitions.find((c) => c.id === chosenId);
-      setCompetitionId(chosenId);
-      setTeamId(
-        preset.teamId !== undefined
-          ? preset.teamId ?? ''
-          : chosen?.teamId && teams.some((t) => t.id === chosen.teamId)
-            ? chosen.teamId
-            : teams.length >= 1
-              ? teams[0].id
-              : '',
-      );
-      setVenue(preset.venue ?? 'home');
-      // A tournament that plays shorter games keeps its length as the starting point.
-      setDurationMinutes(preset.durationMinutes ?? (chosen?.matchLength || settings.defaultMatchLength));
-      setLocation(preset.location ?? chosen?.location ?? '');
-      setNotes(preset.notes ?? '');
-      setStage(preset.stage ?? null);
-      setStageDetail(preset.stageDetail ?? '');
+      const start: FormValues = {
+        opponent: preset.opponent ?? '',
+        date: preset.date ?? target.dateISO ?? todayISO(),
+        time: preset.time ?? settings.defaultKickoff,
+        competitionId: chosenId,
+        teamId:
+          preset.teamId !== undefined
+            ? preset.teamId ?? ''
+            : chosen?.teamId && teams.some((t) => t.id === chosen.teamId)
+              ? chosen.teamId
+              : teams.length >= 1
+                ? teams[0].id
+                : '',
+        venue: preset.venue ?? 'home',
+        // A tournament that plays shorter games keeps its length as the starting point.
+        durationMinutes: preset.durationMinutes ?? (chosen?.matchLength || settings.defaultMatchLength),
+        location: preset.location ?? chosen?.location ?? '',
+        notes: preset.notes ?? '',
+        stage: preset.stage ?? null,
+        stageDetail: preset.stageDetail ?? '',
+      };
+      if (target.sharedText) {
+        const read = fromMessage(target.sharedText, start);
+        setAll(read.values);
+        setPasteNote(read.note);
+      } else {
+        setAll(start);
+      }
     }
     // Only when the sheet opens: a sync landing while it's open must not wipe what's being typed.
   }, [target]);
@@ -180,13 +364,93 @@ export function MatchFormSheet({
     >
       {error && <p className="form-error">{error}</p>}
 
+      {!editing &&
+        (pasteOpen ? (
+          <div className="paste-box">
+            <Field label="Paste the message" hint="Copy it in WhatsApp or Messages, then paste it here.">
+              <textarea
+                className="input"
+                rows={3}
+                value={pasted}
+                onChange={(e) => onPastedChange(e.target.value)}
+                placeholder="e.g. Sat 17th v Oakfield, KO 10:30 at Riverside Park"
+                autoFocus={!target.sharedText}
+              />
+            </Field>
+            <div className="paste-actions">
+              {CAN_READ_CLIPBOARD && (
+                <button type="button" className="ghost-btn" onClick={() => void pasteFromClipboard()}>
+                  Paste
+                </button>
+              )}
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => {
+                  setPasteOpen(false);
+                  setPasteNote(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+            {pasteNote?.kind === 'filled' && (
+              <p className="paste-note ok" role="status">
+                ✓ Filled in: {pasteNote.filled.join(' · ')}. Check it below.
+              </p>
+            )}
+            {pasteNote?.kind === 'none' && (
+              <p className="paste-note" role="status">
+                Couldn't find a match in that message, so fill it in below.
+              </p>
+            )}
+            {pasteNote?.kind === 'blocked' && (
+              <p className="paste-note" role="status">
+                The phone didn't let the app read what's copied. Long-press the box and tap Paste instead.
+              </p>
+            )}
+            {pasteNote?.kind === 'many' && (
+              <div className="paste-note many" role="status">
+                <span>This message has {pasteNote.found.length} games in it.</span>
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={() => {
+                    // A game with no day goes on the tournament's next one, when the message is for one.
+                    const named = pasteNote.found.find((g) => g.competitionId)?.competitionId ?? null;
+                    const competition = competitions.find((c) => c.id === (competitionId || named));
+                    const next = competition ? nextMatchFor(competition, matches, teams, settings, todayISO()) : null;
+                    const fallback = next
+                      ? { date: next.date, venue: next.venue, location: next.location }
+                      : { date, venue, location };
+                    onMany?.({
+                      fixtures: asScheduleRows(pasteNote.found, fallback),
+                      summary: pasteNote.found.some((g) => !g.date)
+                        ? `From the message. It didn't say the day for some, so they're on ${formatDateShort(fallback.date)}. Tap Edit on any that aren't.`
+                        : 'From the message.',
+                      teamId: teamId || next?.teamId || null,
+                      competitionId: competition?.id ?? null,
+                    });
+                  }}
+                >
+                  Check all {pasteNote.found.length}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button type="button" className="ghost-btn paste-open" onClick={() => setPasteOpen(true)}>
+            📋 Paste from a message
+          </button>
+        ))}
+
       <Field label="Opponent">
         <input
           className="input"
           value={opponent}
           onChange={(e) => setOpponent(e.target.value)}
           placeholder="e.g. Riverside FC"
-          autoFocus={!editing}
+          autoFocus={!editing && !target.sharedText}
           list={opponentSuggestions.length > 0 ? opponentListId : undefined}
           autoComplete="off"
         />

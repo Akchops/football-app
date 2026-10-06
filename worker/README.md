@@ -79,6 +79,26 @@ It is deliberately **not** a general Gemini proxy:
   and Google's own reason, with anything shaped like a key removed - so a
   screenshot of the error is enough to know what went wrong.
 
+## Match reminders
+
+The same worker sends Matchday's match reminders (`src/push.ts`): a notification
+the evening before each match, and one after full time to log the result. Each
+phone turns them on in Setup → Match reminders.
+
+- The app works out the reminders from its fixtures and sends this phone's list
+  whenever the fixtures change. Each phone gets one Durable Object holding that
+  list, with an alarm set for the first one due. A reminder is deleted once
+  it's sent, and dropped if it's over three hours late.
+- Pushes are standard Web Push, signed and encrypted with WebCrypto alone
+  (`src/webpush.ts`) - no keys to set up. The signing key is made the first time
+  it's needed and kept in its own Durable Object.
+- Only real push services (Google, Mozilla, Apple, Microsoft) can be sent to,
+  so the worker can't be pointed at anything else. These requests don't count
+  towards `DAILY_LIMIT`.
+- Durable Objects come with Cloudflare's free plan. Re-running **Deploy AI
+  proxy** after this change is all it takes to switch reminders on; until then
+  the app says reminders aren't set up on the server.
+
 ## Costs and limits
 
 The Gemini free tier is shared across everyone using your proxy, and it is rate

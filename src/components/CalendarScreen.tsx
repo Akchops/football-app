@@ -6,6 +6,7 @@ import {
   toISODate, todayISO, weekdayLabels,
 } from '../lib/date';
 import { matchesOnDate, upcomingMatches } from '../lib/stats';
+import { GroundLink } from './GroundLink';
 import { MatchCard } from './MatchCard';
 import { Avatar } from './Avatar';
 import { StarBadge } from './MissionBoard';
@@ -238,6 +239,8 @@ export function CalendarScreen({
         <div className="next-up">
           <div className="next-label">Next up · {countdown(kickoffAt(next.date, next.time), now)}</div>
           <MatchCard match={next} showDate now={now} onOpen={() => onOpenMatch(next)} />
+          {/* Match day: one tap from the app to the satnav. */}
+          {next.location && <GroundLink location={next.location} className="link-btn next-ground" />}
         </div>
       ) : matches.length === 0 ? (
         <EmptyState

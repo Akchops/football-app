@@ -1,8 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { todayISO } from '../lib/date';
 import { describeError, lastModelUsed, readFixtures, scheduleProblem } from '../lib/ai';
 import { buildRows, importable, matchCompetition, toMatchInput, type ReviewRow } from '../lib/fixtures';
+import { asScheduleRows, monthFirstLocale, readFixtureMessage } from '../lib/fixtureMessage';
+import type { MessageImport } from './MatchFormSheet';
 import { Field, Sheet } from './ui';
 import type { MatchStage, Venue } from '../types';
 import { STAGES, STAGE_LABEL, stageName } from '../lib/stage';
@@ -14,10 +16,13 @@ const VENUE_ORDER: Venue[] = ['home', 'away', 'neutral'];
 
 export function ImportFixturesSheet({
   open,
+  initial,
   onClose,
   onImported,
 }: {
   open: boolean;
+  /** Games already read out of a pasted message - straight to checking them. */
+  initial?: MessageImport | null;
   onClose: () => void;
   onImported: (count: number) => void;
 }) {
@@ -33,6 +38,7 @@ export function ImportFixturesSheet({
   const [timing, setTiming] = useState('');
   const [teamId, setTeamId] = useState('');
   const [competitionId, setCompetitionId] = useState('');
+  const [message, setMessage] = useState('');
 
   const liveCompetitions = useMemo(() => competitions.filter((c) => !c.archived), [competitions]);
   const ready = importable(rows);
@@ -48,6 +54,43 @@ export function ImportFixturesSheet({
     setSummary('');
     setRows([]);
     setExpanded(null);
+    setMessage('');
+  }
+
+  useEffect(() => {
+    if (!open || !initial) return;
+    reset();
+    setRows(buildRows(initial.fixtures, matches, todayISO()));
+    setSummary(initial.summary);
+    setTeamId(initial.teamId ?? (teams.length === 1 ? teams[0].id : ''));
+    setCompetitionId(initial.competitionId ?? '');
+    setStage('review');
+    // Only as it opens with them: a sync landing mid-check must not throw away edits.
+  }, [open, initial]);
+
+  /** A fixture list sent as text: read on the phone, no signal needed. */
+  function readMessage() {
+    const today = todayISO();
+    const found = readFixtureMessage(message, {
+      today,
+      teamNames: teams.map((t) => t.name),
+      competitions: liveCompetitions.map(({ id, name }) => ({ id, name })),
+      monthFirst: monthFirstLocale(),
+    });
+    if (found.length === 0) {
+      setError("Couldn't find any games in that message. Each one needs who it's against, or a kick-off and a round.");
+      return;
+    }
+    setError('');
+    setRows(buildRows(asScheduleRows(found, { date: today, venue: 'home', location: '' }), matches, today));
+    setSummary(
+      found.some((g) => !g.date)
+        ? "From the message. It didn't say the day for some, so they're on today. Tap Edit on any that aren't."
+        : 'From the message.',
+    );
+    if (teams.length === 1) setTeamId(teams[0].id);
+    setCompetitionId(found.find((g) => g.competitionId)?.competitionId ?? '');
+    setStage('review');
   }
 
   function close() {
@@ -137,7 +180,7 @@ export function ImportFixturesSheet({
     <Sheet
       open={open}
       title="Import fixtures"
-      subtitle={stage === 'review' ? 'Check these before they go in' : 'From a photo, screenshot or PDF'}
+      subtitle={stage === 'review' ? 'Check these before they go in' : 'From a photo, screenshot, PDF or message'}
       onClose={close}
       dismissible={stage !== 'reading'}
       footer={
@@ -184,6 +227,24 @@ export function ImportFixturesSheet({
             A clear, straight-on shot reads best. A screenshot beats a photo of a screen, and one page at a time beats a
             whole season in one go.
           </p>
+
+          <div className="import-or" aria-hidden="true">
+            <span>or</span>
+          </div>
+          <Field label="Paste a message" hint="Fixtures sent as text, one game or a whole list.">
+            <textarea
+              className="input"
+              rows={3}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="e.g. 9:30 v Vale, 10:15 v Hillcrest, 11:00 v Oakfield"
+            />
+          </Field>
+          <div className="button-row">
+            <button className="ghost-btn" onClick={readMessage} disabled={!message.trim()}>
+              Read the message
+            </button>
+          </div>
         </>
       )}
 
