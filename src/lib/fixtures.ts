@@ -137,6 +137,20 @@ export function problemWith(fixture: ParsedFixture, today: string): string {
   return '';
 }
 
+/** Grounds played at before, most recent first, each spelling once - to offer when adding a match. */
+export function pastGrounds(matches: Match[]): string[] {
+  const seen = new Set<string>();
+  const grounds: string[] = [];
+  for (const m of [...matches].sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`))) {
+    const ground = m.location.trim();
+    const key = ground.toLowerCase().replace(/\s+/g, ' ');
+    if (ground === '' || seen.has(key)) continue;
+    seen.add(key);
+    grounds.push(ground);
+  }
+  return grounds;
+}
+
 /** Club names vary by row - "Oakwood Utd U16" and "Oakwood United" are one team. */
 export function normaliseOpponent(name: string): string {
   return name

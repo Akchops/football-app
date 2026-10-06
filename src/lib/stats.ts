@@ -1,5 +1,5 @@
 import type { Competition, Match, MatchResult, MetricTotals, PositionGroup, Settings, Team, Venue } from '../types';
-import { MONTH_NAMES, fromISODate, kickoffAt, toISODate } from './date';
+import { MONTH_NAMES, fromISODate, kickoffAt, seasonOf, toISODate } from './date';
 import { addMetrics } from './metrics';
 import { matchScore } from './score';
 
@@ -51,6 +51,11 @@ export function playedMatches(matches: Match[]): (Match & { result: MatchResult 
   return matches
     .filter(isPlayed)
     .sort((a, b) => kickoffAt(b.date, b.time).getTime() - kickoffAt(a.date, a.time).getTime());
+}
+
+/** Seasons with at least one result in them, newest first - '2026/27', '2025/26'. */
+export function seasonsPlayed(matches: Match[]): string[] {
+  return [...new Set(matches.filter(isPlayed).map((m) => seasonOf(m.date)))].sort().reverse();
 }
 
 export function matchesOnDate(matches: Match[], iso: string): Match[] {

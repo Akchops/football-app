@@ -14,6 +14,15 @@ export function addMetrics(into: MetricTotals, from: MetricTotals): MetricTotals
   return into;
 }
 
+/**
+ * Whether a keeper's goals conceded still just mirrors the opponent's score, so
+ * the result form can keep the two in step until the player sets it themselves
+ * (on as a sub, say, and only in goal for one of the goals).
+ */
+export function concededFollowsScore(result: MatchResult): boolean {
+  return (result.metrics.conceded ?? 0) === result.goalsAgainst;
+}
+
 /** Drop zero/undefined entries so results stay small and "did they record this?" stays answerable. */
 export function pruneMetrics(metrics: MetricTotals): MetricTotals {
   const out: MetricTotals = {};

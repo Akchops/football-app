@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyResult, type Competition, type Match, type MatchStage, type Result } from '../types';
-import { knownTeams, standings, teamKey, type TableGroup } from './standings';
+import { knownTeams, standings, suggestedOpponents, teamKey, type TableGroup } from './standings';
 
 let seq = 0;
 
@@ -193,5 +193,28 @@ describe('an academy\'s table', () => {
 describe('knownTeams', () => {
   it('lists every team named so far, once each, leaving out TBC', () => {
     expect(knownTeams([ours('Vale FC', 1, 0), ours('TBC', 0, 0)], [result('Vale', 1, 0, 'Hilltop')])).toEqual(['Hilltop', 'Vale FC']);
+  });
+});
+
+describe('suggestedOpponents', () => {
+  it("puts the competition's teams first, then everyone played, most recent first", () => {
+    const matches = [
+      ours('Vale FC', 1, 0, { date: '2026-09-05' }),
+      ours('Castle Park', 2, 2, { date: '2026-09-20', competitionId: 'c2' }),
+      ours('Hilltop', 0, 1, { date: '2026-09-12', competitionId: 'c2' }),
+    ];
+    const results = [result('Moor', 1, 1, 'Ash Lane')];
+    expect(suggestedOpponents(matches, results, 'c1')).toEqual(['Ash Lane', 'Moor', 'Vale FC', 'Castle Park', 'Hilltop']);
+    expect(suggestedOpponents(matches, results, null)).toEqual(['Castle Park', 'Hilltop', 'Vale FC']);
+  });
+
+  it('lists one club once, and leaves out our own teams and TBC', () => {
+    const matches = [
+      ours('Vale FC', 1, 0, { date: '2026-09-20' }),
+      ours('vale', 3, 0, { date: '2026-09-05' }),
+      ours('TBC', 0, 0, { date: '2026-09-21' }),
+    ];
+    const results = [result('Oakwood Rangers', 2, 0, 'Moor')];
+    expect(suggestedOpponents(matches, results, 'c1', ['Oakwood Rangers'])).toEqual(['Moor', 'Vale FC']);
   });
 });

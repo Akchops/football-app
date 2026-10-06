@@ -1,5 +1,5 @@
 import { POSITIONS_BY_GROUP, type Competition, type CompetitionType, type Match, type PositionGroup } from '../types';
-import { fromISODate, seasonLabel } from './date';
+import { seasonOf } from './date';
 import { computeStats, playedMatches, type Stats } from './stats';
 import { isKnockout } from './stage';
 
@@ -40,10 +40,7 @@ export interface StatsFilter {
 
 export const NO_FILTER: StatsFilter = { season: '', competition: '', stage: 'all', positionGroup: '', squadId: '' };
 
-/** The football season a day falls in - '2026/27' from July on, as the rest of the app counts it. */
-export function seasonOf(dateISO: string): string {
-  return seasonLabel(fromISODate(dateISO));
-}
+export { seasonOf } from './date';
 
 /**
  * The same competition logged by different families: "Yorkshire U16 League"

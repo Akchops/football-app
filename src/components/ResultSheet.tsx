@@ -6,7 +6,7 @@ import {
   type MatchResult, type Match, type MetricId, type PositionGroup,
 } from '../types';
 import { formatDateShort, formatTime } from '../lib/date';
-import { formMetricsFor, pruneMetrics } from '../lib/metrics';
+import { concededFollowsScore, formMetricsFor, pruneMetrics } from '../lib/metrics';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
 import { Field, Sheet, Stepper } from './ui';
 
@@ -39,6 +39,8 @@ export function ResultSheet({
   const [showPens, setShowPens] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
+  // A keeper's goals conceded follows the opponent's score until it is set by hand.
+  const [concededLinked, setConcededLinked] = useState(true);
 
   useEffect(() => {
     if (!match) return;
@@ -47,6 +49,7 @@ export function ResultSheet({
     setNotes(match.notes ?? '');
     setShowPens(existing?.penaltiesFor !== null && existing?.penaltiesFor !== undefined);
     setShowDetail(Boolean(existing));
+    setConcededLinked(existing ? concededFollowsScore(existing) : true);
   }, [match, profile.position, team]);
 
   const group = result.positionGroup;
@@ -64,8 +67,16 @@ export function ResultSheet({
 
   const competition = competitionOf(match);
   const patch = (over: Partial<MatchResult>) => setResult((r) => ({ ...r, ...over }));
-  const setMetric = (id: MetricId, value: number) =>
+  const setMetric = (id: MetricId, value: number) => {
+    if (id === 'conceded') setConcededLinked(false);
     setResult((r) => ({ ...r, metrics: { ...r.metrics, [id]: value } }));
+  };
+  const setGoalsAgainst = (value: number) =>
+    setResult((r) => ({
+      ...r,
+      goalsAgainst: value,
+      metrics: concededLinked && r.positionGroup === 'goalkeeper' ? { ...r.metrics, conceded: value } : r.metrics,
+    }));
   const isDraw = result.goalsFor === result.goalsAgainst;
   const us = team?.name?.trim() || 'Us';
   const them = match.opponent.trim() || 'Them';
@@ -74,7 +85,12 @@ export function ResultSheet({
     const nextPosition = POSITIONS_BY_GROUP[nextGroup].includes(result.position)
       ? result.position
       : POSITIONS_BY_GROUP[nextGroup][0];
-    patch({ positionGroup: nextGroup, position: nextPosition });
+    setResult((r) => ({
+      ...r,
+      positionGroup: nextGroup,
+      position: nextPosition,
+      metrics: nextGroup === 'goalkeeper' && concededLinked ? { ...r.metrics, conceded: r.goalsAgainst } : r.metrics,
+    }));
   };
 
   const save = () => {
@@ -127,7 +143,7 @@ export function ResultSheet({
         <div className="score-dash">–</div>
         <div className="score-side">
           <span className="score-team">{them}</span>
-          <Stepper label={them} value={result.goalsAgainst} onChange={(v) => patch({ goalsAgainst: v })} max={50} accent />
+          <Stepper label={them} value={result.goalsAgainst} onChange={setGoalsAgainst} max={50} accent />
         </div>
       </div>
 

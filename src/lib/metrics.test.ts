@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { groupForPosition, metricsForGroup } from '../types';
-import { addMetrics, formMetricsFor, positionStatCards, pruneMetrics, showsTeamAttack } from './metrics';
+import { emptyResult, groupForPosition, metricsForGroup } from '../types';
+import { addMetrics, concededFollowsScore, formMetricsFor, positionStatCards, pruneMetrics, showsTeamAttack } from './metrics';
 
 describe('position groups', () => {
   it('maps shirt positions onto stat sets', () => {
@@ -88,5 +88,24 @@ describe('positionStatCards', () => {
   it('hides the team attacking tile for keepers only', () => {
     expect(showsTeamAttack('goalkeeper')).toBe(false);
     expect(showsTeamAttack('defender')).toBe(true);
+  });
+});
+
+describe('concededFollowsScore', () => {
+  const keeper = (goalsAgainst: number, conceded?: number) => ({
+    ...emptyResult('GK'),
+    goalsAgainst,
+    metrics: conceded === undefined ? {} : { conceded },
+  });
+
+  it('follows while conceded is unset at 0-0, or matches the score', () => {
+    expect(concededFollowsScore(keeper(0))).toBe(true);
+    expect(concededFollowsScore(keeper(2, 2))).toBe(true);
+  });
+
+  it('stops once the player set a different number', () => {
+    expect(concededFollowsScore(keeper(2, 1))).toBe(false);
+    // Saved as 0 (pruned away) while the team let in 2 - on for the second half only, say.
+    expect(concededFollowsScore(keeper(2))).toBe(false);
   });
 });

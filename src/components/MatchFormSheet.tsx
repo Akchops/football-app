@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useStore, type NewMatchInput } from '../store/AppStore';
 import { MATCH_LENGTHS, type Match, type MatchStage, type Venue } from '../types';
 import { todayISO } from '../lib/date';
+import { pastGrounds } from '../lib/fixtures';
+import { suggestedOpponents } from '../lib/standings';
 import { STAGES, STAGE_LABEL, detailPrompt, toStage } from '../lib/stage';
 import { DurationPicker, Field, Segmented, Sheet } from './ui';
 
@@ -29,7 +31,7 @@ export function MatchFormSheet({
   /** Fired with the new match so the caller can follow up - e.g. ask for the result of a match that has already been played. */
   onCreated?: (match: Match) => void;
 }) {
-  const { addMatch, updateMatch, competitions, teams, settings } = useStore();
+  const { addMatch, updateMatch, competitions, teams, settings, matches, results } = useStore();
   const editing = target?.mode === 'edit' ? target.match ?? null : null;
 
   const [opponent, setOpponent] = useState('');
@@ -44,10 +46,17 @@ export function MatchFormSheet({
   const [stage, setStage] = useState<MatchStage | null>(null);
   const [stageDetail, setStageDetail] = useState('');
   const [error, setError] = useState('');
+  // Picking a competition fills in its match length and team, unless they were already chosen by hand.
+  const [lengthTouched, setLengthTouched] = useState(false);
+  const [teamTouched, setTeamTouched] = useState(false);
+  const opponentListId = useId();
+  const groundListId = useId();
 
   useEffect(() => {
     if (!target) return;
     setError('');
+    setLengthTouched(false);
+    setTeamTouched(false);
     if (target.match) {
       const m = target.match;
       setOpponent(m.opponent);
@@ -68,19 +77,35 @@ export function MatchFormSheet({
       setTime(preset.time ?? settings.defaultKickoff);
       // Default to the only competition still running when there is just one - one less tap.
       const running = competitions.filter((c) => !c.archived);
-      setCompetitionId(
-        preset.competitionId !== undefined ? preset.competitionId ?? '' : running.length === 1 ? running[0].id : '',
+      const chosenId =
+        preset.competitionId !== undefined ? preset.competitionId ?? '' : running.length === 1 ? running[0].id : '';
+      const chosen = competitions.find((c) => c.id === chosenId);
+      setCompetitionId(chosenId);
+      setTeamId(
+        preset.teamId !== undefined
+          ? preset.teamId ?? ''
+          : chosen?.teamId && teams.some((t) => t.id === chosen.teamId)
+            ? chosen.teamId
+            : teams.length >= 1
+              ? teams[0].id
+              : '',
       );
-      setTeamId(preset.teamId !== undefined ? preset.teamId ?? '' : teams.length >= 1 ? teams[0].id : '');
       setVenue(preset.venue ?? 'home');
-      // A team that plays shorter games keeps its length as the starting point.
-      setDurationMinutes(preset.durationMinutes ?? settings.defaultMatchLength);
-      setLocation(preset.location ?? '');
+      // A tournament that plays shorter games keeps its length as the starting point.
+      setDurationMinutes(preset.durationMinutes ?? (chosen?.matchLength || settings.defaultMatchLength));
+      setLocation(preset.location ?? chosen?.location ?? '');
       setNotes(preset.notes ?? '');
       setStage(preset.stage ?? null);
       setStageDetail(preset.stageDetail ?? '');
     }
-  }, [target, settings.defaultKickoff, competitions, teams]);
+    // Only when the sheet opens: a sync landing while it's open must not wipe what's being typed.
+  }, [target]);
+
+  const opponentSuggestions = useMemo(
+    () => (target ? suggestedOpponents(matches, results, competitionId || null, teams.map((t) => t.name)) : []),
+    [target, matches, results, competitionId, teams],
+  );
+  const groundSuggestions = useMemo(() => (target ? pastGrounds(matches) : []), [target, matches]);
 
   if (!target) return null;
 
@@ -88,6 +113,15 @@ export function MatchFormSheet({
   // that already has one keeps the field, so it can be changed or cleared.
   const competition = competitions.find((c) => c.id === competitionId) ?? null;
   const showStage = stage !== null || competition?.type === 'cup' || competition?.type === 'tournament';
+
+  const pickCompetition = (id: string) => {
+    setCompetitionId(id);
+    const picked = competitions.find((c) => c.id === id);
+    if (editing || !picked) return;
+    if (picked.matchLength > 0 && !lengthTouched) setDurationMinutes(picked.matchLength);
+    if (picked.teamId && !teamTouched && teams.some((t) => t.id === picked.teamId)) setTeamId(picked.teamId);
+    if (picked.location && !location.trim()) setLocation(picked.location);
+  };
 
   const submit = () => {
     if (!opponent.trim()) {
@@ -153,7 +187,14 @@ export function MatchFormSheet({
           onChange={(e) => setOpponent(e.target.value)}
           placeholder="e.g. Riverside FC"
           autoFocus={!editing}
+          list={opponentSuggestions.length > 0 ? opponentListId : undefined}
+          autoComplete="off"
         />
+        <datalist id={opponentListId}>
+          {opponentSuggestions.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
       </Field>
 
       <div className="row two">
@@ -167,7 +208,14 @@ export function MatchFormSheet({
 
       {teams.length > 0 && (
         <Field label="Playing for" hint={teams.length === 1 ? undefined : 'Which of your teams is this match for?'}>
-          <select className="input" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
+          <select
+            className="input"
+            value={teamId}
+            onChange={(e) => {
+              setTeamId(e.target.value);
+              setTeamTouched(true);
+            }}
+          >
             <option value="">No team set</option>
             {teams.map((t) => (
               <option key={t.id} value={t.id}>
@@ -187,7 +235,7 @@ export function MatchFormSheet({
         label="Competition"
         hint={competitions.length === 0 ? 'Add leagues, cups and tournaments in Setup.' : undefined}
       >
-        <select className="input" value={competitionId} onChange={(e) => setCompetitionId(e.target.value)}>
+        <select className="input" value={competitionId} onChange={(e) => pickCompetition(e.target.value)}>
           <option value="">No competition</option>
           {/* A finished one isn't taking new fixtures, but a match already in it keeps it. */}
           {competitions
@@ -234,7 +282,14 @@ export function MatchFormSheet({
         label="Match length"
         hint="Youth and small-sided games are rarely 90 minutes — this sets how long a full game is for this match."
       >
-        <DurationPicker value={durationMinutes} onChange={setDurationMinutes} presets={MATCH_LENGTHS} />
+        <DurationPicker
+          value={durationMinutes}
+          onChange={(minutes) => {
+            setDurationMinutes(minutes);
+            setLengthTouched(true);
+          }}
+          presets={MATCH_LENGTHS}
+        />
       </Field>
 
       <Field label="Ground / pitch" hint="Optional">
@@ -243,7 +298,14 @@ export function MatchFormSheet({
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="e.g. Central Playing Fields, Pitch 3"
+          list={groundSuggestions.length > 0 ? groundListId : undefined}
+          autoComplete="off"
         />
+        <datalist id={groundListId}>
+          {groundSuggestions.map((ground) => (
+            <option key={ground} value={ground} />
+          ))}
+        </datalist>
       </Field>
 
       <Field label="Notes" hint="Optional - meet time, kit colour, anything">

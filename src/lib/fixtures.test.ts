@@ -7,6 +7,7 @@ import {
   isRealDate,
   matchCompetition,
   normaliseOpponent,
+  pastGrounds,
   problemWith,
   toMatchInput,
   FIXTURES_SCHEMA,
@@ -288,5 +289,17 @@ describe('stages on imported fixtures', () => {
     expect(findDuplicate(fixture({ opponent: 'TBC', stage: 'semi' }), [semi])?.id).toBe(semi.id);
     // Without a stage on one side there is nothing to tell them apart by.
     expect(findDuplicate(fixture({ opponent: 'TBC' }), [semi])?.id).toBe(semi.id);
+  });
+});
+
+describe('pastGrounds', () => {
+  it('lists each ground once, most recent first, skipping blanks', () => {
+    const grounds = pastGrounds([
+      match({ id: 'a', date: '2026-09-01', location: 'Central Playing Fields' }),
+      match({ id: 'b', date: '2026-09-20', location: 'Oak Park, Pitch 3' }),
+      match({ id: 'c', date: '2026-09-10', location: 'central  playing fields ' }),
+      match({ id: 'd', date: '2026-09-25', location: '  ' }),
+    ]);
+    expect(grounds).toEqual(['Oak Park, Pitch 3', 'central  playing fields']);
   });
 });

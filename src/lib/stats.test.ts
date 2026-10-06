@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, emptyResult, type Competition, type Match, type MatchResult, type Settings } from '../types';
 import {
   computeStats, mainPositionGroup, outcomeOf, pendingResultMatches, placingLabel, scoreline, shootoutWinner,
-  statsByCompetition, statsByMonth, statsByOpponent, statsByStage, statsByTournament, statsByVenue, upcomingMatches,
+  seasonsPlayed, statsByCompetition, statsByMonth, statsByOpponent, statsByStage, statsByTournament, statsByVenue,
+  upcomingMatches,
 } from './stats';
 
 let seq = 0;
@@ -345,5 +346,18 @@ describe('statsByOpponent', () => {
       played(0, 1, { opponent: '' }),
     ]);
     expect(rows.map((r) => [r.opponent, r.played])).toEqual([['Vale FC', 2]]);
+  });
+});
+
+describe('seasonsPlayed', () => {
+  it('lists seasons with a result, newest first, with July starting a new one', () => {
+    const seasons = seasonsPlayed([
+      played(1, 0, { date: '2026-06-30' }),
+      played(2, 1, { date: '2026-07-01' }),
+      played(0, 0, { date: '2024-11-02' }),
+      played(3, 3, { date: '2026-03-14' }),
+      match({ date: '2027-08-20' }),
+    ]);
+    expect(seasons).toEqual(['2026/27', '2025/26', '2024/25']);
   });
 });

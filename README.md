@@ -375,7 +375,6 @@ Third-party components are used under their own licences, listed in
   genuinely useful and is what the Coach tab does; counting every save
   automatically is not something this app can do honestly.
 - Push notifications (needs a server; calendar alarms cover reminders today)
-- Season filter on the stats page
 - Academies linked to each other sharing one competition, each entering its
   own scores
 - Goalkeeper extras: distribution accuracy, sweeper-keeper actions by zone

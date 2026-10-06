@@ -131,6 +131,11 @@ export function seasonLabel(now: Date = new Date()): string {
   return now.getMonth() >= 6 ? `${y}/${String(y + 1).slice(2)}` : `${y - 1}/${String(y).slice(2)}`;
 }
 
+/** The football season a day falls in - '2026/27' from July on, as the rest of the app counts it. */
+export function seasonOf(dateISO: string): string {
+  return seasonLabel(fromISODate(dateISO));
+}
+
 /** Age on a given day, from a 'YYYY-MM-DD' date of birth. */
 export function ageOn(dob: string, on: Date): number | null {
   if (!dob) return null;

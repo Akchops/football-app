@@ -246,3 +246,33 @@ export function knownTeams(matches: Match[], results: Result[]): string[] {
   }
   return [...names.values()].sort((a, b) => a.localeCompare(b));
 }
+
+/**
+ * Names to offer for a new match's opponent: the teams already in the chosen
+ * competition first, A to Z, then everyone played before, most recent first.
+ * Our own teams and "TBC" are left out, and spellings of one club appear once.
+ */
+export function suggestedOpponents(
+  matches: Match[],
+  results: Result[],
+  competitionId: string | null,
+  ourTeams: string[] = [],
+): string[] {
+  const seen = new Set(ourTeams.filter((name) => !unknown(name)).map(teamKey));
+  const names: string[] = [];
+  const add = (name: string) => {
+    if (unknown(name)) return;
+    const key = teamKey(name);
+    if (seen.has(key)) return;
+    seen.add(key);
+    names.push(name.trim());
+  };
+  if (competitionId) {
+    knownTeams(
+      matches.filter((m) => m.competitionId === competitionId),
+      results.filter((r) => r.competitionId === competitionId),
+    ).forEach(add);
+  }
+  [...matches].sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)).forEach((m) => add(m.opponent));
+  return names;
+}

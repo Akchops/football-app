@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { POSITION_GROUP_LABEL, VENUE_LABEL, type PositionGroup } from '../types';
-import { formatDateShort } from '../lib/date';
+import { formatDateShort, seasonOf } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import {
-  computeStats, mainPositionGroup, recentScores, recordSummary, scoreline, statsByCompetition, statsByMonth,
-  statsByOpponent, statsByStage, statsByTeam, statsByTournament, statsByVenue, type StageBreakdown,
+  computeStats, isPlayed, mainPositionGroup, recentScores, recordSummary, scoreline, seasonsPlayed, statsByCompetition,
+  statsByMonth, statsByOpponent, statsByStage, statsByTeam, statsByTournament, statsByVenue, type StageBreakdown,
 } from '../lib/stats';
 import { milestones, personalBests } from '../lib/records';
 import { TRAINING_TYPE_LABEL } from '../types';
@@ -27,13 +27,16 @@ export function StatsScreen({
   const { matches, competitions, teams, profile, training } = useStore();
   const [competitionId, setCompetitionId] = useState<string>('all');
   const [teamId, setTeamId] = useState<string>('all');
+  const [season, setSeason] = useState<string>('all');
+  const seasons = useMemo(() => seasonsPlayed(matches), [matches]);
 
   const scoped = useMemo(
     () =>
       matches
         .filter((m) => competitionId === 'all' || (m.competitionId ?? '') === competitionId)
-        .filter((m) => teamId === 'all' || (m.teamId ?? '') === teamId),
-    [matches, competitionId, teamId],
+        .filter((m) => teamId === 'all' || (m.teamId ?? '') === teamId)
+        .filter((m) => season === 'all' || seasonOf(m.date) === season),
+    [matches, competitionId, teamId, season],
   );
 
   const stats = useMemo(() => computeStats(scoped), [scoped]);
@@ -68,42 +71,8 @@ export function StatsScreen({
   const bests = useMemo(() => personalBests(scoped, group), [scoped, group]);
   const goals = useMemo(() => milestones(scoped, group), [scoped, group]);
 
-  if (stats.played === 0) {
-    return (
-      <div className="screen">
-        <div className="screen-head">
-          <h1>Stats</h1>
-        </div>
-        <EmptyState
-          icon="📊"
-          title="No stats yet"
-          message="Log a couple of results and this page fills up with the numbers that matter for your position."
-          action={
-            <button className="primary-btn" onClick={onGoToMatches}>
-              Go to matches
-            </button>
-          }
-        />
-      </div>
-    );
-  }
-
-  const maxMonth = Math.max(1, ...byMonth.map((b) => b.played));
-  const winPct = Math.round(stats.winRate * 100);
-  const drawPct = stats.played ? Math.round((stats.draws / stats.played) * 100) : 0;
-  const lossPct = Math.max(0, 100 - winPct - drawPct);
-
-  const positionCards = positionStatCards(group, {
-    appearances: stats.appearances,
-    played: stats.played,
-    minutes: stats.minutes,
-    cleanSheetsPlayed: stats.cleanSheetsPlayed,
-    goalsAgainst: stats.goalsAgainst,
-    totals: stats.totals,
-  });
-
-  return (
-    <div className="screen">
+  const header = (
+    <>
       <div className="screen-head">
         <h1>Stats</h1>
         <div className="stats-who">
@@ -114,6 +83,19 @@ export function StatsScreen({
           <Avatar photo={profile.photo} name={profile.name} size={34} />
         </div>
       </div>
+
+      {seasons.length > 1 && (
+        <div className="chip-scroll" role="group" aria-label="Season">
+          <button className={season === 'all' ? 'filter-chip on' : 'filter-chip'} onClick={() => setSeason('all')}>
+            All seasons
+          </button>
+          {seasons.map((s) => (
+            <button key={s} className={season === s ? 'filter-chip on' : 'filter-chip'} onClick={() => setSeason(s)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       {teams.length > 1 && (
         <div className="chip-scroll">
@@ -153,6 +135,73 @@ export function StatsScreen({
           ))}
         </div>
       )}
+    </>
+  );
+
+  // Nothing played at all: the empty page. Nothing played in this selection: keep the
+  // filters on screen, so there's a way back out of it.
+  if (stats.played === 0 && matches.some(isPlayed)) {
+    return (
+      <div className="screen">
+        {header}
+        <EmptyState
+          icon="🔎"
+          title="Nothing played here yet"
+          message="No results for this season, team and competition together."
+          action={
+            <button
+              className="ghost-btn"
+              onClick={() => {
+                setSeason('all');
+                setTeamId('all');
+                setCompetitionId('all');
+              }}
+            >
+              Show everything
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (stats.played === 0) {
+    return (
+      <div className="screen">
+        <div className="screen-head">
+          <h1>Stats</h1>
+        </div>
+        <EmptyState
+          icon="📊"
+          title="No stats yet"
+          message="Log a couple of results and this page fills up with the numbers that matter for your position."
+          action={
+            <button className="primary-btn" onClick={onGoToMatches}>
+              Go to matches
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const maxMonth = Math.max(1, ...byMonth.map((b) => b.played));
+  const winPct = Math.round(stats.winRate * 100);
+  const drawPct = stats.played ? Math.round((stats.draws / stats.played) * 100) : 0;
+  const lossPct = Math.max(0, 100 - winPct - drawPct);
+
+  const positionCards = positionStatCards(group, {
+    appearances: stats.appearances,
+    played: stats.played,
+    minutes: stats.minutes,
+    cleanSheetsPlayed: stats.cleanSheetsPlayed,
+    goalsAgainst: stats.goalsAgainst,
+    totals: stats.totals,
+  });
+
+  return (
+    <div className="screen">
+      {header}
 
       <div className="record-hero">
         <div className="record-line">
