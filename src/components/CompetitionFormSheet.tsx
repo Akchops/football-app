@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { AGE_GROUPS, COMPETITION_COLORS, COMPETITION_TYPE_LABEL, type Competition, type CompetitionType } from '../types';
-import { seasonLabel } from '../lib/date';
+import { calendarSeason } from '../lib/date';
 import { ACADEMY } from '../lib/features';
 import { Field, Sheet } from './ui';
 
@@ -24,7 +24,7 @@ export function CompetitionFormSheet({
 
   const [name, setName] = useState('');
   const [type, setType] = useState<CompetitionType>('league');
-  const [season, setSeason] = useState(seasonLabel());
+  const [season, setSeason] = useState(calendarSeason());
   const [ageGroup, setAgeGroup] = useState('');
   const [color, setColor] = useState(COMPETITION_COLORS[0]);
   const [notes, setNotes] = useState('');
@@ -47,7 +47,7 @@ export function CompetitionFormSheet({
     } else {
       setName('');
       setType('league');
-      setSeason(seasonLabel());
+      setSeason(calendarSeason());
       setAgeGroup(profile.ageGroup);
       setColor(COMPETITION_COLORS[competitions.length % COMPETITION_COLORS.length]);
       setNotes('');
@@ -110,7 +110,7 @@ export function CompetitionFormSheet({
       </Field>
 
       <Field label="Season" hint="Optional — keeps last year's stats separate">
-        <input className="input" value={season} onChange={(e) => setSeason(e.target.value)} placeholder="2025/26" />
+        <input className="input" value={season} onChange={(e) => setSeason(e.target.value)} placeholder="2026" />
       </Field>
 
       <Field label="Age group" hint="The one you play in here — it can differ from competition to competition.">

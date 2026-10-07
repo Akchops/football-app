@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ageGroupCheck, ageOn, countdown, daysBetween, formatDateShort, formatTime, fromISODate, kickoffAt, monthGrid,
-  nextSeasonAgeGroup, relativeDayLabel, seasonLabel, suggestAgeGroup, toISODate, weekdayLabels,
+  calendarSeason, nextSeasonAgeGroup, relativeDayLabel, seasonLabel, suggestAgeGroup, toISODate, weekdayLabels,
 } from './date';
 
 describe('date helpers', () => {
@@ -73,6 +73,9 @@ describe('date helpers', () => {
   it('rolls the season over in July', () => {
     expect(seasonLabel(new Date(2026, 7, 1))).toBe('2026/27');
     expect(seasonLabel(new Date(2026, 2, 1))).toBe('2025/26');
+    // A player's own season is the calendar year.
+    expect(calendarSeason(new Date(2026, 7, 1))).toBe('2026');
+    expect(calendarSeason(new Date(2027, 0, 1))).toBe('2027');
   });
 });
 

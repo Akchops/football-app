@@ -131,7 +131,15 @@ export function seasonLabel(now: Date = new Date()): string {
   return now.getMonth() >= 6 ? `${y}/${String(y + 1).slice(2)}` : `${y - 1}/${String(y).slice(2)}`;
 }
 
-/** The football season a day falls in - '2026/27' from July on, as the rest of the app counts it. */
+/**
+ * A player's own season: the calendar year, the way their age group moves up
+ * each January - '2026'. (The academy area counts '2026/27' seasons from July.)
+ */
+export function calendarSeason(now: Date = new Date()): string {
+  return String(now.getFullYear());
+}
+
+/** The football season a day falls in - '2026/27' from July on, as the academy area counts it. */
 export function seasonOf(dateISO: string): string {
   return seasonLabel(fromISODate(dateISO));
 }

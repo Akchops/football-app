@@ -197,6 +197,8 @@ academy. Without it, nothing is uploaded.
   picture. The season runs with the calendar year: "2026 so far" through the
   year, and in January the year just finished, with a one-off invitation to
   watch it
+- Filter by season, team or competition. A season is a calendar year - 2026,
+  2025 - the way age groups move up each January
 - Team record, win rate, points per game, form guide, streak
 - Goals against, goal difference, clean sheets (goals *for* is hidden for
   keepers — it isn't their job)

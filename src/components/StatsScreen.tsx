@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { POSITION_GROUP_LABEL, VENUE_LABEL, type PositionGroup } from '../types';
-import { formatDateShort, seasonOf } from '../lib/date';
+import { formatDateShort } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import {
@@ -39,7 +39,7 @@ export function StatsScreen({
       matches
         .filter((m) => competitionId === 'all' || (m.competitionId ?? '') === competitionId)
         .filter((m) => teamId === 'all' || (m.teamId ?? '') === teamId)
-        .filter((m) => season === 'all' || seasonOf(m.date) === season),
+        .filter((m) => season === 'all' || m.date.startsWith(`${season}-`)),
     [matches, competitionId, teamId, season],
   );
 

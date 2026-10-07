@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { AGE_GROUPS, COMPETITION_COLORS, MATCH_LENGTHS, type MatchStage } from '../types';
-import { seasonLabel, todayISO } from '../lib/date';
+import { calendarSeason, todayISO } from '../lib/date';
 import { hourAfter } from '../lib/competitions';
 import { STAGES, STAGE_LABEL, nextStage, toStage } from '../lib/stage';
 import { DurationPicker, Field, Sheet } from './ui';
@@ -88,7 +88,7 @@ export function TournamentSheet({ open, onClose }: { open: boolean; onClose: () 
     addTournament({
       name: name.trim(),
       type: 'tournament',
-      season: seasonLabel(),
+      season: calendarSeason(),
       ageGroup,
       color,
       notes: '',

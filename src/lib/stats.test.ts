@@ -350,14 +350,15 @@ describe('statsByOpponent', () => {
 });
 
 describe('seasonsPlayed', () => {
-  it('lists seasons with a result, newest first, with July starting a new one', () => {
+  it('lists seasons with a result, newest first, with each new year starting one', () => {
     const seasons = seasonsPlayed([
-      played(1, 0, { date: '2026-06-30' }),
-      played(2, 1, { date: '2026-07-01' }),
+      played(1, 0, { date: '2025-12-31' }),
+      played(2, 1, { date: '2026-01-01' }),
       played(0, 0, { date: '2024-11-02' }),
-      played(3, 3, { date: '2026-03-14' }),
+      played(3, 3, { date: '2026-07-14' }),
+      // Not played yet, so no season of its own.
       match({ date: '2027-08-20' }),
     ]);
-    expect(seasons).toEqual(['2026/27', '2025/26', '2024/25']);
+    expect(seasons).toEqual(['2026', '2025', '2024']);
   });
 });
