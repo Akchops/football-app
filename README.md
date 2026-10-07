@@ -41,7 +41,26 @@ academy. Without it, nothing is uploaded.
   which one the calendar uses
 - Month summary: how many matches, how many played, how many still to come
 - Quick actions to add a match or a whole tournament, and a "Next up" card with
-  a live countdown
+  a live countdown. Tap its ground to open it in Maps
+
+**Fixtures from a message**
+- The coach sends the next game on WhatsApp. On Android, long-press the message,
+  tap Share and pick Matchday: the app opens on Add match with it filled in. On
+  iPhone (which doesn't let web apps into the share menu), copy the message,
+  then tap "📋 Paste from a message" at the top of Add match
+- It picks out the date ("Sat 17th", "Sunday 11/10", "tomorrow"), the kick-off
+  rather than the meeting time, the opponent, home or away ("(A)", "at theirs",
+  "@ Dockside"), the ground and pitch, the round ("QF", "Plate semi", "Group
+  B"), how long the games are when it says, and a tournament it names. The
+  meeting time goes in the notes. Everything is shown in the form to check
+  before it's added
+- It's read on the phone, so it works with no signal and nothing is sent
+  anywhere. Dates like 10/11 follow the weekday given with them, then the
+  phone's own way of writing dates
+- A whole order of play in one message - "9:30 v Vale, 10:15 v Hillcrest, Semis
+  1pm" - goes to the same check-before-adding list a photographed schedule gets,
+  with the day, ground and group above each game applied to it. Import takes a
+  pasted message too
 
 **Tournaments**
 - "+ Tournament" on the home screen creates the tournament, and its matches
@@ -72,6 +91,21 @@ academy. Without it, nothing is uploaded.
   that list, from any of its matches, or from Stats → Tournaments. The stats come
   from the matches themselves, so they're kept for good and stay right if you
   fix a score later
+- **Share** a tournament as one picture: the medal and how far you got, the
+  record, your numbers for your position and every result in order. A finished
+  one has Share at the bottom of its page; one still going can share "so far"
+- Its page shows where to go, and the ground opens in Maps
+
+**Match reminders**
+- Turn them on in Setup → Match reminders: "Tomorrow: @ Oakfield · Meet 9:45 AM
+  · Kick-off 10:30 AM · Riverside Park" at 6 pm the evening before, and "How did
+  it go?" half an hour after full time. A tournament day is one of each, not one
+  per game
+- Each phone turns them on for itself. On iPhone that needs Matchday on the
+  Home Screen first; the section says so
+- They follow the fixtures: add, move or log a match and the list is updated.
+  The Matchday server (the same worker as the shared coach) keeps each phone's
+  next few reminders and deletes each one once it's sent
 
 **Result prompt**
 - A match kicks off at 16:30. Open the app after that and it pops up asking for
@@ -106,6 +140,8 @@ academy. Without it, nothing is uploaded.
 - Tap any match for that individual performance: score out of 100, a verdict,
   your stat line, and an expandable breakdown of exactly how the score was
   reached (`+18 clean sheet`, `+12.5 5 saves`, `−4 1 conceded`)
+- Tap the ground for directions: Apple Maps on an iPhone, Google Maps
+  elsewhere, searching for the ground rather than "Pitch 3"
 - **Share a match card**: generates an image of the performance — photo, score,
   match rating out of 100 and the position stats — through the phone's share
   sheet, or as a download
@@ -152,6 +188,17 @@ academy. Without it, nothing is uploaded.
 - Training hours and session counts feed the stats page
 
 **Stats tab**
+- **Wrapped**: your year on the pitch, Spotify Wrapped style. Full-screen
+  slides that move on by themselves - matches played, wins, your big numbers
+  for your position, your best game, tournaments and medals, your most-played
+  opponent, your busiest month, training, and a player type your numbers add
+  up to ("The Wall", "Goal Machine"). Tap the right to skip on, the left to go
+  back, hold to pause. It ends on a summary that shares as a story-sized
+  picture. The season runs with the calendar year: "2026 so far" through the
+  year, and in January the year just finished, with a one-off invitation to
+  watch it
+- Filter by season, team or competition. A season is a calendar year - 2026,
+  2025 - the way age groups move up each January
 - Team record, win rate, points per game, form guide, streak
 - Goals against, goal difference, clean sheets (goals *for* is hidden for
   keepers — it isn't their job)
@@ -290,6 +337,10 @@ Step-by-step, including where to get each key, is in
 
 Without it the app still works — it just asks each player for their own key.
 
+The same worker sends the match reminders. They need nothing extra set up:
+re-running **Deploy AI proxy** adds them, and until then Setup says reminders
+aren't set up on the server.
+
 ## Hosting it
 
 `.github/workflows/deploy.yml` builds the app, runs the tests, and publishes it
@@ -304,9 +355,9 @@ Once that's set, the site is served from
 `https://<user>.github.io/football-app/`. The build uses relative asset paths,
 so it works from that subpath without extra configuration.
 
-Because everything is stored in the browser, each phone that opens the link
-keeps its own separate data — there's no shared server and nothing syncs
-between devices. Use Export/Import in Setup to move data across.
+Everything is stored in the browser, so each phone that opens the link keeps
+its own data. Signing in (see Family and academies) shares it between a
+family's phones; without that, Export/Import in Setup moves it across.
 
 ## Layout on a phone
 
@@ -374,7 +425,6 @@ Third-party components are used under their own licences, listed in
   problem that dedicated systems still get wrong. Short-clip coaching is
   genuinely useful and is what the Coach tab does; counting every save
   automatically is not something this app can do honestly.
-- Push notifications (needs a server; calendar alarms cover reminders today)
 - Academies linked to each other sharing one competition, each entering its
   own scores
 - Goalkeeper extras: distribution accuracy, sweeper-keeper actions by zone

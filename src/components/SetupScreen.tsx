@@ -17,6 +17,7 @@ import { DurationPicker, EmptyState, Field, Section } from './ui';
 import { AvatarPicker } from './Avatar';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
 import type { TeamFormTarget } from './TeamFormSheet';
+import { ReminderSettings } from './ReminderSettings';
 
 const PROMPT_DELAYS = [
   { value: 0, label: 'At kickoff' },
@@ -333,6 +334,8 @@ export function SetupScreen({
           </Field>
         </div>
       </Section>
+
+      <ReminderSettings />
 
       <AccountSection />
       {ACADEMY && <AcademySection />}

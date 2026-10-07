@@ -7,15 +7,20 @@ import type { Match } from './types';
 import { ageGroupCheck, kickoffAt, todayISO } from './lib/date';
 import { nextMatchFor } from './lib/competitions';
 import { pendingResultMatches } from './lib/stats';
+import { takeSharedText } from './lib/shareTarget';
+import { syncReminders } from './lib/push';
 import { CalendarScreen } from './components/CalendarScreen';
 import { MatchesScreen } from './components/MatchesScreen';
 import { StatsScreen } from './components/StatsScreen';
 import { SetupScreen } from './components/SetupScreen';
-import { MatchFormSheet, type MatchFormTarget } from './components/MatchFormSheet';
+import { MatchFormSheet, type MatchFormTarget, type MessageImport } from './components/MatchFormSheet';
 import { MatchDetailSheet } from './components/MatchDetailSheet';
 import { ResultSheet } from './components/ResultSheet';
 import { ResultPrompt } from './components/ResultPrompt';
 import { AgeGroupPrompt } from './components/AgeGroupPrompt';
+import { WrappedInvite } from './components/WrappedInvite';
+import { WrappedStory } from './components/WrappedStory';
+import { wrappedInvite } from './lib/wrapped';
 import { CompetitionFormSheet, type CompetitionFormTarget } from './components/CompetitionFormSheet';
 import { CompetitionSheet, type CompetitionView } from './components/CompetitionSheet';
 import { TeamFormSheet, type TeamFormTarget } from './components/TeamFormSheet';
@@ -37,6 +42,9 @@ import { UpdatePrompt } from './components/UpdatePrompt';
 import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, MediaIcon, ShieldIcon } from './components/icons';
 
 type Tab = 'calendar' | 'matches' | 'media' | 'coach' | 'stats' | 'setup';
+
+/** The last year this phone was invited to watch its Wrapped. */
+const WRAPPED_SEEN_KEY = 'matchday.wrappedSeen';
 
 const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
   { id: 'calendar', label: 'Calendar', Icon: CalendarIcon },
@@ -63,11 +71,44 @@ function Shell() {
   const [teamForm, setTeamForm] = useState<TeamFormTarget | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // A pasted message with a whole list of games in it, being checked before they go in.
+  const [importInitial, setImportInitial] = useState<MessageImport | null>(null);
   const [imported, setImported] = useState(0);
   const [trainingForm, setTrainingForm] = useState<TrainingFormTarget | null>(null);
   const [promptHidden, setPromptHidden] = useState(false);
   const [ageAskHidden, setAgeAskHidden] = useState(false);
+  const [wrappedView, setWrappedView] = useState<{ year: number; complete: boolean } | null>(null);
+  // The January invitation is shown once per phone - the Stats page has it after that.
+  const [wrappedSeen, setWrappedSeen] = useState(() => {
+    try {
+      return Number(localStorage.getItem(WRAPPED_SEEN_KEY)) || 0;
+    } catch {
+      return 0;
+    }
+  });
+  const markWrappedSeen = (year: number) => {
+    setWrappedSeen(year);
+    try {
+      localStorage.setItem(WRAPPED_SEEN_KEY, String(year));
+    } catch {
+      // Private mode: it just asks again next time.
+    }
+  };
   const contentRef = useRef<HTMLElement>(null);
+
+  // A message shared into the app from WhatsApp (Android's share sheet) opens as
+  // a new match, read from the message. Once, on the launch it arrived with.
+  useEffect(() => {
+    const shared = takeSharedText();
+    if (shared) setMatchForm({ mode: 'create', sharedText: shared });
+  }, []);
+
+  // Match reminders on this phone follow the fixtures: a match added, moved or
+  // played sends the new list to the server. Nothing happens while they're off.
+  useEffect(() => {
+    const timer = window.setTimeout(() => void syncReminders({ matches, competitions }).catch(() => undefined), 1500);
+    return () => window.clearTimeout(timer);
+  }, [matches, competitions]);
 
   // The scroll container is shared across tabs, so reset it or you land halfway
   // down the next screen.
@@ -110,6 +151,12 @@ function Shell() {
       trainingForm,
   );
   const showAgeAsk = newSeason !== null && !ageAskHidden && !showPrompt && !sheetOpen;
+  // After the age group question, never on top of it.
+  const inviteYear = useMemo(
+    () => wrappedInvite(now, wrappedSeen, { matches, training, competitions, profile }),
+    [now, wrappedSeen, matches, training, competitions, profile],
+  );
+  const showInvite = inviteYear !== null && !showPrompt && !sheetOpen && !showAgeAsk && !wrappedView;
 
   // Academy staff: their half of the app, with no player's calendar unless this phone has one.
   // (ACADEMY first each time: with the release switched off, the build drops all of this.)
@@ -199,7 +246,12 @@ function Shell() {
           </Suspense>
         )}
         {tab === 'stats' && (
-          <StatsScreen now={now} onGoToMatches={() => setTab('matches')} onOpenCompetition={openCompetition} />
+          <StatsScreen
+            now={now}
+            onGoToMatches={() => setTab('matches')}
+            onOpenCompetition={openCompetition}
+            onOpenWrapped={(year, complete) => setWrappedView({ year, complete })}
+          />
         )}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
       </main>
@@ -224,6 +276,21 @@ function Shell() {
         <ResultPrompt pending={pending} onEnterResult={openResult} onDismiss={() => setPromptHidden(true)} />
       )}
 
+      {showInvite && inviteYear !== null && (
+        <WrappedInvite
+          year={inviteYear}
+          onLater={() => markWrappedSeen(inviteYear)}
+          onWatch={() => {
+            markWrappedSeen(inviteYear);
+            setWrappedView({ year: inviteYear, complete: true });
+          }}
+        />
+      )}
+
+      {wrappedView && (
+        <WrappedStory year={wrappedView.year} complete={wrappedView.complete} onClose={() => setWrappedView(null)} />
+      )}
+
       {showAgeAsk && newSeason && (
         <AgeGroupPrompt
           check={newSeason}
@@ -246,6 +313,11 @@ function Shell() {
           // Backfilling a match that has already been played - ask for the score now
           // rather than letting the prompt ambush them a moment later.
           if (kickoffAt(created.date, created.time).getTime() <= Date.now()) openResult(created);
+        }}
+        onMany={(games) => {
+          setMatchForm(null);
+          setImportInitial(games);
+          setImportOpen(true);
         }}
       />
 
@@ -297,10 +369,19 @@ function Shell() {
       <TournamentSheet open={tournamentOpen} onClose={() => setTournamentOpen(false)} />
       <ImportFixturesSheet
         open={importOpen}
-        onClose={() => setImportOpen(false)}
+        initial={importInitial}
+        onClose={() => {
+          setImportOpen(false);
+          setImportInitial(null);
+          if (returnTo) setCompetitionView({ id: returnTo, step: 'summary' });
+          setReturnTo(null);
+        }}
         onImported={(count) => {
           setImportOpen(false);
+          setImportInitial(null);
           setImported(count);
+          if (returnTo) setCompetitionView({ id: returnTo, step: 'summary' });
+          setReturnTo(null);
         }}
       />
       {imported > 0 && (

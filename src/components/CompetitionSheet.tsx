@@ -9,8 +9,11 @@ import { personalBests } from '../lib/records';
 import { scoreVerdict } from '../lib/score';
 import { computeStats, mainPositionGroup, placingLabel, recordSummary } from '../lib/stats';
 import { stageName } from '../lib/stage';
+import { shareCard } from '../lib/share';
+import { renderTournamentCard } from '../lib/tournamentCard';
 import { ACADEMY } from '../lib/features';
 import { knownTeams, standings } from '../lib/standings';
+import { GroundLink } from './GroundLink';
 import { MatchCard } from './MatchCard';
 import { StandingsTable } from './StandingsTable';
 import { TableResultSheet, type TableResultTarget } from './TableResultSheet';
@@ -55,6 +58,7 @@ export function CompetitionSheet({
   const [custom, setCustom] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
   const [notes, setNotes] = useState('');
+  const [shareState, setShareState] = useState<'idle' | 'working' | 'done' | 'failed'>('idle');
 
   // Oldest first - the order it was played in.
   const own = useMemo(
@@ -119,6 +123,7 @@ export function CompetitionSheet({
     // this page before the sheet on top of it can close itself.
     setResultTarget(null);
     setAllResults(false);
+    setShareState('idle');
   }, [view]);
 
   if (!view || !competition) return null;
@@ -129,6 +134,8 @@ export function CompetitionSheet({
   // purpose: finishing one mid-season by mistake would call off every fixture left.
   const finishable = competition.type === 'tournament' || competition.type === 'cup';
   const unplayed = own.filter((m) => m.status === 'scheduled');
+  // Where to head for: the next game's ground, or the one the tournament was set up with.
+  const ground = unplayed.find((m) => m.location)?.location || competition.location || '';
   const fixtures = own.filter((m) => m.status !== 'cancelled');
   const calledOff = own.length - fixtures.length;
   const first = own[0]?.date ?? '';
@@ -260,6 +267,23 @@ export function CompetitionSheet({
   const openResult = (result?: Result) =>
     setResultTarget({ competition, result, defaultGroup, knownTeams: knownTeams(own, otherResults), ourNames });
 
+  // One picture of the whole thing, for the family chat.
+  const share = async () => {
+    setShareState('working');
+    try {
+      const blob = await renderTournamentCard({ competition, matches: own, team, profile, group });
+      if (!blob) return setShareState('failed');
+      const how = await shareCard(
+        blob,
+        `${competition.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || noun}.png`,
+        `${competition.name} — ${competition.placing ? placingLabel(competition.placing) : recordSummary(stats)}`,
+      );
+      setShareState(how === 'cancelled' ? 'idle' : 'done');
+    } catch {
+      setShareState('failed');
+    }
+  };
+
   const positionCards = positionStatCards(group, {
     appearances: stats.appearances,
     played: stats.played,
@@ -282,8 +306,9 @@ export function CompetitionSheet({
             <button className="ghost-btn wide" onClick={startFinish}>
               Edit
             </button>
-            <button className="primary-btn wide" onClick={onClose}>
-              Done
+            {/* Finished is when it gets shown off - the header's ✕ still closes. */}
+            <button className="primary-btn wide" onClick={() => void share()} disabled={shareState === 'working'}>
+              {shareState === 'working' ? 'Making image…' : '📤 Share'}
             </button>
           </>
         ) : finishable && stats.played > 0 ? (
@@ -318,11 +343,14 @@ export function CompetitionSheet({
           </span>
         </div>
       ) : (
-        <p className="muted small">
-          {fixtures.length === 0
-            ? 'No matches yet. Add each one here as its fixture comes in.'
-            : `${stats.played > 0 ? 'In progress' : 'Coming up'} · ${stats.played} of ${fixtures.length} played`}
-        </p>
+        <>
+          <p className="muted small">
+            {fixtures.length === 0
+              ? 'No matches yet. Add each one here as its fixture comes in.'
+              : `${stats.played > 0 ? 'In progress' : 'Coming up'} · ${stats.played} of ${fixtures.length} played`}
+          </p>
+          {ground && <GroundLink location={ground} className="link-btn next-ground" />}
+        </>
       )}
 
       {stats.played > 0 && (
@@ -339,6 +367,16 @@ export function CompetitionSheet({
           </div>
         </div>
       )}
+
+      {stats.played > 0 && !finished && (
+        <div className="sheet-extra">
+          <button className="ghost-btn" onClick={() => void share()} disabled={shareState === 'working'}>
+            {shareState === 'working' ? 'Making image…' : `📤 Share ${noun} so far`}
+          </button>
+        </div>
+      )}
+      {shareState === 'done' && <p className="notice">Image ready — saved or shared.</p>}
+      {shareState === 'failed' && <p className="form-error">Couldn't make the image on this device.</p>}
 
       {/* The table first: in a league it's what the page is opened for. */}
       {showTables &&

@@ -7,6 +7,7 @@ import { outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
 import { downloadICS, matchToICS } from '../lib/ics';
 import { renderShareCard, shareCard } from '../lib/share';
+import { GroundLink } from './GroundLink';
 import { MediaGallery } from './MediaGallery';
 import { Sheet } from './ui';
 
@@ -58,12 +59,12 @@ export function MatchDetailSheet({
         profile,
       });
       if (!blob) return setShareState('failed');
-      await shareCard(
+      const how = await shareCard(
         blob,
         `${match.opponent.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'match'}.png`,
         `${match.venue === 'away' ? '@' : 'vs'} ${match.opponent} — ${scoreline(result)}`,
       );
-      setShareState('done');
+      setShareState(how === 'cancelled' ? 'idle' : 'done');
     } catch {
       setShareState('failed');
     }
@@ -184,11 +185,16 @@ export function MatchDetailSheet({
         </div>
         <div>
           <dt>Venue</dt>
-          <dd>
-            {VENUE_LABEL[match.venue]}
-            {match.location ? ` · ${match.location}` : ''}
-          </dd>
+          <dd>{VENUE_LABEL[match.venue]}</dd>
         </div>
+        {match.location && (
+          <div>
+            <dt>Ground</dt>
+            <dd>
+              <GroundLink location={match.location} />
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Competition</dt>
           <dd>

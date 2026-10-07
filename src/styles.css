@@ -2197,3 +2197,229 @@ table.compare td.best { color: var(--accent); font-weight: 800; }
 .doc-list > li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .doc-list > li:last-child { border-bottom: 0; }
 .doc-preview { display: block; margin-top: 8px; max-width: 100%; max-height: 420px; border-radius: 8px; background: #fff; }
+
+/* ---------- directions ---------- */
+a.ground-link { text-decoration: none; }
+.next-ground { align-self: flex-start; font-size: 13px; padding: 2px 0; }
+
+/* ---------- paste a fixture ---------- */
+.paste-open { width: 100%; }
+.paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+}
+.paste-box .field { margin: 0; }
+.paste-actions { display: flex; align-items: center; gap: 12px; }
+.paste-note { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+.paste-note.ok { color: var(--win); }
+.paste-note.many { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--text); }
+.import-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.import-or::before, .import-or::after { content: ''; flex: 1; height: 1px; background: var(--line-soft); }
+
+/* ---------- Wrapped: the year as a story ---------- */
+.wr {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(160deg, var(--wr-a, #15803d), var(--wr-b, #052e16));
+  transition: background 0.5s ease;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.wr.summary {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(34, 197, 94, 0.55), transparent 45%),
+    radial-gradient(circle at 95% 45%, rgba(168, 85, 247, 0.5), transparent 45%),
+    radial-gradient(circle at 15% 95%, rgba(249, 115, 22, 0.42), transparent 45%),
+    #0b1220;
+}
+/* Soft light drifting behind the words. */
+.wr-glow {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 62%);
+  pointer-events: none;
+  animation: wr-drift 14s ease-in-out infinite alternate;
+}
+.wr-glow.one { top: -30vmax; right: -25vmax; }
+.wr-glow.two { bottom: -35vmax; left: -30vmax; animation-duration: 18s; animation-direction: alternate-reverse; }
+.wr.summary .wr-glow { display: none; }
+@keyframes wr-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-8vmax, 6vmax) scale(1.15); }
+}
+
+.wr-top {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(var(--safe-top) + 12px) 14px 0;
+}
+.wr-bars { flex: 1; display: flex; gap: 4px; }
+.wr-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.3); overflow: hidden; }
+.wr-bar i { display: block; height: 100%; width: 0; background: #fff; }
+.wr-bar i.full { width: 100%; }
+.wr-bar i.run { animation: wr-fill linear forwards; }
+@keyframes wr-fill { from { width: 0; } to { width: 100%; } }
+.wr-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 18px;
+  flex: none;
+}
+
+.wr-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 28px calc(var(--safe-bottom) + 48px);
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+}
+.wr-kicker {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.wr-big {
+  margin: 0;
+  font-size: clamp(88px, 30vw, 150px);
+  line-height: 0.95;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.wr-unit {
+  display: block;
+  margin-top: 6px;
+  font-size: clamp(26px, 8vw, 38px);
+  letter-spacing: -0.01em;
+  font-weight: 800;
+  color: #fff;
+}
+.wr-word {
+  margin: 0;
+  font-size: clamp(54px, 17vw, 96px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+.wr-word.long { font-size: clamp(40px, 12vw, 72px); }
+.wr-line { margin: 16px 0 0; font-size: 19px; font-weight: 600; line-height: 1.4; }
+.wr-list { list-style: none; margin: 22px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.wr-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 17px;
+  font-weight: 700;
+}
+.wr-list li strong { white-space: nowrap; }
+
+/* Each part of a slide arrives a beat after the last. */
+.wr-in { animation: wr-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: calc(var(--d, 0) * 120ms); }
+@keyframes wr-rise { from { opacity: 0; transform: translateY(26px); } }
+.wr.still .wr-in, .wr.still .wr-glow { animation: none; }
+
+/* Taps: the left third goes back, the rest goes on. */
+.wr-tap { position: absolute; z-index: 2; top: 0; bottom: 0; border: 0; padding: 0; background: transparent; -webkit-tap-highlight-color: transparent; }
+.wr-tap.back { left: 0; width: 33%; }
+.wr-tap.on { right: 0; width: 67%; }
+.wr-tap:focus-visible { outline: 3px solid rgba(255, 255, 255, 0.7); outline-offset: -6px; }
+.wr-paused {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 24px);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wr-summary { justify-content: flex-start; padding-top: 28px; overflow-y: auto; }
+.wr-who { display: flex; align-items: center; gap: 12px; margin: 6px 0 20px; }
+.wr-who div { display: flex; flex-direction: column; }
+.wr-who strong { font-size: 20px; }
+.wr-who span { font-size: 15px; font-weight: 800; color: #4ade80; }
+.wr-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wr-tile {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(11, 18, 32, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.wr-tile strong { font-size: 38px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.wr-tile span { font-size: 14px; font-weight: 700; opacity: 0.8; }
+.wr-actions { display: flex; gap: 10px; margin-top: 22px; }
+.wr-actions > * { flex: 1; }
+
+/* The way in, on the Stats page. */
+.wrapped-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 18px;
+  color: #fff;
+  text-align: left;
+  background: linear-gradient(120deg, #15803d, #6d28d9 55%, #be185d);
+  box-shadow: 0 8px 24px rgba(109, 40, 217, 0.25);
+}
+.wrapped-banner-year { font-size: 30px; font-weight: 900; letter-spacing: -0.03em; }
+.wrapped-banner-text { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.wrapped-banner-text strong { font-size: 16px; }
+.wrapped-banner-text small { font-size: 13px; opacity: 0.85; }
+.wrapped-banner-play {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+}

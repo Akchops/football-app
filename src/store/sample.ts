@@ -2,7 +2,7 @@ import {
   COMPETITION_COLORS, TEAM_COLORS,
   type AppData, type Competition, type Match, type MatchResult, type Result, type Team,
 } from '../types';
-import { toISODate, seasonLabel } from '../lib/date';
+import { calendarSeason, toISODate } from '../lib/date';
 import { createId, emptyData } from './storage';
 
 /**
@@ -12,7 +12,7 @@ import { createId, emptyData } from './storage';
  */
 export function buildSampleData(now: Date = new Date()): AppData {
   const base = emptyData();
-  const season = seasonLabel(now);
+  const season = calendarSeason(now);
   const stamp = new Date().toISOString();
   const iso = (offsetDays: number) => toISODate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + offsetDays));
 

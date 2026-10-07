@@ -8,3 +8,7 @@ coverage
 
 # Python packages fetched to check SQL locally - never part of the app.
 *.whl
+
+# Running the worker locally (npx wrangler dev) keeps its state and secrets here.
+.wrangler
+.dev.vars

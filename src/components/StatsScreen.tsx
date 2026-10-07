@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { POSITION_GROUP_LABEL, VENUE_LABEL, type PositionGroup } from '../types';
-import { formatDateShort, seasonOf } from '../lib/date';
+import { formatDateShort } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import {
@@ -9,6 +9,7 @@ import {
   statsByMonth, statsByOpponent, statsByStage, statsByTeam, statsByTournament, statsByVenue, type StageBreakdown,
 } from '../lib/stats';
 import { milestones, personalBests } from '../lib/records';
+import { wrappedYear } from '../lib/wrapped';
 import { TRAINING_TYPE_LABEL } from '../types';
 import { Avatar } from './Avatar';
 import { MissionBoard } from './MissionBoard';
@@ -19,10 +20,13 @@ export function StatsScreen({
   now,
   onGoToMatches,
   onOpenCompetition,
+  onOpenWrapped,
 }: {
   now: Date;
   onGoToMatches: () => void;
   onOpenCompetition: (id: string, step?: 'summary' | 'finish') => void;
+  /** The year as a story - see WrappedStory. */
+  onOpenWrapped?: (year: number, complete: boolean) => void;
 }) {
   const { matches, competitions, teams, profile, training } = useStore();
   const [competitionId, setCompetitionId] = useState<string>('all');
@@ -35,7 +39,7 @@ export function StatsScreen({
       matches
         .filter((m) => competitionId === 'all' || (m.competitionId ?? '') === competitionId)
         .filter((m) => teamId === 'all' || (m.teamId ?? '') === teamId)
-        .filter((m) => season === 'all' || seasonOf(m.date) === season),
+        .filter((m) => season === 'all' || m.date.startsWith(`${season}-`)),
     [matches, competitionId, teamId, season],
   );
 
@@ -199,9 +203,26 @@ export function StatsScreen({
     totals: stats.totals,
   });
 
+  // In January it's the year just finished; otherwise this one so far.
+  const offer = wrappedYear(now);
+  const hasWrapped = matches.some((m) => isPlayed(m) && m.date.startsWith(`${offer.year}-`));
+
   return (
     <div className="screen">
       {header}
+
+      {hasWrapped && onOpenWrapped && (
+        <button className="wrapped-banner" onClick={() => onOpenWrapped(offer.year, offer.complete)}>
+          <span className="wrapped-banner-year">{offer.year}</span>
+          <span className="wrapped-banner-text">
+            <strong>{offer.complete ? `Your ${offer.year} Wrapped` : `Your ${offer.year} so far`}</strong>
+            <small>Your year on the pitch, Wrapped-style</small>
+          </span>
+          <span className="wrapped-banner-play" aria-hidden="true">
+            ▶
+          </span>
+        </button>
+      )}
 
       <div className="record-hero">
         <div className="record-line">
