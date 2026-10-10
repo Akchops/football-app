@@ -190,6 +190,8 @@ export function StatsScreen({
   }
 
   const maxMonth = Math.max(1, ...byMonth.map((b) => b.played));
+  // Walkovers count in the record but not here - no goals were played for.
+  const goalsPerGame = (goals: number) => (stats.goalGames ? goals / stats.goalGames : 0).toFixed(1);
   const winPct = Math.round(stats.winRate * 100);
   const drawPct = stats.played ? Math.round((stats.draws / stats.played) * 100) : 0;
   const lossPct = Math.max(0, 100 - winPct - drawPct);
@@ -261,15 +263,15 @@ export function StatsScreen({
 
       <div className="tile-grid">
         {showsTeamAttack(group) && (
-          <StatTile label="Goals for" value={stats.goalsFor} sub={`${(stats.goalsFor / stats.played).toFixed(1)} per game`} />
+          <StatTile label="Goals for" value={stats.goalsFor} sub={`${goalsPerGame(stats.goalsFor)} per game`} />
         )}
         <StatTile
           label="Goals against"
           value={stats.goalsAgainst}
-          sub={`${(stats.goalsAgainst / stats.played).toFixed(1)} per game`}
+          sub={`${goalsPerGame(stats.goalsAgainst)} per game`}
         />
         <StatTile label="Goal difference" value={stats.goalDifference > 0 ? `+${stats.goalDifference}` : stats.goalDifference} />
-        <StatTile label="Clean sheets" value={stats.cleanSheets} sub={`${stats.played - stats.cleanSheets} conceded in`} />
+        <StatTile label="Clean sheets" value={stats.cleanSheets} sub={`${stats.goalGames - stats.cleanSheets} conceded in`} />
       </div>
 
       <Section title={`Your game · ${POSITION_GROUP_LABEL[group]}`}>

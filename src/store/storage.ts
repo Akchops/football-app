@@ -58,6 +58,7 @@ function migrateResult(raw: MatchResult | null): MatchResult | null {
     motm: raw.motm ?? false,
     yellowCards: raw.yellowCards ?? 0,
     redCards: raw.redCards ?? 0,
+    walkover: raw.walkover === 'us' || raw.walkover === 'them' ? raw.walkover : null,
     metrics,
   };
 }

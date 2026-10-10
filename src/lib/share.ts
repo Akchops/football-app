@@ -4,7 +4,7 @@ import {
 import { fixtureContext } from './stage';
 import { formatDateLong } from './date';
 import { matchScore, scoreBand, scoreVerdict } from './score';
-import { outcomeOf, scoreline } from './stats';
+import { isWalkover, outcomeOf, scoreline } from './stats';
 
 const W = 1080;
 /** Where the stat tiles start; the card's height grows from here. */
@@ -69,7 +69,7 @@ export async function renderShareCard({ match, team, competition, profile }: Sha
     if (value) entries.push({ label: METRIC_BY_ID[id]?.short ?? id, value: String(value) });
   };
   if (result.positionGroup === 'goalkeeper') {
-    if (result.goalsAgainst === 0) entries.push({ label: 'Clean sheet', value: '✓' });
+    if (result.goalsAgainst === 0 && !isWalkover(result)) entries.push({ label: 'Clean sheet', value: '✓' });
     push('saves');
     push('penaltiesSaved');
     push('claims');

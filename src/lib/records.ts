@@ -1,7 +1,7 @@
 import { METRIC_BY_ID, type Match, type MatchResult, type MetricId, type PositionGroup } from '../types';
 import { formatDateShort, kickoffAt } from './date';
 import { matchScore } from './score';
-import { computeStats, outcomeOf, playedMatches, type Stats } from './stats';
+import { computeStats, isWalkover, outcomeOf, playedMatches, type Stats } from './stats';
 
 export interface PersonalBest {
   id: string;
@@ -90,7 +90,8 @@ export function personalBests(matches: Match[], group: PositionGroup): PersonalB
   if (group === 'goalkeeper') {
     bests.push(bestForMetric(played, 'saves', 'Most saves in a match'));
     bests.push(bestForMetric(played, 'penaltiesSaved', 'Most penalties saved'));
-    const run = longestRun(played, (m) => m.result.goalsAgainst === 0);
+    // Walkovers neither add to a clean-sheet run nor end one - nobody played.
+    const run = longestRun(played.filter((m) => !isWalkover(m.result)), (m) => m.result.goalsAgainst === 0);
     if (run.length > 0) {
       bests.push({
         id: 'cleanSheetRun',

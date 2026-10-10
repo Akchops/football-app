@@ -52,6 +52,17 @@ describe('parseData', () => {
     expect(parseData(saved('semis')).matches[0].stage).toBeNull();
   });
 
+  it('loads results from before walkovers as not being one, and keeps a real one', () => {
+    const saved = (walkover: unknown) =>
+      JSON.stringify({
+        version: 7,
+        matches: [{ id: 'm', date: '2026-04-10', status: 'played', result: { goalsFor: 0, goalsAgainst: 0, walkover } }],
+      });
+    expect(parseData(saved(undefined)).matches[0].result?.walkover).toBeNull();
+    expect(parseData(saved('them')).matches[0].result?.walkover).toBe('them');
+    expect(parseData(saved('yes')).matches[0].result?.walkover).toBeNull();
+  });
+
   it('turns the old single team name into the player\'s first team', () => {
     const data = parseData(V1_BACKUP);
     expect(data.teams).toHaveLength(1);

@@ -218,3 +218,18 @@ describe('suggestedOpponents', () => {
     expect(suggestedOpponents(matches, results, 'c1', ['Oakwood Rangers'])).toEqual(['Moor', 'Vale FC']);
   });
 });
+
+describe('walkovers in a table', () => {
+  const walkover = (opponent: string, side: 'us' | 'them') =>
+    ours(opponent, 0, 0, { result: { ...emptyResult('GK'), didPlay: false, walkover: side } });
+
+  it('give the winner the points and nobody any goals', () => {
+    const [group] = table({ matches: [walkover('Vale', 'us'), walkover('Hilltop', 'them')] });
+    expect(lines(group)).toEqual([
+      'Hilltop 1 1 0 0 0:0 3',
+      'Oakwood Rangers 2 1 0 1 0:0 3',
+      'Vale 1 0 0 1 0:0 0',
+    ]);
+    expect(group.rows.find((r) => r.team === 'Vale')?.form).toEqual(['L']);
+  });
+});

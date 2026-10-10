@@ -3,7 +3,7 @@ import { stageName } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import { METRIC_BY_ID, VENUE_LABEL, type Competition, type Match, type MetricId } from '../types';
 import { formatDateLong, formatTime, kickoffAt, relativeDayLabel } from '../lib/date';
-import { outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
+import { isWalkover, outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
 import { downloadICS, matchToICS } from '../lib/ics';
 import { renderShareCard, shareCard } from '../lib/share';
@@ -103,6 +103,7 @@ export function MatchDetailSheet({
           <div className="result-score">{scoreline(result)}</div>
           <div className="result-caption">
             {outcomeOf(result) === 'W' ? 'Win' : outcomeOf(result) === 'L' ? 'Defeat' : 'Draw'}
+            {isWalkover(result) && ' · walkover'}
             {shootoutWinner(result) === 'us' && ' · won on penalties'}
             {shootoutWinner(result) === 'them' && ' · lost on penalties'}
             {` · ${us} ${match.venue === 'away' ? 'away' : match.venue === 'home' ? 'at home' : 'neutral venue'}`}
@@ -231,7 +232,8 @@ export function MatchDetailSheet({
       )}
 
       <div className="sheet-extra">
-        {result && (
+        {/* A walkover has no performance to put on a card. */}
+        {result && !isWalkover(result) && (
           <button className="ghost-btn" onClick={() => void share()} disabled={shareState === 'working'}>
             {shareState === 'working' ? 'Making image…' : '📤 Share match card'}
           </button>

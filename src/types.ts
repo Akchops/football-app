@@ -182,7 +182,13 @@ export interface MatchResult {
   redCards: number;
   /** Position-specific counting stats. */
   metrics: MetricTotals;
+  /** Won or lost without a ball kicked - the other side didn't turn up. No goals
+      count either way. Missing on results saved before walkovers existed. */
+  walkover?: Walkover;
 }
+
+/** Which side was given the match: 'us' is a win, 'them' a loss. */
+export type Walkover = 'us' | 'them' | null;
 
 export interface Match {
   id: string;
@@ -380,6 +386,7 @@ export function emptyResult(position: string, group?: PositionGroup, durationMin
     yellowCards: 0,
     redCards: 0,
     metrics: {},
+    walkover: null,
   };
 }
 

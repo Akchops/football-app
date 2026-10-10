@@ -73,6 +73,19 @@ describe('personalBests', () => {
     expect(list.find((b) => b.id === 'cleanSheetRun')?.value).toBe('3 games');
   });
 
+  it('lets a walkover neither add to a clean-sheet run nor end it', () => {
+    const list = personalBests(
+      [
+        played({ result: { goalsAgainst: 0 } }),
+        played({ result: { didPlay: false, walkover: 'us' } }),
+        played({ result: { goalsAgainst: 0 } }),
+        played({ result: { didPlay: false, walkover: 'them' } }),
+      ],
+      'goalkeeper',
+    );
+    expect(list.find((b) => b.id === 'cleanSheetRun')?.value).toBe('2 games');
+  });
+
   it('tracks an unbeaten run through draws', () => {
     const list = personalBests(
       [

@@ -362,3 +362,29 @@ describe('seasonsPlayed', () => {
     expect(seasons).toEqual(['2026', '2025', '2024']);
   });
 });
+
+describe('walkovers', () => {
+  it('count as a win or a loss, with no goals and no clean sheet', () => {
+    const stats = computeStats([
+      played(2, 1, { date: '2026-04-01' }),
+      played(0, 0, { date: '2026-04-08', walkover: 'us', didPlay: false }),
+      played(0, 0, { date: '2026-04-15', walkover: 'them', didPlay: false }),
+    ]);
+    expect([stats.played, stats.wins, stats.draws, stats.losses]).toEqual([3, 2, 0, 1]);
+    expect([stats.goalsFor, stats.goalsAgainst]).toEqual([2, 1]);
+    expect(stats.cleanSheets).toBe(0);
+    expect(stats.failedToScore).toBe(0);
+    expect(stats.goalGames).toBe(1);
+    expect(stats.appearances).toBe(1);
+    expect(stats.points).toBe(6);
+  });
+
+  it('read as W/O and decide the outcome on their own', () => {
+    const win = { ...emptyResult('GK'), walkover: 'us' as const };
+    const loss = { ...emptyResult('GK'), walkover: 'them' as const };
+    expect(scoreline(win)).toBe('W/O');
+    expect(outcomeOf(win)).toBe('W');
+    expect(outcomeOf(loss)).toBe('L');
+    expect(outcomeOf({ ...emptyResult('GK'), walkover: null })).toBe('D');
+  });
+});

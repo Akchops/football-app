@@ -49,6 +49,8 @@ export function ResultSheet({
     setNotes(match.notes ?? '');
     setShowPens(existing?.penaltiesFor !== null && existing?.penaltiesFor !== undefined);
     setShowDetail(Boolean(existing));
+    // A walkover lives in Extra settings, so open them when there is one to show.
+    setShowExtra(Boolean(existing?.walkover));
     setConcededLinked(existing ? concededFollowsScore(existing) : true);
   }, [match, profile.position, team]);
 
@@ -57,11 +59,14 @@ export function ResultSheet({
   const primary = metricDefs.filter((m) => m.primary);
   const secondary = metricDefs.filter((m) => !m.primary);
   const preview = useMemo(() => matchScore(result, duration), [result, duration]);
-  const extraSummary = [
-    result.motm ? 'Man of the match' : null,
-    result.didPlay ? null : 'Did not play',
-    showPens ? 'Decided on penalties' : null,
-  ].filter((s): s is string => s !== null);
+  const walkover = result.walkover ?? null;
+  const extraSummary = walkover
+    ? [walkover === 'us' ? 'Walkover win' : 'Walkover loss']
+    : [
+        result.motm ? 'Man of the match' : null,
+        result.didPlay ? null : 'Did not play',
+        showPens ? 'Decided on penalties' : null,
+      ].filter((s): s is string => s !== null);
 
   if (!match) return null;
 
@@ -94,17 +99,35 @@ export function ResultSheet({
   };
 
   const save = () => {
-    const cleaned: MatchResult = {
-      ...result,
-      penaltiesFor: showPens && isDraw ? result.penaltiesFor ?? 0 : null,
-      penaltiesAgainst: showPens && isDraw ? result.penaltiesAgainst ?? 0 : null,
-      minutes: result.didPlay ? result.minutes : 0,
-      motm: result.didPlay ? result.motm : false,
-      rating: result.didPlay ? result.rating : null,
-      yellowCards: result.didPlay ? result.yellowCards : 0,
-      redCards: result.didPlay ? result.redCards : 0,
-      metrics: result.didPlay ? pruneMetrics(result.metrics) : {},
-    };
+    // Nobody played and nobody scored: a walkover is the win or loss and nothing else.
+    const cleaned: MatchResult = walkover
+      ? {
+          ...result,
+          goalsFor: 0,
+          goalsAgainst: 0,
+          penaltiesFor: null,
+          penaltiesAgainst: null,
+          didPlay: false,
+          minutes: 0,
+          motm: false,
+          rating: null,
+          yellowCards: 0,
+          redCards: 0,
+          metrics: {},
+          walkover,
+        }
+      : {
+          ...result,
+          penaltiesFor: showPens && isDraw ? result.penaltiesFor ?? 0 : null,
+          penaltiesAgainst: showPens && isDraw ? result.penaltiesAgainst ?? 0 : null,
+          minutes: result.didPlay ? result.minutes : 0,
+          motm: result.didPlay ? result.motm : false,
+          rating: result.didPlay ? result.rating : null,
+          yellowCards: result.didPlay ? result.yellowCards : 0,
+          redCards: result.didPlay ? result.redCards : 0,
+          metrics: result.didPlay ? pruneMetrics(result.metrics) : {},
+          walkover: null,
+        };
     saveResult(match.id, cleaned);
     if (notes !== match.notes) updateMatch(match.id, { notes });
     onSaved?.();
@@ -135,19 +158,28 @@ export function ResultSheet({
         </>
       }
     >
-      <div className="scoreboard">
-        <div className="score-side">
-          <span className="score-team">{us}</span>
-          <Stepper label={us} value={result.goalsFor} onChange={(v) => patch({ goalsFor: v })} max={50} accent />
+      {walkover ? (
+        <div className={`walkover-note outcome-${walkover === 'us' ? 'w' : 'l'}`}>
+          <strong>{walkover === 'us' ? `Walkover to ${us}` : `Walkover to ${them}`}</strong>
+          <span>
+            Counts as a {walkover === 'us' ? 'win' : 'defeat'}. No goals for either side, and no stats - nobody played.
+          </span>
         </div>
-        <div className="score-dash">–</div>
-        <div className="score-side">
-          <span className="score-team">{them}</span>
-          <Stepper label={them} value={result.goalsAgainst} onChange={setGoalsAgainst} max={50} accent />
+      ) : (
+        <div className="scoreboard">
+          <div className="score-side">
+            <span className="score-team">{us}</span>
+            <Stepper label={us} value={result.goalsFor} onChange={(v) => patch({ goalsFor: v })} max={50} accent />
+          </div>
+          <div className="score-dash">–</div>
+          <div className="score-side">
+            <span className="score-team">{them}</span>
+            <Stepper label={them} value={result.goalsAgainst} onChange={setGoalsAgainst} max={50} accent />
+          </div>
         </div>
-      </div>
+      )}
 
-      {result.didPlay && (
+      {result.didPlay && !walkover && (
         <>
           <Field group label="Position played" hint="Changes which stats are tracked below">
             <div className="chip-wrap">
@@ -258,6 +290,18 @@ export function ResultSheet({
         />
       </Field>
 
+      {/* On the main page, not tucked away: a match that never happened is common
+          enough to need one obvious tap. */}
+      <button
+        className="danger-link"
+        onClick={() => {
+          cancelMatch(match.id);
+          onClose();
+        }}
+      >
+        This match didn't happen (called off)
+      </button>
+
       {/* The things that are true of few matches. Kept out of the main flow so
           entering a normal result is a scoreline and your stats, and nothing
           else - but one tap away when a match was odd. */}
@@ -273,24 +317,46 @@ export function ResultSheet({
 
       {showExtra && (
         <div className="detail-block">
-          <label className="toggle-row">
-            <input type="checkbox" checked={result.motm} onChange={(e) => patch({ motm: e.target.checked })} />
-            <span>I was man of the match 🏅</span>
-          </label>
+          <Field group label="Walkover" hint="When a side doesn't turn up. It counts as a win or a loss, with no goals.">
+            {([
+              [null, 'No walkover - the match was played'],
+              ['us', `${us} got a walkover`],
+              ['them', `${them} got a walkover`],
+            ] as const).map(([value, label]) => (
+              <label key={value ?? 'none'} className="toggle-row">
+                <input
+                  type="radio"
+                  name="walkover"
+                  checked={walkover === value}
+                  onChange={() => patch({ walkover: value })}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </Field>
 
-          <label className="toggle-row">
-            <input type="checkbox" checked={result.didPlay} onChange={(e) => patch({ didPlay: e.target.checked })} />
-            <span>I played in this match</span>
-          </label>
+          {!walkover && (
+            <>
+              <label className="toggle-row">
+                <input type="checkbox" checked={result.motm} onChange={(e) => patch({ motm: e.target.checked })} />
+                <span>I was man of the match 🏅</span>
+              </label>
 
-          {isDraw && (
+              <label className="toggle-row">
+                <input type="checkbox" checked={result.didPlay} onChange={(e) => patch({ didPlay: e.target.checked })} />
+                <span>I played in this match</span>
+              </label>
+            </>
+          )}
+
+          {isDraw && !walkover && (
             <label className="toggle-row">
               <input type="checkbox" checked={showPens} onChange={(e) => setShowPens(e.target.checked)} />
               <span>Decided on penalties</span>
             </label>
           )}
 
-          {isDraw && showPens && (
+          {isDraw && showPens && !walkover && (
             <div className="row two">
               <Field label={`${us} pens`}>
                 <input
@@ -313,15 +379,6 @@ export function ResultSheet({
             </div>
           )}
 
-          <button
-            className="danger-link"
-            onClick={() => {
-              cancelMatch(match.id);
-              onClose();
-            }}
-          >
-            This match didn't happen (called off)
-          </button>
         </div>
       )}
     </Sheet>

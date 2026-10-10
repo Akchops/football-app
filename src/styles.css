@@ -830,6 +830,24 @@ select.input {
 
 .detail-block { display: flex; flex-direction: column; gap: 12px; }
 
+/* Takes the scoreboard's place when a side was given the match. */
+.walkover-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.walkover-note strong { font-size: 17px; }
+.walkover-note.outcome-w { border-color: rgba(41, 209, 124, 0.45); }
+.walkover-note.outcome-w strong { color: var(--win); }
+.walkover-note.outcome-l { border-color: rgba(242, 104, 95, 0.45); }
+.walkover-note.outcome-l strong { color: var(--loss); }
+
 .scoreboard {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

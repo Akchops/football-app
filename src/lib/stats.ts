@@ -5,7 +5,14 @@ import { matchScore } from './score';
 
 export type Outcome = 'W' | 'D' | 'L';
 
+/** Given the match without a ball kicked - the other side didn't turn up, or we didn't. */
+export function isWalkover(result: MatchResult): boolean {
+  return result.walkover === 'us' || result.walkover === 'them';
+}
+
 export function outcomeOf(result: MatchResult): Outcome {
+  if (result.walkover === 'us') return 'W';
+  if (result.walkover === 'them') return 'L';
   if (result.goalsFor > result.goalsAgainst) return 'W';
   if (result.goalsFor < result.goalsAgainst) return 'L';
   return 'D';
@@ -19,6 +26,7 @@ export function shootoutWinner(result: MatchResult): 'us' | 'them' | null {
 }
 
 export function scoreline(result: MatchResult): string {
+  if (isWalkover(result)) return 'W/O';
   const base = `${result.goalsFor}-${result.goalsAgainst}`;
   if (result.penaltiesFor !== null && result.penaltiesAgainst !== null) {
     return `${base} (${result.penaltiesFor}-${result.penaltiesAgainst} pens)`;
@@ -85,6 +93,8 @@ export interface Stats extends Record_ {
   /** Clean sheets in matches the player actually featured in. */
   cleanSheetsPlayed: number;
   failedToScore: number;
+  /** Played matches with a real score - walkovers count in the record but carry no goals. */
+  goalGames: number;
   shootoutWins: number;
   biggestWin: (Match & { result: MatchResult }) | null;
   heaviestDefeat: (Match & { result: MatchResult }) | null;
@@ -141,6 +151,7 @@ export function computeStats(matches: Match[]): Stats {
   let cleanSheets = 0;
   let cleanSheetsPlayed = 0;
   let failedToScore = 0;
+  let goalGames = 0;
   let shootoutWins = 0;
   let appearances = 0;
   let minutes = 0;
@@ -158,8 +169,12 @@ export function computeStats(matches: Match[]): Stats {
   for (const match of played) {
     const r = match.result;
     addToRecord(base, r);
-    if (r.goalsAgainst === 0) cleanSheets += 1;
-    if (r.goalsFor === 0) failedToScore += 1;
+    // A walkover is a win or a loss and nothing else: no goals, no clean sheet.
+    if (!isWalkover(r)) {
+      goalGames += 1;
+      if (r.goalsAgainst === 0) cleanSheets += 1;
+      if (r.goalsFor === 0) failedToScore += 1;
+    }
     if (shootoutWinner(r) === 'us') shootoutWins += 1;
 
     if (r.didPlay) {
@@ -213,6 +228,7 @@ export function computeStats(matches: Match[]): Stats {
     cleanSheets,
     cleanSheetsPlayed,
     failedToScore,
+    goalGames,
     shootoutWins,
     biggestWin,
     heaviestDefeat,

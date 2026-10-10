@@ -3,7 +3,7 @@ import type {
 } from '../types';
 import { MONTH_NAMES } from './date';
 import { matchScore } from './score';
-import { computeStats, mainPositionGroup, outcomeOf, playedMatches, scoreline, statsByOpponent } from './stats';
+import { computeStats, isWalkover, mainPositionGroup, outcomeOf, playedMatches, scoreline, statsByOpponent } from './stats';
 
 /**
  * A year on the pitch, told the way Spotify Wrapped tells a year of music: one
@@ -89,7 +89,7 @@ function bestLine(match: Match & { result: MatchResult }, group: PositionGroup):
     const value = r.metrics[metric] ?? 0;
     if (value > 0) parts.push(`${value} ${value === 1 ? one : label}`);
   }
-  if (r.goalsAgainst === 0 && (group === 'goalkeeper' || group === 'defender')) parts.push('clean sheet');
+  if (!isWalkover(r) && r.goalsAgainst === 0 && (group === 'goalkeeper' || group === 'defender')) parts.push('clean sheet');
   if (r.motm) parts.push('man of the match');
   return parts.slice(0, 4).join(' · ');
 }

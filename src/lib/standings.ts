@@ -51,6 +51,8 @@ interface Game {
   away: string;
   homeGoals: number;
   awayGoals: number;
+  /** Given without being played: the side named wins, and no goals count. */
+  walkover?: 'home' | 'away';
   /** For putting form in order. */
   order: string;
   group: string;
@@ -102,6 +104,7 @@ function gamesFrom(input: TableInput): { games: Game[]; ours: Set<string> } {
       away: match.opponent.trim(),
       homeGoals: match.result.goalsFor,
       awayGoals: match.result.goalsAgainst,
+      walkover: match.result.walkover === 'us' ? 'home' : match.result.walkover === 'them' ? 'away' : undefined,
       order: `${match.date}T${match.time}`,
       group: groupOf(match.stage, match.stageDetail, competition.type),
     });
@@ -150,15 +153,20 @@ function tally(games: Game[], win: number, draw: number, ours: Set<string>): Map
     return found;
   };
   for (const game of games) {
-    const sides: [Tally, number, number][] = [
-      [entry(game.home), game.homeGoals, game.awayGoals],
-      [entry(game.away), game.awayGoals, game.homeGoals],
+    const sides: [Tally, number, number, 'home' | 'away'][] = [
+      [entry(game.home), game.homeGoals, game.awayGoals, 'home'],
+      [entry(game.away), game.awayGoals, game.homeGoals, 'away'],
     ];
-    for (const [t, scored, conceded] of sides) {
-      const letter: FormLetter = scored > conceded ? 'W' : scored < conceded ? 'L' : 'D';
+    for (const [t, scored, conceded, side] of sides) {
+      // A walkover is a win for one side and a loss for the other, and no goals for either.
+      const letter: FormLetter = game.walkover
+        ? game.walkover === side ? 'W' : 'L'
+        : scored > conceded ? 'W' : scored < conceded ? 'L' : 'D';
       t.row.played += 1;
-      t.row.goalsFor += scored;
-      t.row.goalsAgainst += conceded;
+      if (!game.walkover) {
+        t.row.goalsFor += scored;
+        t.row.goalsAgainst += conceded;
+      }
       if (letter === 'W') {
         t.row.won += 1;
         t.row.points += win;
