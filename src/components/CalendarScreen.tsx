@@ -8,7 +8,7 @@ import {
 import { matchesOnDate, upcomingMatches } from '../lib/stats';
 import { GroundLink } from './GroundLink';
 import { MatchCard } from './MatchCard';
-import { Avatar } from './Avatar';
+import { PlayerCardMini } from './PlayerCard';
 import { StarBadge } from './MissionBoard';
 import { TRAINING_TYPE_LABEL } from '../types';
 import { EmptyState } from './ui';
@@ -24,6 +24,7 @@ export function CalendarScreen({
   onAddTraining,
   onOpenTraining,
   onEnterResult,
+  onOpenCard,
 }: {
   now: Date;
   onOpenMatch: (match: Match) => void;
@@ -33,6 +34,8 @@ export function CalendarScreen({
   onAddTraining: (dateISO: string) => void;
   onOpenTraining: (id: string) => void;
   onEnterResult: (match: Match) => void;
+  /** The little card by the greeting opens the full one, on Stats. */
+  onOpenCard?: () => void;
 }) {
   const { matches, settings, colorOf, teams, competitions, updateSettings, profile, training } = useStore();
   const [cursor, setCursor] = useState(() => startOfMonth(now));
@@ -83,7 +86,7 @@ export function CalendarScreen({
   return (
     <div className="screen">
       <div className="profile-header">
-        <Avatar photo={profile.photo} name={profile.name} size={46} />
+        <PlayerCardMini onOpen={onOpenCard} />
         <div className="profile-header-text">
           <strong>{profile.name ? `Hi, ${profile.name}` : 'Matchday'}</strong>
           <span>
@@ -99,8 +102,9 @@ export function CalendarScreen({
             {MONTH_NAMES[month]} <span>{year}</span>
           </h1>
           <p className="cal-sub">
+            {year} ·{' '}
             {monthMatches.length === 0
-              ? 'No matches this month'
+              ? 'no matches'
               : `${monthMatches.length} ${monthMatches.length === 1 ? 'match' : 'matches'} · ${monthPlayed} played · ${monthUpcoming} to come`}
           </p>
         </div>

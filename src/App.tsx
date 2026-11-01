@@ -1,4 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { LazyMotion, MotionConfig, domMax, m, useScroll, useTransform } from 'motion/react';
+import { springs } from './lib/motion';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { SyncProvider } from './store/SyncProvider';
 import { AcademyProvider, useAcademy } from './store/AcademyProvider';
@@ -95,6 +97,13 @@ function Shell() {
     }
   };
   const contentRef = useRef<HTMLElement>(null);
+  // iOS's large titles: as the page scrolls, the bar frosts over and the
+  // brand gives way to the screen's own name.
+  const { scrollY } = useScroll({ container: contentRef });
+  const barGlass = useTransform(scrollY, [0, 24], [0, 1]);
+  const brandFade = useTransform(scrollY, [12, 44], [1, 0]);
+  const titleFade = useTransform(scrollY, [28, 60], [0, 1]);
+  const titleLift = useTransform(scrollY, [28, 60], [8, 0]);
 
   // A message shared into the app from WhatsApp (Android's share sheet) opens as
   // a new match, read from the message. Once, on the launch it arrived with.
@@ -178,11 +187,17 @@ function Shell() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">
-            <BallIcon />
-          </span>
-          <span>Matchday</span>
+        <m.div className="topbar-glass" style={{ opacity: barGlass }} aria-hidden="true" />
+        <div className="topbar-titles">
+          <m.div className="brand" style={{ opacity: brandFade }}>
+            <span className="brand-mark">
+              <BallIcon />
+            </span>
+            <span>Matchday</span>
+          </m.div>
+          <m.div className="topbar-title" style={{ opacity: titleFade, y: titleLift }} aria-hidden="true">
+            {tab === 'setup' ? 'Setup' : TABS.find((t) => t.id === tab)?.label}
+          </m.div>
         </div>
         <div className="topbar-actions">
           {pending.length > 0 && (
@@ -214,6 +229,8 @@ function Shell() {
 
       <main className="content" ref={contentRef}>
         <InstallBanner />
+        {/* Screens cross-fade; nothing slides sideways, as on iOS's tab bar. */}
+        <m.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={springs.smooth}>
         {tab === 'calendar' && (
           <CalendarScreen
             now={now}
@@ -227,6 +244,7 @@ function Shell() {
               if (session) setTrainingForm({ mode: 'edit', session });
             }}
             onEnterResult={openResult}
+            onOpenCard={() => setTab('stats')}
           />
         )}
         {tab === 'matches' && (
@@ -254,6 +272,7 @@ function Shell() {
           />
         )}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
+        </m.div>
       </main>
 
       <nav className="tabbar">
@@ -264,9 +283,15 @@ function Shell() {
             onClick={() => setTab(t.id)}
             aria-current={tab === t.id ? 'page' : undefined}
           >
-            <span className="tab-icon">
+            {tab === t.id && <m.span layoutId="tab-pill" className="tab-pill" transition={springs.snappy} />}
+            {/* A small bounce when chosen - Apple's symbol "bounce". */}
+            <m.span
+              className="tab-icon"
+              animate={tab === t.id ? { scale: [1, 1.18, 0.96, 1] } : { scale: 1 }}
+              transition={{ duration: 0.42, ease: 'easeOut' }}
+            >
               <t.Icon />
-            </span>
+            </m.span>
             <span className="tab-label">{t.label}</span>
           </button>
         ))}
@@ -397,14 +422,20 @@ function Shell() {
 
 export default function App() {
   return (
-    <AppStoreProvider>
-      {/* Sits outside Shell so the service worker registers during onboarding too. */}
-      <UpdatePrompt />
-      <SyncProvider>
-        <AcademyProvider>
-          <Shell />
-        </AcademyProvider>
-      </SyncProvider>
-    </AppStoreProvider>
+    // Springs, drags and shared-element morphs, loaded once for the whole app.
+    // reducedMotion="user": with Reduce Motion on, things fade instead of moving.
+    <LazyMotion features={domMax} strict>
+      <MotionConfig reducedMotion="user" transition={springs.smooth}>
+        <AppStoreProvider>
+          {/* Sits outside Shell so the service worker registers during onboarding too. */}
+          <UpdatePrompt />
+          <SyncProvider>
+            <AcademyProvider>
+              <Shell />
+            </AcademyProvider>
+          </SyncProvider>
+        </AppStoreProvider>
+      </MotionConfig>
+    </LazyMotion>
   );
 }

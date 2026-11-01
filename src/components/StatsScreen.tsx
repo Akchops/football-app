@@ -11,7 +11,7 @@ import {
 import { milestones, personalBests } from '../lib/records';
 import { wrappedYear } from '../lib/wrapped';
 import { TRAINING_TYPE_LABEL } from '../types';
-import { Avatar } from './Avatar';
+import { PlayerCard } from './PlayerCard';
 import { MissionBoard } from './MissionBoard';
 import { TournamentList } from './TournamentList';
 import { EmptyState, Section, StatTile } from './ui';
@@ -79,14 +79,10 @@ export function StatsScreen({
     <>
       <div className="screen-head">
         <h1>Stats</h1>
-        <div className="stats-who">
-          <span className="muted small">
-            {profile.name ? `${profile.name} · ` : ''}
-            {POSITION_GROUP_LABEL[group]}
-          </span>
-          <Avatar photo={profile.photo} name={profile.name} size={34} />
-        </div>
+        <span className="muted small">{POSITION_GROUP_LABEL[group]}</span>
       </div>
+
+      <PlayerCard />
 
       {seasons.length > 1 && (
         <div className="chip-scroll" role="group" aria-label="Season">

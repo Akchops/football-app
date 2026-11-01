@@ -35,8 +35,8 @@ export default defineConfig(({ mode }) => {
           scope: '.',
           display: 'standalone',
           orientation: 'portrait',
-          background_color: '#0b1220',
-          theme_color: '#0b1220',
+          background_color: '#000000',
+          theme_color: '#000000',
           categories: ['sports', 'health', 'productivity'],
           // Puts Matchday in Android's share sheet: share the coach's message
           // from WhatsApp and it opens as a new match, read from the message.
