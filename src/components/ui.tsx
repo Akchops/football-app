@@ -1,7 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, animate, m, useDragControls, useMotionValue, useTransform, type PanInfo } from 'motion/react';
-import { prefersReducedMotion, sheetOpened, springs } from '../lib/motion';
+import { prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
+import { BallIcon, CalendarIcon, ChartIcon, NoEntryIcon, RunIcon, ShieldIcon, TrophyIcon } from './icons';
 
 export function Sheet({
   open,
@@ -54,6 +55,8 @@ function SheetFrame({
 }) {
   const backdropRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Opened from a tapped match: grow out of that row rather than rise from the bottom.
+  const [from] = useState(() => (prefersReducedMotion() ? null : takeOrigin()));
   const leaving = useRef(false);
   const y = useMotionValue(0);
   const drag = useDragControls();
@@ -83,6 +86,26 @@ function SheetFrame({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dismissible]);
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!from || !panel) return;
+    const to = panel.getBoundingClientRect();
+    const inset = [
+      Math.max(0, from.top - to.top),
+      Math.max(0, to.right - from.right),
+      Math.max(0, to.bottom - from.bottom),
+      Math.max(0, from.left - to.left),
+    ];
+    animate(
+      panel,
+      // Ends on the sheet's own shape (round on top, square at the foot), so nothing is cut off.
+      { clipPath: [`inset(${inset.map((v) => `${v}px`).join(' ')} round 16px)`, 'inset(0px 0px 0px 0px round 14px 14px 0px 0px)'] },
+      springs.smooth,
+    ).then(() => requestAnimationFrame(() => panel.style.removeProperty('clip-path')));
+    const body = panel.querySelectorAll<HTMLElement>('.sheet-head, .sheet-body, .sheet-foot');
+    animate(body, { opacity: [0.2, 1] }, { duration: 0.35, ease: 'easeOut' });
+  }, [from]);
 
   // Closed from outside (saved, or another sheet took over): slide a copy of
   // what was on screen away, so it never just blinks out.
@@ -118,7 +141,7 @@ function SheetFrame({
         aria-modal="true"
         aria-label={title}
         style={{ y }}
-        initial={{ y: '100%' }}
+        initial={from ? false : { y: '100%' }}
         animate={{ y: 0 }}
         transition={springs.smooth}
         drag={dismissible ? 'y' : false}
@@ -345,24 +368,70 @@ export function EmptyState({
   );
 }
 
+/**
+ * A coloured symbol per kind of stat, the way Health colours its categories:
+ * goals red, defending green, keeping blue, time orange, discipline yellow.
+ */
+const TILE_KINDS: { match: RegExp; color: string; Icon: () => JSX.Element }[] = [
+  { match: /goal diff|win|point|record/i, color: '#bf5af2', Icon: TrophyIcon },
+  { match: /clean sheet|conced|against|save|claim|sweep|pen/i, color: '#0a84ff', Icon: ShieldIcon },
+  { match: /goal|shot|target/i, color: '#ff375f', Icon: BallIcon },
+  { match: /assist|chance|pass/i, color: '#ff9f0a', Icon: RunIcon },
+  { match: /tackle|intercept|clear|block|duel/i, color: '#30d158', Icon: ShieldIcon },
+  { match: /minute|session|training|apps|appearance/i, color: '#64d2ff', Icon: CalendarIcon },
+  { match: /card|yellow|red|discipline/i, color: '#ffd60a', Icon: NoEntryIcon },
+];
+
+/** Labels whose numbers have already counted up this session - they only do it once. */
+const counted = new Set<string>();
+
+/** A number that counts up from zero the first time it's seen in a session. */
+function CountUp({ value, id }: { value: number; id: string }) {
+  const first = !counted.has(id) && !prefersReducedMotion() && value > 0;
+  const [shown, setShown] = useState(first ? 0 : value);
+  useEffect(() => {
+    if (!first) return void setShown(value);
+    counted.add(id);
+    const run = animate(0, value, { duration: 0.9, ease: [0.16, 1, 0.3, 1], onUpdate: (v) => setShown(Math.round(v)) });
+    return () => run.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return <>{shown}</>;
+}
+
 export function StatTile({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: string; tone?: 'win' | 'loss' | 'draw' }) {
+  const kind = TILE_KINDS.find((k) => k.match.test(label)) ?? { color: '#8e8e93', Icon: ChartIcon };
   return (
     <div className={tone ? `tile tone-${tone}` : 'tile'}>
-      <div className="tile-value">{value}</div>
+      <span className="tile-icon" style={{ background: kind.color }} aria-hidden="true">
+        <kind.Icon />
+      </span>
+      <div className="tile-value">{typeof value === 'number' ? <CountUp value={value} id={label} /> : value}</div>
       <div className="tile-label">{label}</div>
       {sub && <div className="tile-sub">{sub}</div>}
     </div>
   );
 }
 
-export function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+export function Section({
+  title,
+  action,
+  children,
+  grouped = false,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+  /** Settings-style: the section's contents sit together on one card. */
+  grouped?: boolean;
+}) {
   return (
-    <section className="section">
+    <section className={grouped ? 'section grouped' : 'section'}>
       <div className="section-head">
         <h2>{title}</h2>
         {action}
       </div>
-      {children}
+      {grouped ? <div className="section-card">{children}</div> : children}
     </section>
   );
 }

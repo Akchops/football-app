@@ -1,0 +1,131 @@
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, m } from 'motion/react';
+import { springs } from '../lib/motion';
+import { BallIcon, PasteIcon, PlusIcon, RunIcon, TrophyIcon } from './icons';
+
+export interface AddActions {
+  match: () => void;
+  tournament: () => void;
+  training: () => void;
+  importFixtures: () => void;
+}
+
+const HOLD_MS = 450;
+
+/**
+ * The big + in the middle of the tab bar - adding matches is what the app is
+ * for. A tap springs open a menu above it; holding it goes straight to a new
+ * match, the most common thing to add.
+ */
+export function AddButton({ actions }: { actions: AddActions }) {
+  const [open, setOpen] = useState(false);
+  const held = useRef<number | null>(null);
+  const fired = useRef(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const startHold = () => {
+    fired.current = false;
+    held.current = window.setTimeout(() => {
+      fired.current = true;
+      setOpen(false);
+      actions.match();
+    }, HOLD_MS);
+  };
+  const endHold = () => {
+    if (held.current !== null) window.clearTimeout(held.current);
+    held.current = null;
+  };
+
+  const pick = (run: () => void) => () => {
+    setOpen(false);
+    run();
+  };
+  const items = [
+    { label: 'Match', hint: 'A game on the calendar', Icon: BallIcon, run: actions.match },
+    { label: 'Tournament', hint: 'A day of games, with groups', Icon: TrophyIcon, run: actions.tournament },
+    { label: 'Training', hint: 'A session you went to', Icon: RunIcon, run: actions.training },
+    { label: 'Import fixtures', hint: 'From a photo or a message', Icon: PasteIcon, run: actions.importFixtures },
+  ];
+
+  return (
+    <>
+      <div className="add-slot">
+        <m.button
+          type="button"
+          className={open ? 'add-btn open' : 'add-btn'}
+          aria-label={open ? 'Close the add menu' : 'Add'}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          onPointerDown={startHold}
+          onPointerUp={endHold}
+          onPointerLeave={endHold}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={() => {
+            if (fired.current) return;
+            setOpen((o) => !o);
+          }}
+          whileTap={{ scale: 0.9 }}
+          transition={springs.snappy}
+        >
+          <m.span className="add-btn-icon" animate={{ rotate: open ? 45 : 0 }} transition={springs.snappy}>
+            <PlusIcon />
+          </m.span>
+        </m.button>
+      </div>
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <div className="add-layer" key="layer">
+              <m.div
+                className="add-scrim"
+                onClick={() => setOpen(false)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={springs.smooth}
+              />
+              <m.div
+                className="add-menu"
+                role="menu"
+                aria-label="Add"
+                initial={{ opacity: 0, scale: 0.6, y: 40 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.7, y: 30 }}
+                transition={springs.snappy}
+              >
+                {items.map(({ label, hint, Icon, run }, i) => (
+                  <m.button
+                    key={label}
+                    type="button"
+                    role="menuitem"
+                    className="add-item"
+                    onClick={pick(run)}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ ...springs.snappy, delay: 0.03 * (items.length - i) }}
+                  >
+                    <span className="add-item-icon">
+                      <Icon />
+                    </span>
+                    <span className="add-item-text">
+                      <strong>{label}</strong>
+                      <span>{hint}</span>
+                    </span>
+                  </m.button>
+                ))}
+              </m.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+    </>
+  );
+}

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { m } from 'motion/react';
+import { springs } from '../lib/motion';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import {
@@ -38,7 +40,13 @@ export function CalendarScreen({
   onOpenCard?: () => void;
 }) {
   const { matches, settings, colorOf, teams, competitions, updateSettings, profile, training } = useStore();
-  const [cursor, setCursor] = useState(() => startOfMonth(now));
+  const [cursor, setCursorState] = useState(() => startOfMonth(now));
+  // Which way the last month change went, so the next grid slides in from that side.
+  const [direction, setDirection] = useState(0);
+  const setCursor = (next: Date) => {
+    setDirection(next.getTime() > cursor.getTime() ? 1 : next.getTime() < cursor.getTime() ? -1 : 0);
+    setCursorState(next);
+  };
   const [selected, setSelected] = useState(() => todayISO(now));
 
   const year = cursor.getFullYear();
@@ -147,7 +155,15 @@ export function CalendarScreen({
         )}
       </div>
 
-      <div className="cal-grid" role="grid">
+      {/* A new month slides in from the side it's coming from. */}
+      <m.div
+        key={monthKey}
+        className="cal-grid"
+        role="grid"
+        initial={{ opacity: 0, x: direction * 28 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={springs.smooth}
+      >
         {weekdayLabels(settings.weekStartsOn).map((d) => (
           <div key={d} className="cal-weekday" role="columnheader">
             {d.slice(0, 1)}
@@ -179,6 +195,8 @@ export function CalendarScreen({
               aria-label={`${formatDateLong(iso)}${live.length ? `, ${live.length} matches` : ''}`}
               onClick={() => setSelected(iso)}
             >
+              {/* The selection glides from day to day. */}
+              {iso === selected && <m.span layoutId="cal-selected" className="cal-selected" transition={springs.snappy} />}
               <span className="cal-daynum">{day.getDate()}</span>
               {live.length > 0 && (
                 <span className="cal-dots">
@@ -196,7 +214,7 @@ export function CalendarScreen({
             </button>
           );
         })}
-      </div>
+      </m.div>
 
       <div className="day-detail">
         <div className="day-head">

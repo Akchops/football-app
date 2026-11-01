@@ -1,5 +1,6 @@
 import type { Match, MetricId, PositionGroup, Profile } from '../types';
-import { computeStats, playedMatches } from './stats';
+import { computeStats, playedMatches, recordSummary, type Outcome } from './stats';
+import { matchScore } from './score';
 
 /**
  * The player's own Ultimate Team-style card: one rating, six stats, a tier.
@@ -23,6 +24,13 @@ export interface PlayerCardData {
   group: PositionGroup;
   stats: CardStat[];
   appearances: number;
+  /** The back of the pass: the season so far. */
+  back: {
+    record: string;
+    /** Last five, newest first. */
+    form: Outcome[];
+    best: { score: number; opponent: string; date: string } | null;
+  };
 }
 
 /** Bronze under 65, silver to 74, gold from 75 - the game's own breaks, on a 100 scale. */
@@ -75,7 +83,14 @@ export function playerCard(matches: Match[], profile: Pick<Profile, 'position' |
   const recent = playedMatches(matches).filter((m) => m.result.didPlay).slice(0, 3);
   const inForm = rating !== null && recent.some((m) => m.result.motm);
   const group = profile.positionGroup;
+  let best: PlayerCardData['back']['best'] = null;
+  for (const m of playedMatches(matches)) {
+    if (!m.result.didPlay) continue;
+    const score = matchScore(m.result, m.durationMinutes).score;
+    if (!best || score > best.score) best = { score, opponent: m.opponent, date: m.date };
+  }
   return {
+    back: { record: recordSummary(stats), form: stats.form, best },
     rating,
     tier: inForm ? 'inform' : tierFor(rating),
     position: profile.position || 'POS',

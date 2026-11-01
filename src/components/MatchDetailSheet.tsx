@@ -10,6 +10,7 @@ import { renderShareCard, shareCard } from '../lib/share';
 import { GroundLink } from './GroundLink';
 import { MediaGallery } from './MediaGallery';
 import { Sheet } from './ui';
+import { useMatchActions } from './UndoToast';
 
 export function MatchDetailSheet({
   match,
@@ -29,7 +30,8 @@ export function MatchDetailSheet({
   onOpenCompetition?: (competition: Competition) => void;
   onSeeAllMedia?: () => void;
 }) {
-  const { competitionOf, teamOf, deleteMatch, cancelMatch, restoreMatch, profile, settings } = useStore();
+  const { competitionOf, teamOf, restoreMatch, profile, settings } = useStore();
+  const actions = useMatchActions();
   const [shareState, setShareState] = useState<'idle' | 'working' | 'done' | 'failed'>('idle');
   if (!match) return null;
 
@@ -70,11 +72,10 @@ export function MatchDetailSheet({
     }
   };
 
+  // No "are you sure?": it goes at once, and the toast offers Undo.
   const remove = () => {
-    if (confirm(`Delete the match against ${match.opponent}? This can't be undone.`)) {
-      deleteMatch(match.id);
-      onClose();
-    }
+    actions.remove(match);
+    onClose();
   };
 
   return (
@@ -253,7 +254,7 @@ export function MatchDetailSheet({
             Restore match
           </button>
         ) : (
-          <button className="ghost-btn" onClick={() => cancelMatch(match.id)}>
+          <button className="ghost-btn" onClick={() => actions.callOff(match)}>
             Mark as called off
           </button>
         )}

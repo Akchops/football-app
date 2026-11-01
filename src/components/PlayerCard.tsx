@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { animate, m, useMotionValue, useSpring, useTransform } from 'motion/react';
 import { useStore } from '../store/AppStore';
 import { playerCard, type CardTier } from '../lib/playerCard';
+import { formatDateShort } from '../lib/date';
 import { prefersReducedMotion, springs } from '../lib/motion';
 import { Avatar } from './Avatar';
 
@@ -27,28 +28,49 @@ function remember(rating: number | null, tier: CardTier): void {
   try {
     localStorage.setItem(SEEN_KEY, JSON.stringify({ rating, tier }));
   } catch {
-    // Private mode or full storage: the card just won't celebrate next time.
+    // Private mode or full storage: the pass just won't celebrate next time.
   }
 }
 
+/** The rating in a ring, Activity-style: the ring fills to the rating out of 100. */
+function RatingRing({ value, size = 92 }: { value: number | null; size?: number }) {
+  const stroke = size * 0.11;
+  const r = (size - stroke) / 2;
+  return (
+    <svg className="ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} className="ring-track" strokeWidth={stroke} fill="none" />
+      <m.circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        className="ring-fill"
+        strokeWidth={stroke}
+        fill="none"
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: (value ?? 0) / 100 }}
+        transition={{ ...springs.smooth, visualDuration: 0.9 }}
+      />
+    </svg>
+  );
+}
+
 /**
- * The player's card, in the style of the game's Ultimate Team cards: the
- * rating is their average match score, the six stats are their own totals,
- * the trim is their team's kit colour.
- *
- * Its moments: it leans toward a finger dragged across it; when a new result
- * moves the rating, the number rolls there and a light sweeps across; going up
- * a tier turns the card over to reveal the new one.
+ * The player's pass, in the manner of a Wallet pass: their average match
+ * score as a ring, six stats from their own logs, the team's colour glowing
+ * through. It leans toward a finger, rolls to a new rating with a sweep of
+ * light, and turns over when tapped to show the season so far.
  */
 export function PlayerCard() {
   const { matches, profile, teams } = useStore();
   const card = useMemo(() => playerCard(matches, profile), [matches, profile]);
-  const kit = teams[0]?.color || 'var(--accent)';
+  const team = teams[0];
 
-  // What the player saw last time decides whether there's anything to celebrate.
   const before = useRef(lastSeen());
   const [shown, setShown] = useState<number | null>(before.current?.rating ?? card.rating);
   const [sweep, setSweep] = useState(0);
+  const [back, setBack] = useState(false);
   const flip = useMotionValue(0);
 
   useEffect(() => {
@@ -59,28 +81,30 @@ export function PlayerCard() {
       setShown(card.rating);
       return;
     }
-    // Roll from the old rating to the new one, then the light sweep.
-    const from = was.rating ?? card.rating;
-    const run = animate(from, card.rating, {
+    const run = animate(was.rating ?? card.rating, card.rating, {
       ...springs.smooth,
-      visualDuration: 0.8,
+      visualDuration: 0.9,
       onUpdate: (v) => setShown(Math.round(v)),
     });
     setSweep((n) => n + 1);
+    // A new tier: one full turn, landing on the front.
     if (was.tier !== card.tier && card.tier !== 'none') {
-      flip.set(180);
+      flip.set(-360);
       animate(flip, 0, springs.bouncy);
     }
     return () => run.stop();
   }, [card.rating, card.tier, flip]);
 
-  // Leans toward the finger, springing back when it lets go.
+  useEffect(() => {
+    animate(flip, back ? 180 : 0, springs.smooth);
+  }, [back, flip]);
+
   const px = useMotionValue(0.5);
   const py = useMotionValue(0.5);
-  const tiltX = useSpring(useTransform(py, [0, 1], [7, -7]), springs.snappy);
-  const tiltY = useSpring(useTransform(px, [0, 1], [-9, 9]), springs.snappy);
+  const tiltX = useSpring(useTransform(py, [0, 1], [6, -6]), springs.snappy);
+  const tiltY = useSpring(useTransform(px, [0, 1], [-8, 8]), springs.snappy);
   const rotateY = useTransform([tiltY, flip], ([t, f]: number[]) => t + f);
-  const glareX = useTransform(px, [0, 1], ['10%', '90%']);
+  const glareX = useTransform(px, [0, 1], ['0%', '100%']);
   const glareY = useTransform(py, [0, 1], ['0%', '100%']);
   const track = (e: React.PointerEvent<HTMLDivElement>) => {
     if (prefersReducedMotion()) return;
@@ -93,66 +117,107 @@ export function PlayerCard() {
     py.set(0.5);
   };
 
-  const label = card.rating === null
-    ? `${profile.name || 'Your'} card: no rating yet. Log a match to get one.`
-    : `${profile.name || 'Your'} card: ${TIER_NAME[card.tier]}, rated ${card.rating}, ${card.position}. ` +
-      card.stats.map((s) => `${s.value} ${s.label}`).join(', ');
+  const label =
+    card.rating === null
+      ? `${profile.name || 'Your'} pass: no rating yet. Log a match to get one.`
+      : `${profile.name || 'Your'} pass: ${TIER_NAME[card.tier]}, rated ${card.rating}, ${card.position}. ` +
+        card.stats.map((s) => `${s.value} ${s.label}`).join(', ');
 
   return (
-    <div className="player-card-stage" onPointerMove={track} onPointerLeave={settle} onPointerUp={settle}>
-      <m.div
-        className={`player-card tier-${card.tier}`}
-        style={{ rotateX: tiltX, rotateY, ['--kit' as string]: kit }}
-        role="img"
-        aria-label={label}
-        initial={{ opacity: 0, y: 16, scale: 0.96 }}
+    <div className="pass-stage" onPointerMove={track} onPointerLeave={settle} onPointerUp={settle}>
+      <m.button
+        type="button"
+        className={`pass tier-${card.tier}`}
+        style={{ rotateX: tiltX, rotateY, ['--gx' as string]: glareX, ['--gy' as string]: glareY }}
+        aria-label={`${label}. Tap to turn it over.`}
+        aria-pressed={back}
+        onClick={() => setBack((b) => !b)}
+        initial={{ opacity: 0, y: 18, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={springs.smooth}
+        whileTap={{ scale: 0.98 }}
       >
-        <m.div className="player-card-glare" style={{ ['--gx' as string]: glareX, ['--gy' as string]: glareY }} aria-hidden="true" />
-        {sweep > 0 && <span key={sweep} className="player-card-sweep" aria-hidden="true" />}
-        <div className="player-card-top" aria-hidden="true">
-          <div className="player-card-rating">
-            <span className="player-card-ovr">{shown ?? '–'}</span>
-            <span className="player-card-pos">{card.position}</span>
-            <span className="player-card-kit" />
-          </div>
-          <div className="player-card-photo">
-            <Avatar photo={profile.photo} name={profile.name} size={92} />
-          </div>
-        </div>
-        <div className="player-card-name" aria-hidden="true">
-          {profile.name || 'Player'}
-        </div>
-        <dl className="player-card-stats" aria-hidden="true">
-          {card.stats.map((s) => (
-            <div key={s.code}>
-              <dd>{s.value}</dd>
-              <dt>{s.code}</dt>
-            </div>
-          ))}
-        </dl>
-        <div className="player-card-foot" aria-hidden="true">
-          {card.rating === null ? 'Log a match to get your rating' : `${TIER_NAME[card.tier]} · ${card.appearances} apps`}
-        </div>
-      </m.div>
+        {/* Front */}
+        <span className="pass-face pass-front" aria-hidden="true">
+          <span className="pass-glare" />
+          {sweep > 0 && <span key={sweep} className="pass-sweep" />}
+          <span className="pass-top">
+            <span className="pass-brand">MATCHDAY</span>
+            <span className="pass-tier">{TIER_NAME[card.tier]}</span>
+          </span>
+          <span className="pass-main">
+            <span className="pass-ring">
+              <RatingRing value={shown} />
+              <span className="pass-ovr">{shown ?? '–'}</span>
+            </span>
+            <span className="pass-who">
+              <span className="pass-name">{profile.name || 'Player'}</span>
+              <span className="pass-sub">{[card.position, profile.ageGroup, team?.name].filter(Boolean).join(' · ')}</span>
+            </span>
+            <span className="pass-photo">
+              <Avatar photo={profile.photo} name={profile.name} size={46} />
+            </span>
+          </span>
+          <span className="pass-stats">
+            {card.stats.map((s) => (
+              <span key={s.code} className="pass-stat">
+                <span className="pass-stat-value">{s.value}</span>
+                <span className="pass-stat-code">{s.code}</span>
+              </span>
+            ))}
+          </span>
+        </span>
+
+        {/* Back */}
+        <span className="pass-face pass-back" aria-hidden="true">
+          <span className="pass-top">
+            <span className="pass-brand">THE SEASON SO FAR</span>
+            <span className="pass-tier">{card.back.record}</span>
+          </span>
+          <span className="pass-back-row">
+            <span className="pass-back-label">Form</span>
+            <span className="pass-form">
+              {card.back.form.length === 0
+                ? '–'
+                : card.back.form.map((o, i) => (
+                    <span key={i} className={`pass-form-pill outcome-${o.toLowerCase()}`}>
+                      {o}
+                    </span>
+                  ))}
+            </span>
+          </span>
+          <span className="pass-back-row">
+            <span className="pass-back-label">Best game</span>
+            <span>
+              {card.back.best
+                ? `${card.back.best.score} vs ${card.back.best.opponent} · ${formatDateShort(card.back.best.date)}`
+                : 'Log a match to see it'}
+            </span>
+          </span>
+          <span className="pass-back-row">
+            <span className="pass-back-label">Apps</span>
+            <span>{card.appearances}</span>
+          </span>
+          <span className="pass-hint">Tap to turn back</span>
+        </span>
+      </m.button>
     </div>
   );
 }
 
-/** The card in miniature, for the Calendar's header: rating, position, tier colour. */
+/** The pass in miniature, for the Calendar's header: the rating ring. */
 export function PlayerCardMini({ onOpen }: { onOpen?: () => void }) {
   const { matches, profile } = useStore();
   const card = useMemo(() => playerCard(matches, profile), [matches, profile]);
   return (
     <button
       type="button"
-      className={`player-card-mini tier-${card.tier}`}
+      className="player-card-mini"
       onClick={onOpen}
-      aria-label={card.rating === null ? 'Your card - no rating yet' : `Your card: rated ${card.rating}, ${TIER_NAME[card.tier]}`}
+      aria-label={card.rating === null ? 'Your pass - no rating yet' : `Your pass: rated ${card.rating}, ${TIER_NAME[card.tier]}`}
     >
+      <RatingRing value={card.rating} size={50} />
       <span className="player-card-mini-ovr">{card.rating ?? '–'}</span>
-      <span className="player-card-mini-pos">{card.position}</span>
     </button>
   );
 }

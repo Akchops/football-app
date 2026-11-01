@@ -13,7 +13,8 @@ import { AcademySection } from './academy/AcademySection';
 import { ACADEMY } from '../lib/features';
 import { useSync } from '../store/SyncProvider';
 import { AiSection } from './AiSettings';
-import { DurationPicker, EmptyState, Field, Section } from './ui';
+import { DurationPicker, EmptyState, Field, Section, Segmented } from './ui';
+import { useMatchesTop, useTheme } from '../useAppearance';
 import { AvatarPicker } from './Avatar';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
 import type { TeamFormTarget } from './TeamFormSheet';
@@ -99,7 +100,9 @@ export function SetupScreen({
         <h1>Setup</h1>
       </div>
 
-      <Section title="Your profile">
+      <AppearanceSection />
+
+      <Section grouped title="Your profile">
         <AvatarPicker
           photo={profile.photo}
           name={profile.name}
@@ -142,7 +145,7 @@ export function SetupScreen({
         </div>
       </Section>
 
-      <Section title="Position">
+      <Section grouped title="Position">
         <p className="muted small">This decides which stats the app tracks and how your match score is worked out.</p>
         <div className="position-grid">
           {GROUPS.map((g) => (
@@ -262,7 +265,7 @@ export function SetupScreen({
         )}
       </Section>
 
-      <Section title="Match defaults">
+      <Section grouped title="Match defaults">
         <Field label="Ask me for the result" hint="When a match has kicked off, the app prompts you next time you open it.">
           <select
             className="input"
@@ -340,7 +343,7 @@ export function SetupScreen({
       <AccountSection />
       {ACADEMY && <AcademySection />}
 
-      <Section title="Your data">
+      <Section grouped title="Your data">
         <p className="muted small">
           {signedIn
             ? "Matches, training and the profile are kept in your family's account as well as on this phone, so a new phone gets them by signing in. Match photos and clips are only on this phone."
@@ -397,7 +400,7 @@ export function SetupScreen({
 
       <AiSection />
 
-      <Section title="The app on your phone">
+      <Section grouped title="The app on your phone">
         <p className="muted small">
           Matchday installs to your home screen and runs like any other app — full screen, its own icon, and it
           works with no signal, which is the normal state at a pitch. On Android, use the Install prompt when it
@@ -414,5 +417,37 @@ export function SetupScreen({
         <br />© {new Date().getFullYear()} Aarav Chopra. All rights reserved.
       </p>
     </div>
+  );
+}
+
+/** Light, Dark or Automatic, and how Matches opens - kept on this phone only. */
+function AppearanceSection() {
+  const [theme, setTheme] = useTheme();
+  const [top, setTop] = useMatchesTop();
+  return (
+    <Section grouped title="Appearance">
+      <Field group label="Look">
+        <Segmented
+          options={[
+            { value: 'dark', label: 'Dark' },
+            { value: 'light', label: 'Light' },
+            { value: 'auto', label: 'Automatic' },
+          ]}
+          value={theme}
+          onChange={setTheme}
+        />
+      </Field>
+      <p className="muted small">Automatic follows your phone. The accent colour is your first team's colour.</p>
+      <Field group label="Top of Matches">
+        <Segmented
+          options={[
+            { value: 'hero', label: 'Next match' },
+            { value: 'list', label: 'Just the list' },
+          ]}
+          value={top}
+          onChange={setTop}
+        />
+      </Field>
+    </Section>
   );
 }

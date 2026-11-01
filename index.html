@@ -13,6 +13,16 @@
     <meta name="apple-mobile-web-app-title" content="Matchday" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>Matchday</title>
+    <script>
+      // Dark unless this phone chose Light or Automatic in Setup - set before
+      // anything draws, so the app never flashes the wrong colours.
+      try {
+        var theme = localStorage.getItem('matchday.theme.v1');
+        document.documentElement.setAttribute('data-theme', theme === 'light' || theme === 'auto' ? theme : 'dark');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

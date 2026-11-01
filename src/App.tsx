@@ -1,8 +1,9 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { LazyMotion, MotionConfig, domMax, m, useScroll, useTransform } from 'motion/react';
 import { springs } from './lib/motion';
+import { useAppearance } from './useAppearance';
 import { AppStoreProvider, useStore } from './store/AppStore';
-import { SyncProvider } from './store/SyncProvider';
+import { SyncProvider, useSync } from './store/SyncProvider';
 import { AcademyProvider, useAcademy } from './store/AcademyProvider';
 import { useNow } from './useNow';
 import type { Match } from './types';
@@ -33,6 +34,7 @@ import { OnboardingScreen } from './components/OnboardingScreen';
 import { WhoIsThisFor } from './components/WhoIsThisFor';
 import { ACADEMY } from './lib/features';
 import { MediaScreen } from './components/MediaScreen';
+import { listAllMedia } from './store/media';
 // The Anthropic SDK is only needed on the Coach tab, so it stays out of the
 // bundle that has to load before the calendar appears.
 const AIScreen = lazy(() => import('./components/AIScreen'));
@@ -40,26 +42,40 @@ const AIScreen = lazy(() => import('./components/AIScreen'));
 // build with the academy release switched off drops it altogether.
 const AcademyShell = /* @__PURE__ */ lazy(() => import('./components/academy/AcademyShell'));
 import { InstallBanner } from './components/InstallBanner';
+import { AddButton } from './components/AddButton';
+import { PullToRefresh } from './components/PullToRefresh';
+import { UndoProvider } from './components/UndoToast';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, MediaIcon, ShieldIcon } from './components/icons';
+import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, ShieldIcon } from './components/icons';
 
 type Tab = 'calendar' | 'matches' | 'media' | 'coach' | 'stats' | 'setup';
 
 /** The last year this phone was invited to watch its Wrapped. */
 const WRAPPED_SEEN_KEY = 'matchday.wrappedSeen';
 
-const TABS: { id: Tab; label: string; Icon: () => JSX.Element }[] = [
+// The big + sits between Matches and Stats. Clips live inside Matches now.
+const TABS: { id: Tab; label: string; Icon: (p: { on?: boolean }) => JSX.Element }[] = [
   { id: 'calendar', label: 'Calendar', Icon: CalendarIcon },
   { id: 'matches', label: 'Matches', Icon: BallIcon },
-  { id: 'media', label: 'Media', Icon: MediaIcon },
-  { id: 'coach', label: 'Coach', Icon: CoachIcon },
   { id: 'stats', label: 'Stats', Icon: ChartIcon },
+  { id: 'coach', label: 'Coach', Icon: CoachIcon },
 ];
+const TITLES: Record<Tab, string> = {
+  calendar: 'Calendar',
+  matches: 'Matches',
+  media: 'Clips',
+  stats: 'Stats',
+  coach: 'Coach',
+  setup: 'Setup',
+};
 
 function Shell() {
   const { matches, settings, profile, training, competitions, teams } = useStore();
   const academy = useAcademy();
+  const sync = useSync();
   const now = useNow();
+  // Dark by default, Light or Automatic from Setup; the accent is the team's own colour.
+  useAppearance(teams[0]?.color);
 
   const [tab, setTab] = useState<Tab>('calendar');
   const [matchForm, setMatchForm] = useState<MatchFormTarget | null>(null);
@@ -97,6 +113,18 @@ function Shell() {
     }
   };
   const contentRef = useRef<HTMLElement>(null);
+  // How many clips are saved, for the Clips row on Matches.
+  const [clipCount, setClipCount] = useState(0);
+  useEffect(() => {
+    if (tab !== 'matches') return;
+    let live = true;
+    void listAllMedia()
+      .then((all) => live && setClipCount(all.length))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [tab]);
   // iOS's large titles: as the page scrolls, the bar frosts over and the
   // brand gives way to the screen's own name.
   const { scrollY } = useScroll({ container: contentRef });
@@ -196,7 +224,7 @@ function Shell() {
             <span>Matchday</span>
           </m.div>
           <m.div className="topbar-title" style={{ opacity: titleFade, y: titleLift }} aria-hidden="true">
-            {tab === 'setup' ? 'Setup' : TABS.find((t) => t.id === tab)?.label}
+            {TITLES[tab]}
           </m.div>
         </div>
         <div className="topbar-actions">
@@ -229,8 +257,9 @@ function Shell() {
 
       <main className="content" ref={contentRef}>
         <InstallBanner />
-        {/* Screens cross-fade; nothing slides sideways, as on iOS's tab bar. */}
-        <m.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={springs.smooth}>
+        <PullToRefresh scroller={contentRef} enabled={Boolean(sync.account)} onRefresh={sync.syncNow}>
+        {/* Screens cross-fade and rise a touch; nothing slides sideways, as on iOS's tab bar. */}
+        <m.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={springs.smooth}>
         {tab === 'calendar' && (
           <CalendarScreen
             now={now}
@@ -253,11 +282,14 @@ function Shell() {
             onOpenMatch={setDetailMatch}
             onAddMatch={(dateISO) => setMatchForm({ mode: 'create', dateISO })}
             onEnterResult={openResult}
+            onEditMatch={(m) => setMatchForm({ mode: 'edit', match: m })}
             onAddTournament={() => setTournamentOpen(true)}
             onOpenCompetition={openCompetition}
+            onOpenClips={() => setTab('media')}
+            clipCount={clipCount}
           />
         )}
-        {tab === 'media' && <MediaScreen onOpenMatch={setDetailMatch} />}
+        {tab === 'media' && <MediaScreen onOpenMatch={setDetailMatch} onBack={() => setTab('matches')} />}
         {tab === 'coach' && (
           <Suspense fallback={<div className="screen"><p className="muted small">Loading the coach…</p></div>}>
             <AIScreen onOpenSetup={() => setTab('setup')} />
@@ -273,28 +305,44 @@ function Shell() {
         )}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
         </m.div>
+        </PullToRefresh>
       </main>
 
       <nav className="tabbar">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={tab === t.id ? 'tab on' : 'tab'}
-            onClick={() => setTab(t.id)}
-            aria-current={tab === t.id ? 'page' : undefined}
-          >
-            {tab === t.id && <m.span layoutId="tab-pill" className="tab-pill" transition={springs.snappy} />}
-            {/* A small bounce when chosen - Apple's symbol "bounce". */}
-            <m.span
-              className="tab-icon"
-              animate={tab === t.id ? { scale: [1, 1.18, 0.96, 1] } : { scale: 1 }}
-              transition={{ duration: 0.42, ease: 'easeOut' }}
-            >
-              <t.Icon />
-            </m.span>
-            <span className="tab-label">{t.label}</span>
-          </button>
-        ))}
+        {TABS.map((t, i) => {
+          // Clips belong to Matches, so Matches stays lit while they're open.
+          const on = tab === t.id || (t.id === 'matches' && tab === 'media');
+          return (
+            <Fragment key={t.id}>
+              {i === 2 && (
+                <AddButton
+                  actions={{
+                    match: () => setMatchForm({ mode: 'create', dateISO: todayISO(now) }),
+                    tournament: () => setTournamentOpen(true),
+                    training: () => setTrainingForm({ mode: 'create', dateISO: todayISO(now) }),
+                    importFixtures: () => setImportOpen(true),
+                  }}
+                />
+              )}
+              <button
+                className={on ? 'tab on' : 'tab'}
+                onClick={() => setTab(t.id)}
+                aria-current={on ? 'page' : undefined}
+              >
+                {on && <m.span layoutId="tab-pill" className="tab-pill" transition={springs.snappy} />}
+                {/* A small bounce when chosen - Apple's symbol "bounce". */}
+                <m.span
+                  className="tab-icon"
+                  animate={on ? { scale: [1, 1.22, 0.94, 1] } : { scale: 1 }}
+                  transition={{ duration: 0.45, ease: 'easeOut' }}
+                >
+                  <t.Icon on={on} />
+                </m.span>
+                <span className="tab-label">{t.label}</span>
+              </button>
+            </Fragment>
+          );
+        })}
       </nav>
 
       {showPrompt && (
@@ -431,7 +479,9 @@ export default function App() {
           <UpdatePrompt />
           <SyncProvider>
             <AcademyProvider>
-              <Shell />
+              <UndoProvider>
+                <Shell />
+              </UndoProvider>
             </AcademyProvider>
           </SyncProvider>
         </AppStoreProvider>

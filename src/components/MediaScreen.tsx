@@ -19,7 +19,7 @@ interface Group {
   items: MediaMeta[];
 }
 
-export function MediaScreen({ onOpenMatch }: { onOpenMatch: (match: Match) => void }) {
+export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Match) => void; onBack?: () => void }) {
   const { matches, competitionOf, teamOf, teams } = useStore();
   const [items, setItems] = useState<MediaMeta[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -92,8 +92,13 @@ export function MediaScreen({ onOpenMatch }: { onOpenMatch: (match: Match) => vo
 
   return (
     <div className="screen">
+      {onBack && (
+        <button className="back-link" onClick={onBack}>
+          ‹ Matches
+        </button>
+      )}
       <div className="screen-head">
-        <h1>Media</h1>
+        <h1>Clips</h1>
         <button className="primary-btn small" onClick={() => fileRef.current?.click()} disabled={busy}>
           {busy ? 'Saving…' : '+ Add'}
         </button>
