@@ -1,4 +1,7 @@
+import { m } from 'motion/react';
 import { formatDateShort } from '../lib/date';
+import { stagger } from '../lib/motion';
+import { ChevronIcon, TrophyIcon } from './icons';
 import { placingLabel, recordSummary, type TournamentBreakdown } from '../lib/stats';
 
 /**
@@ -23,8 +26,8 @@ export function TournamentList({
     iso.startsWith(String(now.getFullYear())) ? formatDateShort(iso) : `${formatDateShort(iso)} ${iso.slice(0, 4)}`;
 
   return (
-    <div className="tourney-list">
-      {rows.map((row) => {
+    <div className="tourney-list list-group">
+      {rows.map((row, i) => {
         const { competition } = row;
         const status = {
           finished: placingLabel(competition.placing) || 'Finished',
@@ -35,14 +38,21 @@ export function TournamentList({
         const when = !row.from ? '' : row.from === row.to ? day(row.from) : `${day(row.from)} – ${day(row.to)}`;
 
         return (
-          <div key={competition.id} className="tourney-row">
+          <m.div key={competition.id} className="tourney-row" {...stagger(i)}>
             <button type="button" className="tourney-main" onClick={() => onOpen(competition.id)}>
-              <span className="swatch" style={{ background: competition.color }} />
+              <span className="icon-square" style={{ background: competition.color }} aria-hidden="true">
+                <TrophyIcon />
+              </span>
               <span className="tourney-text">
                 <span className="tourney-name">{competition.name}</span>
                 <span className="tourney-meta">{[status, competition.ageGroup, when].filter(Boolean).join(' · ')}</span>
               </span>
               {row.played > 0 && <span className="tourney-record">{recordSummary(row)}</span>}
+              {row.status === 'finished' || row.played === 0 ? (
+                <span className="row-chevron" aria-hidden="true">
+                  <ChevronIcon />
+                </span>
+              ) : null}
             </button>
             {row.status !== 'finished' && row.played > 0 && (
               <button
@@ -54,7 +64,7 @@ export function TournamentList({
                 Finish
               </button>
             )}
-          </div>
+          </m.div>
         );
       })}
     </div>

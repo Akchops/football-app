@@ -227,3 +227,50 @@ export function SyncIcon() {
     </svg>
   );
 }
+
+export function SendIcon() {
+  // Messages' send: an arrow up.
+  return (
+    <svg {...base} strokeWidth={2.6}>
+      <path d="M12 19V5.5M6 11l6-6 6 6" />
+    </svg>
+  );
+}
+
+export function ComposeIcon() {
+  // A pencil on a page: a new conversation.
+  return (
+    <svg {...base}>
+      <path d="M12 4.5H7a3 3 0 00-3 3v9.5a3 3 0 003 3h9.5a3 3 0 003-3V12" />
+      <path d="M17.6 3.6a1.9 1.9 0 012.8 2.8L12.5 14.3l-3.5.9.9-3.5z" />
+    </svg>
+  );
+}
+
+export function FilmIcon() {
+  return (
+    <svg {...base}>
+      <rect x="3" y="4" width="18" height="16" rx="3.5" />
+      <path d="M7.5 4v16M16.5 4v16M3 9.5h4.5M3 14.5h4.5M16.5 9.5H21M16.5 14.5H21" />
+    </svg>
+  );
+}
+
+export function CheckIcon() {
+  return (
+    <svg {...base} strokeWidth={2.6}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+export function StarIcon({ on }: IconProps = {}) {
+  return (
+    <svg {...base}>
+      <path
+        d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"
+        fill={on ? 'currentColor' : 'none'}
+      />
+    </svg>
+  );
+}

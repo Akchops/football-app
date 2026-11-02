@@ -1,33 +1,69 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { m, useScroll, useTransform } from 'motion/react';
 import { ROLE_LABEL, VERIFICATION_LABEL, can, type StaffRole } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { SignInForm } from '../AccountSettings';
-import { BallIcon, ChartIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon } from '../icons';
+import { BallIcon, ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon } from '../icons';
 import { Section, Sheet } from '../ui';
+import { AddButton, type AddItem } from '../AddButton';
+import { springs } from '../../lib/motion';
 import { CreateAcademyForm } from './AcademyDetails';
 import { AcademyHome, type AcademyTab } from './AcademyHome';
 import { AcademySettings } from './AcademySettings';
 import { AdminScreen } from './AdminScreen';
-import { AcademyLogo, StaffInviteCard, VerificationBadge } from './parts';
+import { AcademyLogo, StaffInviteCard, VerificationBadge, type AddRequest, type AddWhat } from './parts';
 import { PlayersScreen } from './PlayersScreen';
 import { StatsScreen } from './StatsScreen';
 import { TablesScreen } from './TablesScreen';
 import { StaffScreen } from './StaffScreen';
 import { UsernameForm } from './UsernameForm';
 
-const TABS: { id: AcademyTab; label: string; Icon: () => JSX.Element }[] = [
-  { id: 'home', label: 'Home', Icon: HomeIcon },
-  { id: 'players', label: 'Players', Icon: ShirtIcon },
-  { id: 'tables', label: 'Tables', Icon: TableIcon },
-  { id: 'stats', label: 'Stats', Icon: ChartIcon },
-  { id: 'staff', label: 'Staff', Icon: PeopleIcon },
-];
+type TabDef = { id: AcademyTab; label: string; Icon: (p: { on?: boolean }) => JSX.Element };
+const HOME: TabDef = { id: 'home', label: 'Home', Icon: HomeIcon };
+const PLAYERS: TabDef = { id: 'players', label: 'Players', Icon: ShirtIcon };
+const TABLES: TabDef = { id: 'tables', label: 'Tables', Icon: TableIcon };
+const STATS: TabDef = { id: 'stats', label: 'Stats', Icon: ChartIcon };
+const STAFF: TabDef = { id: 'staff', label: 'Staff', Icon: PeopleIcon };
 
-/** The admin role works on the office side and never sees players' stats, so has no Stats tab. */
-function tabsFor(role: StaffRole) {
-  return TABS.filter((t) => t.id !== 'stats' || can(role, 'coach'));
+/**
+ * Four tabs round the big +, as in the player's app. Staff is a row on Home
+ * for those who pick teams; the admin role works on the office side and never
+ * sees players' stats, so Staff takes the Stats tab's place for them.
+ */
+function tabsFor(role: StaffRole): TabDef[] {
+  return [HOME, PLAYERS, TABLES, can(role, 'coach') ? STATS : STAFF];
 }
+
+const TITLES: Record<AcademyTab, string> = {
+  home: 'Home',
+  players: 'Players',
+  tables: 'Tables',
+  stats: 'Stats',
+  staff: 'Staff',
+  settings: 'Settings',
+};
+
+/** What the + offers, by what this person may do. */
+function addItems(role: StaffRole, ask: (what: AddWhat) => void): AddItem[] {
+  const items: AddItem[] = [];
+  if (can(role, 'add-players')) items.push({ label: 'Player', hint: 'By username, or just a name', Icon: ShirtIcon, run: () => ask('player') });
+  if (can(role, 'run-squads')) items.push({ label: 'Squad', hint: 'U14 Elite, a cup squad…', Icon: PeopleIcon, run: () => ask('squad') });
+  if (can(role, 'coach')) {
+    items.push({ label: 'Competition', hint: 'A league or a tournament', Icon: TrophyIcon, run: () => ask('competition') });
+    items.push({ label: 'Team pick', hint: 'Sort a squad, tick a team', Icon: ChartIcon, run: () => ask('pick') });
+  }
+  if (can(role, 'invite-staff')) items.push({ label: 'Staff', hint: 'A coach, a manager, the office', Icon: PeopleIcon, run: () => ask('staff') });
+  return items;
+}
+
+const TAB_FOR: Record<AddWhat, AcademyTab> = {
+  player: 'players',
+  squad: 'players',
+  competition: 'tables',
+  pick: 'stats',
+  staff: 'staff',
+};
 
 /**
  * The academy's half of the app. Loaded only when someone opens it, so the
@@ -41,6 +77,18 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   const [switching, setSwitching] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
   const current = academy.current;
+  const [request, setRequest] = useState<AddRequest | null>(null);
+  const ask = (what: AddWhat) => {
+    setTab(TAB_FOR[what]);
+    setRequest((r) => ({ what, n: (r?.n ?? 0) + 1 }));
+  };
+
+  // The large titles and frosted bar, as in the player's app.
+  const { scrollY } = useScroll({ container: contentRef });
+  const barGlass = useTransform(scrollY, [0, 24], [0, 1]);
+  const brandFade = useTransform(scrollY, [12, 44], [1, 0]);
+  const titleFade = useTransform(scrollY, [28, 60], [0, 1]);
+  const titleLift = useTransform(scrollY, [28, 60], [8, 0]);
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0 });
@@ -93,27 +141,37 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   return (
     <div className={current && !gate ? 'app academy-app with-nav' : 'app academy-app'}>
       <header className="topbar">
-        {current && !gate ? (
-          <button className="academy-switch" onClick={() => setSwitching(true)} aria-label="Your academies">
-            <AcademyLogo name={current.name} logo={current.logo} size={34} />
-            <span className="academy-switch-text">
-              <span className="academy-switch-name">{current.name}</span>
-              <span className="academy-switch-meta">
-                {ROLE_LABEL[current.role]} · {VERIFICATION_LABEL[current.verification]}
+        <m.div className="topbar-glass" style={{ opacity: barGlass }} aria-hidden="true" />
+        <div className="topbar-titles">
+          {current && !gate ? (
+            <m.div style={{ opacity: brandFade }}>
+              <button className="academy-switch" onClick={() => setSwitching(true)} aria-label="Your academies">
+                <AcademyLogo name={current.name} logo={current.logo} size={32} />
+                <span className="academy-switch-text">
+                  <span className="academy-switch-name">{current.name}</span>
+                  <span className="academy-switch-meta">
+                    {ROLE_LABEL[current.role]} · {VERIFICATION_LABEL[current.verification]}
+                  </span>
+                </span>
+                <span className="academy-switch-chev" aria-hidden="true">
+                  <ChevronIcon />
+                </span>
+              </button>
+            </m.div>
+          ) : (
+            <m.div className="brand" style={{ opacity: brandFade }}>
+              <span className="brand-mark">
+                <ShieldIcon />
               </span>
-            </span>
-            <span className="chev" aria-hidden="true">
-              ▾
-            </span>
-          </button>
-        ) : (
-          <div className="brand">
-            <span className="brand-mark">
-              <ShieldIcon />
-            </span>
-            <span>Matchday Academy</span>
-          </div>
-        )}
+              <span>Matchday Academy</span>
+            </m.div>
+          )}
+          {current && !gate && (
+            <m.div className="topbar-title" style={{ opacity: titleFade, y: titleLift }} aria-hidden="true">
+              {tab === 'home' ? current.name : TITLES[tab]}
+            </m.div>
+          )}
+        </div>
         <div className="topbar-actions">
           {hasPlayer && (
             <button className="topbar-btn" onClick={() => academy.setMode('player')} aria-label="My matches">
@@ -139,32 +197,47 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
         )}
         {gate ??
           (current && (
-            <>
+            <m.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={springs.smooth}>
               {tab === 'home' && <AcademyHome academy={current} onGo={setTab} />}
-              {tab === 'players' && <PlayersScreen academy={current} />}
-              {tab === 'tables' && <TablesScreen academy={current} />}
-              {tab === 'stats' && can(current.role, 'coach') && <StatsScreen academy={current} />}
-              {tab === 'staff' && <StaffScreen academy={current} />}
+              {tab === 'players' && <PlayersScreen academy={current} request={request} />}
+              {tab === 'tables' && <TablesScreen academy={current} request={request} />}
+              {tab === 'stats' && can(current.role, 'coach') && <StatsScreen academy={current} request={request} />}
+              {tab === 'staff' && (
+                <StaffScreen
+                  academy={current}
+                  request={request}
+                  onBack={tabsFor(current.role).some((t) => t.id === 'staff') ? undefined : () => setTab('home')}
+                />
+              )}
               {tab === 'settings' && <AcademySettings academy={current} hasPlayer={hasPlayer} />}
-            </>
+            </m.div>
           ))}
       </main>
 
       {current && !gate && (
-        <nav className="tabbar" style={{ gridTemplateColumns: `repeat(${tabsFor(current.role).length}, 1fr)` }}>
-          {tabsFor(current.role).map((t) => (
-            <button
-              key={t.id}
-              className={tab === t.id ? 'tab on' : 'tab'}
-              onClick={() => setTab(t.id)}
-              aria-current={tab === t.id ? 'page' : undefined}
-            >
-              <span className="tab-icon">
-                <t.Icon />
-              </span>
-              <span className="tab-label">{t.label}</span>
-            </button>
-          ))}
+        <nav className="tabbar">
+          {tabsFor(current.role).map((t, i) => {
+            // Staff belongs to Home when it isn't a tab of its own, so Home stays lit.
+            const tabs = tabsFor(current.role);
+            const on = tab === t.id || (t.id === 'home' && tab === 'staff' && !tabs.some((x) => x.id === 'staff'));
+            const items = addItems(current.role, ask);
+            return (
+              <Fragment key={t.id}>
+                {i === 2 && items.length > 0 && <AddButton items={items} />}
+                <button className={on ? 'tab on' : 'tab'} onClick={() => setTab(t.id)} aria-current={on ? 'page' : undefined}>
+                  {on && <m.span layoutId="academy-tab-pill" className="tab-pill" transition={springs.snappy} />}
+                  <m.span
+                    className="tab-icon"
+                    animate={on ? { scale: [1, 1.22, 0.94, 1] } : { scale: 1 }}
+                    transition={{ duration: 0.45, ease: 'easeOut' }}
+                  >
+                    <t.Icon on={on} />
+                  </m.span>
+                  <span className="tab-label">{t.label}</span>
+                </button>
+              </Fragment>
+            );
+          })}
         </nav>
       )}
 

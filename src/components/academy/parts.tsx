@@ -140,3 +140,48 @@ export function StaffInviteCard({ invite, onJoined }: { invite: StaffInvite; onJ
     </div>
   );
 }
+
+/** What the big + asked for, handed to the screen that does it. `n` makes asking twice count twice. */
+export type AddWhat = 'player' | 'squad' | 'competition' | 'staff' | 'pick';
+export interface AddRequest {
+  what: AddWhat;
+  n: number;
+}
+
+// Requests already acted on, so coming back to a screen later doesn't act on an old one again.
+const handled = new Set<number>();
+
+/** Runs `run` once for each new request of this kind - when the screen opens on it, or while it's showing. */
+export function useAddRequest(request: AddRequest | null | undefined, what: AddWhat, run: () => void, ready = true): void {
+  const runRef = useRef(run);
+  runRef.current = run;
+  useEffect(() => {
+    if (!ready || !request || request.what !== what || handled.has(request.n)) return;
+    handled.add(request.n);
+    runRef.current();
+  }, [request, what, ready]);
+}
+
+/** A person as a round tile of their initials, coloured from their name, as Contacts does. */
+export function Initials({ name, size = 36 }: { name: string; size?: number }) {
+  const clean = name.replace(/^@/, '');
+  const parts = clean.split(/[\s_.-]+/).filter(Boolean);
+  const letters = (parts.length > 1 ? parts[0][0] + parts[1][0] : clean.slice(0, 2)).toUpperCase() || '?';
+  let hash = 0;
+  for (const ch of clean) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const hue = hash % 360;
+  return (
+    <span
+      className="initials-tile"
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.4,
+        background: `linear-gradient(180deg, hsl(${hue} 45% 62%), hsl(${hue} 42% 46%))`,
+      }}
+    >
+      {letters}
+    </span>
+  );
+}

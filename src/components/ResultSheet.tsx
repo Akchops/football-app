@@ -2,13 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { fixtureContext } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import {
-  ALL_POSITIONS, POSITIONS_BY_GROUP, POSITION_GROUP_LABEL, emptyResult, groupForPosition,
+  ALL_POSITIONS, POSITIONS_BY_GROUP, emptyResult, groupForPosition,
   type MatchResult, type Match, type MetricId, type PositionGroup,
 } from '../types';
 import { formatDateShort, formatTime } from '../lib/date';
 import { concededFollowsScore, formMetricsFor, pruneMetrics } from '../lib/metrics';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
-import { Field, Sheet, Stepper } from './ui';
+import { Disclosure, Field, Segmented, Sheet, Stepper } from './ui';
+import { NoEntryIcon } from './icons';
+
+const SHORT_GROUP: Record<PositionGroup, string> = {
+  goalkeeper: 'Keeper',
+  defender: 'Defender',
+  midfielder: 'Midfield',
+  forward: 'Forward',
+};
 
 /**
  * Entering a result for one match. The stats it asks for follow the position
@@ -182,18 +190,11 @@ export function ResultSheet({
       {result.didPlay && !walkover && (
         <>
           <Field group label="Position played" hint="Changes which stats are tracked below">
-            <div className="chip-wrap">
-              {(Object.keys(POSITIONS_BY_GROUP) as PositionGroup[]).map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  className={g === group ? 'filter-chip on' : 'filter-chip'}
-                  onClick={() => changeGroup(g)}
-                >
-                  {POSITION_GROUP_LABEL[g]}
-                </button>
-              ))}
-            </div>
+            <Segmented
+              options={(Object.keys(POSITIONS_BY_GROUP) as PositionGroup[]).map((g) => ({ value: g, label: SHORT_GROUP[g] }))}
+              value={group}
+              onChange={changeGroup}
+            />
           </Field>
 
           <div className="stat-steppers">
@@ -216,11 +217,12 @@ export function ResultSheet({
             </span>
           </div>
 
-          <button className="link-btn" onClick={() => setShowDetail((s) => !s)}>
-            {showDetail ? 'Hide extra detail' : 'Add more detail (minutes, cards, rating)'}
-          </button>
-
-          {showDetail && (
+          <Disclosure
+            label="More detail"
+            detail="Minutes, cards, your own rating"
+            open={showDetail}
+            onToggle={() => setShowDetail((s) => !s)}
+          >
             <div className="detail-block">
               {secondary.length > 0 && (
                 <div className="stat-steppers">
@@ -276,7 +278,7 @@ export function ResultSheet({
                 </Field>
               </div>
             </div>
-          )}
+          </Disclosure>
         </>
       )}
 
@@ -292,47 +294,33 @@ export function ResultSheet({
 
       {/* On the main page, not tucked away: a match that never happened is common
           enough to need one obvious tap. */}
-      <button
-        className="danger-link"
-        onClick={() => {
-          cancelMatch(match.id);
-          onClose();
-        }}
+      <Disclosure
+        label="Extra settings"
+        detail={extraSummary.length > 0 ? extraSummary.join(' · ') : 'Walkover, man of the match, penalties'}
+        open={showExtra}
+        onToggle={() => setShowExtra((s) => !s)}
       >
-        This match didn't happen (called off)
-      </button>
-
-      {/* The things that are true of few matches. Kept out of the main flow so
-          entering a normal result is a scoreline and your stats, and nothing
-          else - but one tap away when a match was odd. */}
-      <button className="link-btn" onClick={() => setShowExtra((s) => !s)}>
-        {showExtra ? 'Hide extra settings' : 'Extra settings'}
-      </button>
-
-      {/* Anything set in here would otherwise be invisible once collapsed, which
-          is how a match ends up quietly marked as one you did not play. */}
-      {!showExtra && extraSummary.length > 0 && (
-        <p className="muted small">{extraSummary.join(' · ')}</p>
-      )}
-
-      {showExtra && (
         <div className="detail-block">
           <Field group label="Walkover" hint="When a side doesn't turn up. It counts as a win or a loss, with no goals.">
-            {([
-              [null, 'No walkover - the match was played'],
-              ['us', `${us} got a walkover`],
-              ['them', `${them} got a walkover`],
-            ] as const).map(([value, label]) => (
-              <label key={value ?? 'none'} className="toggle-row">
-                <input
-                  type="radio"
-                  name="walkover"
-                  checked={walkover === value}
-                  onChange={() => patch({ walkover: value })}
-                />
-                <span>{label}</span>
-              </label>
-            ))}
+            <div className="choice-card" role="radiogroup" aria-label="Walkover">
+              {([
+                [null, 'No walkover: the match was played'],
+                ['us', `${us} got a walkover`],
+                ['them', `${them} got a walkover`],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value ?? 'none'}
+                  type="button"
+                  role="radio"
+                  aria-checked={walkover === value}
+                  className="choice-row"
+                  onClick={() => patch({ walkover: value })}
+                >
+                  <span>{label}</span>
+                  {walkover === value && <span className="choice-check">✓</span>}
+                </button>
+              ))}
+            </div>
           </Field>
 
           {!walkover && (
@@ -378,9 +366,21 @@ export function ResultSheet({
               </Field>
             </div>
           )}
-
         </div>
-      )}
+      </Disclosure>
+
+      {/* On the main page, not tucked away: a match that never happened is common
+          enough to need one obvious tap. */}
+      <button
+        className="destructive-row"
+        onClick={() => {
+          cancelMatch(match.id);
+          onClose();
+        }}
+      >
+        <NoEntryIcon />
+        This match didn't happen (called off)
+      </button>
     </Sheet>
   );
 }

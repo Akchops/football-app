@@ -7,13 +7,16 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { COMPETITION_TYPE_LABEL, type CompetitionType } from '../../types';
 import { Field, Section, Sheet, Stepper } from '../ui';
 import { CompetitionTables, competitionFacts } from './CompetitionTables';
-import { useLoad } from './parts';
+import { useAddRequest, useLoad, type AddRequest } from './parts';
+import { m } from 'motion/react';
+import { stagger } from '../../lib/motion';
+import { ChevronIcon, PlusIcon, TableIcon, TrophyIcon } from '../icons';
 
 /** Friendlies have no table, so they are not offered here. */
 const TYPES: CompetitionType[] = ['league', 'tournament', 'cup', 'other'];
 
 /** The academy's own competitions, and their tables. */
-export function TablesScreen({ academy }: { academy: StaffAcademy }) {
+export function TablesScreen({ academy, request }: { academy: StaffAcademy; request?: AddRequest | null }) {
   const { api } = useAcademy();
   const competitions = useLoad(api ? () => api.competitions(academy.id) : null, academy.id);
   const squads = useLoad(api ? () => api.squads(academy.id) : null, academy.id);
@@ -21,6 +24,10 @@ export function TablesScreen({ academy }: { academy: StaffAcademy }) {
   const [form, setForm] = useState<{ competition: AcademyCompetition | null } | null>(null);
 
   const editable = can(academy.role, 'coach');
+  useAddRequest(request, 'competition', () => {
+    setOpenId(null);
+    setForm({ competition: null });
+  });
   const list = competitions.data ?? [];
   const squadName = (id: string | null) => squads.data?.find((s) => s.id === id)?.name;
   const open = list.find((c) => c.id === openId) ?? null;
@@ -47,8 +54,11 @@ export function TablesScreen({ academy }: { academy: StaffAcademy }) {
   if (open) {
     return (
       <div className="screen">
-        <button className="link-btn back-link" onClick={() => setOpenId(null)}>
-          ‹ All competitions
+        <button className="back-link" onClick={() => setOpenId(null)}>
+          <span className="back-chevron" aria-hidden="true">
+            <ChevronIcon />
+          </span>
+          Tables
         </button>
         <div className="screen-head">
           <div>
@@ -72,8 +82,8 @@ export function TablesScreen({ academy }: { academy: StaffAcademy }) {
       <div className="screen-head">
         <h1>Tables</h1>
         {editable && (
-          <button className="primary-btn small" onClick={() => setForm({ competition: null })}>
-            + Competition
+          <button className="toolbar-btn" onClick={() => setForm({ competition: null })} aria-label="New competition">
+            <PlusIcon />
           </button>
         )}
       </div>
@@ -92,16 +102,22 @@ export function TablesScreen({ academy }: { academy: StaffAcademy }) {
 
       {list.length > 0 && (
         <Section title={`Competitions · ${list.length}`}>
-          <ul className="squad-list">
-            {list.map((c) => (
-              <li key={c.id}>
-                <button className="squad-card" onClick={() => setOpenId(c.id)}>
-                  <span className="squad-card-main">
-                    <strong>{c.name}</strong>
+          <ul className="list-group nav-group">
+            {list.map((c, i) => (
+              <m.li key={c.id} {...stagger(i)}>
+                <button className="nav-row" onClick={() => setOpenId(c.id)}>
+                  <span className="icon-square" style={{ background: c.type === 'league' ? '#30d158' : '#ff9f0a' }} aria-hidden="true">
+                    {c.type === 'league' ? <TableIcon on /> : <TrophyIcon />}
                   </span>
-                  <span className="muted small">{competitionFacts(c, squadName(c.squadId))}</span>
+                  <span className="nav-row-text">
+                    <span className="nav-row-label">{c.name}</span>
+                    <span className="nav-row-sub">{competitionFacts(c, squadName(c.squadId))}</span>
+                  </span>
+                  <span className="row-chevron" aria-hidden="true">
+                    <ChevronIcon />
+                  </span>
                 </button>
-              </li>
+              </m.li>
             ))}
           </ul>
         </Section>

@@ -308,7 +308,7 @@ export function CompetitionSheet({
             </button>
             {/* Finished is when it gets shown off - the header's ✕ still closes. */}
             <button className="primary-btn wide" onClick={() => void share()} disabled={shareState === 'working'}>
-              {shareState === 'working' ? 'Making image…' : '📤 Share'}
+              {shareState === 'working' ? 'Making image…' : 'Share'}
             </button>
           </>
         ) : finishable && stats.played > 0 ? (
@@ -371,7 +371,7 @@ export function CompetitionSheet({
       {stats.played > 0 && !finished && (
         <div className="sheet-extra">
           <button className="ghost-btn" onClick={() => void share()} disabled={shareState === 'working'}>
-            {shareState === 'working' ? 'Making image…' : `📤 Share ${noun} so far`}
+            {shareState === 'working' ? 'Making image…' : `Share ${noun} so far`}
           </button>
         </div>
       )}

@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, m } from 'motion/react';
 import { springs } from '../lib/motion';
-import { BallIcon, PasteIcon, PlusIcon, RunIcon, TrophyIcon } from './icons';
+import { PlusIcon } from './icons';
 
-export interface AddActions {
-  match: () => void;
-  tournament: () => void;
-  training: () => void;
-  importFixtures: () => void;
+export interface AddItem {
+  label: string;
+  hint: string;
+  Icon: () => JSX.Element;
+  run: () => void;
 }
 
 const HOLD_MS = 450;
@@ -16,9 +16,9 @@ const HOLD_MS = 450;
 /**
  * The big + in the middle of the tab bar - adding matches is what the app is
  * for. A tap springs open a menu above it; holding it goes straight to a new
- * match, the most common thing to add.
+ * match (or whatever comes first), the most common thing to add.
  */
-export function AddButton({ actions }: { actions: AddActions }) {
+export function AddButton({ items, onHold }: { items: AddItem[]; onHold?: () => void }) {
   const [open, setOpen] = useState(false);
   const held = useRef<number | null>(null);
   const fired = useRef(false);
@@ -35,7 +35,7 @@ export function AddButton({ actions }: { actions: AddActions }) {
     held.current = window.setTimeout(() => {
       fired.current = true;
       setOpen(false);
-      actions.match();
+      (onHold ?? items[0].run)();
     }, HOLD_MS);
   };
   const endHold = () => {
@@ -47,12 +47,6 @@ export function AddButton({ actions }: { actions: AddActions }) {
     setOpen(false);
     run();
   };
-  const items = [
-    { label: 'Match', hint: 'A game on the calendar', Icon: BallIcon, run: actions.match },
-    { label: 'Tournament', hint: 'A day of games, with groups', Icon: TrophyIcon, run: actions.tournament },
-    { label: 'Training', hint: 'A session you went to', Icon: RunIcon, run: actions.training },
-    { label: 'Import fixtures', hint: 'From a photo or a message', Icon: PasteIcon, run: actions.importFixtures },
-  ];
 
   return (
     <>

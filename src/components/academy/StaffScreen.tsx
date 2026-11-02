@@ -4,17 +4,30 @@ import {
   type StaffAcademy, type StaffMember, type StaffRole,
 } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
-import { Field, Section, Sheet } from '../ui';
-import { RoleChip, useLoad } from './parts';
+import { m } from 'motion/react';
+import { stagger } from '../../lib/motion';
+import { Field, Section, Segmented, Sheet } from '../ui';
+import { ChevronIcon, PlusIcon } from '../icons';
+import { Initials, RoleChip, useAddRequest, useLoad, type AddRequest } from './parts';
 
 const ROLE_ORDER: StaffRole[] = ['owner', 'manager', 'coach', 'admin'];
 
 /** Who works at the academy, who has been asked to, and asking someone new. */
-export function StaffScreen({ academy }: { academy: StaffAcademy }) {
+export function StaffScreen({
+  academy,
+  request,
+  onBack,
+}: {
+  academy: StaffAcademy;
+  request?: AddRequest | null;
+  /** When Staff is reached from Home rather than a tab of its own. */
+  onBack?: () => void;
+}) {
   const { api, refresh } = useAcademy();
   const staff = useLoad(api ? () => api.staff(academy.id) : null, academy.id);
   const pending = useLoad(api ? () => api.pendingStaff(academy.id) : null, academy.id);
   const [managing, setManaging] = useState<StaffMember | null>(null);
+  const [inviting, setInviting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -36,13 +49,28 @@ export function StaffScreen({ academy }: { academy: StaffAcademy }) {
     setBusy(false);
   };
 
+  useAddRequest(request, 'staff', () => setInviting(true));
+
   const manageable = (m: StaffMember) =>
     !m.isMe && (rolesToGive(me, m.role).length > 0 || canRemove(me, m.role, false) || (can(me, 'hand-over') && m.role !== 'owner'));
 
   return (
     <div className="screen">
+      {onBack && (
+        <button className="back-link" onClick={onBack}>
+          <span className="back-chevron" aria-hidden="true">
+            <ChevronIcon />
+          </span>
+          Home
+        </button>
+      )}
       <div className="screen-head">
         <h1>Staff</h1>
+        {can(me, 'invite-staff') && (
+          <button className="toolbar-btn" onClick={() => setInviting(true)} aria-label="Invite staff">
+            <PlusIcon />
+          </button>
+        )}
       </div>
 
       {(staff.error || pending.error) && (
@@ -59,21 +87,35 @@ export function StaffScreen({ academy }: { academy: StaffAcademy }) {
       <Section title={staff.data ? `On the staff · ${staff.data.length}` : 'On the staff'}>
         {!staff.data && !staff.error && <p className="muted small">Loading…</p>}
         {staff.data && (
-          <ul className="staff-list">
-            {staff.data.map((m) => (
-              <li key={m.userId}>
-                <span className="staff-name">
-                  <strong>@{m.username || 'no username yet'}</strong>
-                  {m.isMe && <span className="muted small"> (you)</span>}
-                </span>
-                <RoleChip role={m.role} />
-                {manageable(m) && (
-                  <button className="link-btn" onClick={() => setManaging(m)} aria-label={`Manage @${m.username}`}>
-                    Manage
-                  </button>
-                )}
-              </li>
-            ))}
+          <ul className="list-group person-group">
+            {staff.data.map((member, i) => {
+              const inner = (
+                <>
+                  <Initials name={member.username || '?'} />
+                  <span className="nav-row-text">
+                    <span className="nav-row-label">
+                      @{member.username || 'no username yet'}
+                      {member.isMe && <span className="muted"> (you)</span>}
+                    </span>
+                  </span>
+                  <RoleChip role={member.role} />
+                </>
+              );
+              return (
+                <m.li key={member.userId} {...stagger(i)}>
+                  {manageable(member) ? (
+                    <button className="nav-row" onClick={() => setManaging(member)} aria-label={`Manage @${member.username}`}>
+                      {inner}
+                      <span className="row-chevron" aria-hidden="true">
+                        <ChevronIcon />
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="nav-row">{inner}</div>
+                  )}
+                </m.li>
+              );
+            })}
           </ul>
         )}
       </Section>
@@ -81,29 +123,35 @@ export function StaffScreen({ academy }: { academy: StaffAcademy }) {
       {pending.data && pending.data.length > 0 && (
         <Section title="Invited, waiting for a yes">
           {error && <p className="notice warn">{error}</p>}
-          <ul className="staff-list">
+          <ul className="list-group person-group">
             {pending.data.map((p) => (
               <li key={p.id}>
-                <span className="staff-name">
-                  <strong>@{p.username}</strong>
-                  <span className="muted small">
-                    {' '}
-                    as {ROLE_LABEL[p.role]}
-                    {p.invitedBy ? ` · asked by @${p.invitedBy}` : ''}
+                <div className="nav-row">
+                  <Initials name={p.username} />
+                  <span className="nav-row-text">
+                    <span className="nav-row-label">@{p.username}</span>
+                    <span className="nav-row-sub">
+                      as {ROLE_LABEL[p.role]}
+                      {p.invitedBy ? ` · asked by @${p.invitedBy}` : ''}
+                    </span>
                   </span>
-                </span>
-                {can(me, 'invite-staff') && (
-                  <button className="link-btn" disabled={busy} onClick={() => void cancel(p.id)}>
-                    Cancel
-                  </button>
-                )}
+                  {can(me, 'invite-staff') && (
+                    <button className="row-text-btn" disabled={busy} onClick={() => void cancel(p.id)}>
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
         </Section>
       )}
 
-      {can(me, 'invite-staff') && <InviteStaff academy={academy} onInvited={() => void pending.reload()} />}
+      {can(me, 'invite-staff') && (
+        <Sheet open={inviting} title="Invite staff" subtitle="They say yes in their own Matchday" onClose={() => setInviting(false)}>
+          <InviteStaff academy={academy} onInvited={() => void pending.reload()} />
+        </Sheet>
+      )}
 
       <Section title="Who can do what">
         <ul className="role-guide">
@@ -167,7 +215,7 @@ function InviteStaff({ academy, onInvited }: { academy: StaffAcademy; onInvited:
   };
 
   return (
-    <Section title="Invite staff">
+    <>
       <Field label="Their username" hint="They pick it when they first sign in. Ask them for it.">
         <span className="username-input">
           <span className="at" aria-hidden="true">
@@ -188,19 +236,7 @@ function InviteStaff({ academy, onInvited }: { academy: StaffAcademy; onInvited:
         </span>
       </Field>
       <Field group label="As">
-        <div className="chip-wrap">
-          {roles.map((r) => (
-            <button
-              key={r}
-              type="button"
-              className={r === role ? 'filter-chip on' : 'filter-chip'}
-              aria-pressed={r === role}
-              onClick={() => setRole(r)}
-            >
-              {ROLE_LABEL[r]}
-            </button>
-          ))}
-        </div>
+        <Segmented<StaffRole> options={roles.map((r) => ({ value: r, label: ROLE_LABEL[r] }))} value={role} onChange={setRole} />
         <span className="field-hint">{ROLE_BLURB[role]}</span>
       </Field>
       {error && <p className="notice warn">{error}</p>}
@@ -210,7 +246,7 @@ function InviteStaff({ academy, onInvited }: { academy: StaffAcademy; onInvited:
           {busy ? 'Sending…' : 'Send invite'}
         </button>
       </div>
-    </Section>
+    </>
   );
 }
 

@@ -10,6 +10,7 @@ import {
 import { MediaTile, MediaViewer } from './MediaViewer';
 import { MatchPickerSheet } from './MatchPickerSheet';
 import { EmptyState } from './ui';
+import { ChevronIcon } from './icons';
 
 type Filter = 'all' | 'video' | 'photo';
 
@@ -94,7 +95,10 @@ export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Matc
     <div className="screen">
       {onBack && (
         <button className="back-link" onClick={onBack}>
-          ‹ Matches
+          <span className="back-chevron" aria-hidden="true">
+            <ChevronIcon />
+          </span>
+          Matches
         </button>
       )}
       <div className="screen-head">

@@ -1,8 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { m } from 'motion/react';
 import { ROLE_LABEL, can, describeAcademyError, type StaffAcademy } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
-import { Section } from '../ui';
+import { springs, stagger } from '../../lib/motion';
+import { CheckIcon, ChevronIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon } from '../icons';
+import { RollingNumber, Section } from '../ui';
 import { AcademyLogo, VerificationBadge, useLoad } from './parts';
+
+/** A Settings-style row: a coloured symbol, what it is, what's there, a chevron. */
+function NavRow({
+  icon,
+  color,
+  label,
+  detail,
+  alert,
+  onClick,
+}: {
+  icon: ReactNode;
+  color: string;
+  label: string;
+  detail: string;
+  alert?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button className="nav-row" onClick={onClick}>
+      <span className="icon-square" style={{ background: color }} aria-hidden="true">
+        {icon}
+      </span>
+      <span className="nav-row-text">
+        <span className="nav-row-label">{label}</span>
+        {alert && <span className="nav-row-alert">{alert}</span>}
+      </span>
+      <span className="nav-row-detail">{detail}</span>
+      <span className="row-chevron" aria-hidden="true">
+        <ChevronIcon />
+      </span>
+    </button>
+  );
+}
 
 export type AcademyTab = 'home' | 'players' | 'tables' | 'stats' | 'staff' | 'settings';
 
@@ -33,19 +69,39 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
   }
   const allDone = steps.every((s) => s.done);
 
+  const stat = (value: number | null, label: string) => (
+    <span className="ac-hero-stat">
+      <span className="ac-hero-num">{value === null ? '–' : <RollingNumber value={value} />}</span>
+      <span className="ac-hero-label">{label}</span>
+    </span>
+  );
+
   return (
     <div className="screen">
-      <div className="academy-hero">
-        <AcademyLogo name={academy.name} logo={academy.logo} size={64} />
-        <div className="academy-hero-text">
-          <h1>{academy.name}</h1>
-          {where && <p className="muted small">{where}</p>}
-          <p className="academy-hero-meta">
-            <VerificationBadge status={academy.verification} />
-            <span className="muted small">You&apos;re the {ROLE_LABEL[academy.role].toLowerCase()}</span>
-          </p>
+      {/* Who the academy is, at a glance: its badge, its place, its numbers. */}
+      <m.div
+        className="ac-hero"
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={springs.smooth}
+      >
+        <div className="ac-hero-top">
+          <AcademyLogo name={academy.name} logo={academy.logo} size={60} />
+          <div className="ac-hero-text">
+            <h1>{academy.name}</h1>
+            {where && <p>{where}</p>}
+            <p className="ac-hero-meta">
+              <VerificationBadge status={academy.verification} />
+              <span>You&apos;re the {ROLE_LABEL[academy.role].toLowerCase()}</span>
+            </p>
+          </div>
         </div>
-      </div>
+        <div className="ac-hero-stats">
+          {stat(onBooks?.length ?? null, onBooks?.length === 1 ? 'Player' : 'Players')}
+          {stat(squadCount, squadCount === 1 ? 'Squad' : 'Squads')}
+          {stat(staffCount, 'Staff')}
+        </div>
+      </m.div>
 
       {academy.verification === 'rejected' && academy.verificationNote && (
         <p className="notice warn">Matchday couldn&apos;t verify the academy: {academy.verificationNote}</p>
@@ -57,54 +113,14 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
           {academy.role === 'owner' ? 'Send your documents from Settings.' : 'The owner sends the documents.'}
         </p>
       )}
-      {academy.role === 'owner' && (academy.verification === 'unverified' || academy.verification === 'rejected') && (
-        <button className="summary-row" onClick={() => onGo('settings')}>
-          <span>
-            <strong>Get verified</strong>
-            <span className="muted small"> - send Matchday your registration and certificates for the badge</span>
-          </span>
-          <span className="chev" aria-hidden="true">
-            ›
-          </span>
-        </button>
-      )}
-
-      <JoinCode academy={academy} />
-
-      <Section title="Players">
-        <button className="summary-row" onClick={() => onGo('players')}>
-          <span>
-            {onBooks === null || squadCount === null
-              ? players.error || squads.error || 'Loading…'
-              : `${onBooks.length} player${onBooks.length === 1 ? '' : 's'} · ${squadCount} squad${squadCount === 1 ? '' : 's'}`}
-            {asking > 0 && <strong className="summary-alert"> · {asking} asking to join</strong>}
-          </span>
-          <span className="chev" aria-hidden="true">
-            ›
-          </span>
-        </button>
-      </Section>
-
-      <Section title="Staff">
-        <button className="summary-row" onClick={() => onGo('staff')}>
-          <span>
-            {staffCount === null
-              ? staff.error || 'Loading…'
-              : `${staffCount} on the staff${invited ? ` · ${invited} invite${invited === 1 ? '' : 's'} waiting` : ''}`}
-          </span>
-          <span className="chev" aria-hidden="true">
-            ›
-          </span>
-        </button>
-      </Section>
 
       {!allDone && (
         <Section title="Getting started">
-          <ol className="checklist">
-            {steps.map((step) => (
-              <li key={step.label} className={step.done ? 'done' : ''}>
+          <ol className="checklist ac-steps">
+            {steps.map((step, i) => (
+              <m.li key={step.label} className={step.done ? 'done' : ''} {...stagger(i)}>
                 <span className="check" aria-hidden="true">
-                  {step.done ? '✓' : ''}
+                  {step.done && <CheckIcon />}
                 </span>
                 {step.go && !step.done ? (
                   <button className="link-btn" onClick={() => onGo(step.go!)}>
@@ -113,11 +129,45 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
                 ) : (
                   <span>{step.label}</span>
                 )}
-              </li>
+              </m.li>
             ))}
           </ol>
         </Section>
       )}
+
+      <div className="list-group nav-group">
+        <NavRow
+          icon={<ShirtIcon on />}
+          color="#0a84ff"
+          label="Players"
+          detail={
+            onBooks === null || squadCount === null
+              ? players.error || squads.error || '…'
+              : `${onBooks.length} · ${squadCount} squad${squadCount === 1 ? '' : 's'}`
+          }
+          alert={asking > 0 ? `${asking} asking to join` : undefined}
+          onClick={() => onGo('players')}
+        />
+        <NavRow
+          icon={<PeopleIcon on />}
+          color="#bf5af2"
+          label="Staff"
+          detail={staffCount === null ? staff.error || '…' : `${staffCount}${invited ? ` · ${invited} invited` : ''}`}
+          onClick={() => onGo('staff')}
+        />
+        <NavRow icon={<TableIcon on />} color="#30d158" label="Tables" detail="" onClick={() => onGo('tables')} />
+        {academy.role === 'owner' && (academy.verification === 'unverified' || academy.verification === 'rejected') && (
+          <NavRow
+            icon={<ShieldIcon />}
+            color="#ff9f0a"
+            label="Get verified"
+            detail="Badge"
+            onClick={() => onGo('settings')}
+          />
+        )}
+      </div>
+
+      <JoinCode academy={academy} />
     </div>
   );
 }
@@ -169,29 +219,46 @@ function JoinCode({ academy }: { academy: StaffAcademy }) {
   };
 
   return (
-    <section className="code-card" aria-label="Join code">
+    <m.section
+      className="code-card"
+      aria-label="Join code"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...springs.smooth, delay: 0.08 }}
+    >
       <span className="code-label">Join code</span>
-      <span className="join-code">{academy.joinCode}</span>
-      <p className="muted small">
+      <span className="join-code">
+        {academy.joinCode.split('').map((ch, i) => (
+          <m.span
+            key={`${academy.joinCode}-${i}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ ...springs.snappy, delay: 0.12 + i * 0.04 }}
+          >
+            {ch}
+          </m.span>
+        ))}
+      </span>
+      <p className="code-help">
         Players enter it in their Matchday to ask to join. Your coaching staff say yes to each one, and the family
         agrees to share their stats.
       </p>
       {error && <p className="notice warn">{error}</p>}
-      <div className="button-row">
-        <button className="ghost-btn" onClick={() => void copy()}>
+      <div className="code-actions">
+        <button className="code-btn" onClick={() => void copy()}>
           {copied ? 'Copied' : 'Copy'}
         </button>
         {typeof navigator.share === 'function' && (
-          <button className="ghost-btn" onClick={() => void share()}>
+          <button className="code-btn" onClick={() => void share()}>
             Share
           </button>
         )}
         {can(academy.role, 'new-join-code') && (
-          <button className="link-btn" disabled={busy} onClick={() => void renew()}>
+          <button className="code-btn subtle" disabled={busy} onClick={() => void renew()}>
             New code
           </button>
         )}
       </div>
-    </section>
+    </m.section>
   );
 }

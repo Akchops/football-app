@@ -12,7 +12,7 @@ import { placingLabel, recordSummary, scoreline, statsByStage, statsByTournament
 import { useAcademy } from '../../store/AcademyProvider';
 import type { PositionGroup } from '../../types';
 import { Section, Segmented, Sheet, StatTile } from '../ui';
-import { useLoad } from './parts';
+import { useLoad, type AddRequest } from './parts';
 import { TeamPicks } from './TeamPicks';
 import { isActive, playerFacts, useRoster } from './useRoster';
 
@@ -84,7 +84,7 @@ export function useSquadData(academy: StaffAcademy): SquadData {
 }
 
 /** Leaderboards across the academy's players, a page per player, side-by-side comparison, and team picks. */
-export function StatsScreen({ academy }: { academy: StaffAcademy }) {
+export function StatsScreen({ academy, request }: { academy: StaffAcademy; request?: AddRequest | null }) {
   const data = useSquadData(academy);
   const seasons = useMemo(() => seasonsIn(data.players), [data.players]);
   const competitions = useMemo(() => competitionsIn(data.players), [data.players]);
@@ -239,7 +239,7 @@ export function StatsScreen({ academy }: { academy: StaffAcademy }) {
             )}
           </Section>
 
-          <TeamPicks academy={academy} data={data} filter={f} board={board} />
+          <TeamPicks request={request} academy={academy} data={data} filter={f} board={board} />
         </>
       )}
 

@@ -5,7 +5,7 @@ import {
 } from '../../lib/academyStats';
 import { useAcademy } from '../../store/AcademyProvider';
 import { Field, Section, Sheet } from '../ui';
-import { useLoad } from './parts';
+import { useAddRequest, useLoad, type AddRequest } from './parts';
 import type { SquadData } from './StatsScreen';
 import { playerFacts } from './useRoster';
 
@@ -15,15 +15,18 @@ export function TeamPicks({
   data,
   filter,
   board,
+  request,
 }: {
   academy: StaffAcademy;
   data: SquadData;
   filter: StatsFilter;
   board: Board;
+  request?: AddRequest | null;
 }) {
   const { api } = useAcademy();
   const picks = useLoad(api ? () => api.selections(academy.id) : null, academy.id);
   const [editing, setEditing] = useState<{ selection: Selection | null } | null>(null);
+  useAddRequest(request, 'pick', () => setEditing({ selection: null }));
   const squadName = (id: string | null) => data.squads.find((s) => s.id === id)?.name;
 
   return (

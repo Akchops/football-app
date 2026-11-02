@@ -8,6 +8,7 @@ import { asScheduleRows, monthFirstLocale, readFixtureMessage, type MessageFixtu
 import { suggestedOpponents } from '../lib/standings';
 import { STAGES, STAGE_LABEL, detailPrompt, stageName, toStage } from '../lib/stage';
 import { DurationPicker, Field, Segmented, Sheet } from './ui';
+import { PasteIcon } from './icons';
 
 export interface MatchFormTarget {
   mode: 'create' | 'edit';
@@ -440,7 +441,7 @@ export function MatchFormSheet({
           </div>
         ) : (
           <button type="button" className="ghost-btn paste-open" onClick={() => setPasteOpen(true)}>
-            📋 Paste from a message
+            <PasteIcon /> Paste from a message
           </button>
         ))}
 

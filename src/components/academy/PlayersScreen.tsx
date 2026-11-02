@@ -6,7 +6,41 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { AGE_GROUPS, ALL_POSITIONS } from '../../types';
 import { Field, Section, Segmented, Sheet } from '../ui';
-import { StatusChip } from './parts';
+import { Initials, StatusChip, useAddRequest, type AddRequest } from './parts';
+import { m } from 'motion/react';
+import { rememberOrigin, stagger } from '../../lib/motion';
+import { ChevronIcon, PeopleIcon, PlusIcon } from '../icons';
+
+/** A steady colour per squad, so a squad looks the same everywhere. */
+const SQUAD_COLOURS = ['#0a84ff', '#30d158', '#ff9f0a', '#bf5af2', '#ff375f', '#64d2ff', '#ffd60a'];
+function squadColour(id: string): string {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return SQUAD_COLOURS[hash % SQUAD_COLOURS.length];
+}
+
+/** One player as an Apple list row: their initials, name, facts, where they stand. */
+function PlayerRow({ player, facts, onOpen }: { player: AcademyPlayer; facts: string; onOpen: () => void }) {
+  return (
+    <button
+      className="nav-row"
+      onClick={(e) => {
+        rememberOrigin(e.currentTarget);
+        onOpen();
+      }}
+    >
+      <Initials name={player.name} />
+      <span className="nav-row-text">
+        <span className="nav-row-label">{player.name}</span>
+        <span className="nav-row-sub">{facts}</span>
+      </span>
+      <StatusChip status={player.status} />
+      <span className="row-chevron" aria-hidden="true">
+        <ChevronIcon />
+      </span>
+    </button>
+  );
+}
 import { PlayerSheet, SquadSheet } from './RosterSheets';
 import { isActive, playerFacts, useRoster } from './useRoster';
 
@@ -39,7 +73,7 @@ export function SquadSelect({
 }
 
 /** Everyone on the academy's books, its squads, and anyone asking to join. */
-export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
+export function PlayersScreen({ academy, request }: { academy: StaffAcademy; request?: AddRequest | null }) {
   const sync = useSync();
   const { requireVerification } = useAcademy();
   const me = sync.account?.id ?? '';
@@ -50,6 +84,9 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [showGone, setShowGone] = useState(false);
+
+  useAddRequest(request, 'player', () => setAdding(true));
+  useAddRequest(request, 'squad', () => setNewSquad(true));
 
   const role = academy.role;
   const squads = roster.squads ?? [];
@@ -76,8 +113,8 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
       <div className="screen-head">
         <h1>Players</h1>
         {can(role, 'add-players') && (
-          <button className="primary-btn small" onClick={() => setAdding(true)}>
-            + Add a player
+          <button className="toolbar-btn" onClick={() => setAdding(true)} aria-label="Add a player">
+            <PlusIcon />
           </button>
         )}
       </div>
@@ -112,25 +149,14 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
         <Section
           title={`Squads · ${squads.length}`}
           action={
-            can(role, 'run-squads') && !newSquad ? (
+            can(role, 'run-squads') ? (
               <button className="link-btn" onClick={() => setNewSquad(true)}>
-                + New squad
+                New squad
               </button>
             ) : undefined
           }
         >
-          {newSquad && (
-            <NewSquadForm
-              academy={academy}
-              onDone={async (id) => {
-                setNewSquad(false);
-                if (!id) return;
-                await roster.reload();
-                setSquadId(id);
-              }}
-            />
-          )}
-          {squads.length === 0 && !newSquad && (
+          {squads.length === 0 && (
             <p className="muted small">
               No squads yet. Split players into squads like &quot;U14 Elite&quot;, &quot;U14 Development&quot; or
               &quot;Dubai Cup squad&quot; - a player can be in several, and a squad&apos;s coaches see its players&apos;
@@ -138,22 +164,35 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
             </p>
           )}
           {squads.length > 0 && (
-            <ul className="squad-list">
-              {squads.map((s) => {
+            <ul className="list-group nav-group">
+              {squads.map((s, i) => {
                 const count = inSquad(s);
                 const names = coaches(s);
                 return (
-                  <li key={s.id}>
-                    <button className="squad-card" onClick={() => setSquadId(s.id)}>
-                      <span className="squad-card-main">
-                        <strong>{s.name}</strong>
-                        {s.ageGroup && <span className="muted small">{s.ageGroup}</span>}
+                  <m.li key={s.id} {...stagger(i)}>
+                    <button
+                      className="nav-row"
+                      onClick={(e) => {
+                        rememberOrigin(e.currentTarget);
+                        setSquadId(s.id);
+                      }}
+                    >
+                      <span className="icon-square" style={{ background: squadColour(s.id) }} aria-hidden="true">
+                        <PeopleIcon on />
                       </span>
-                      <span className="muted small">
-                        {count} player{count === 1 ? '' : 's'} · {names.length ? `coached by ${names.join(', ')}` : 'no coach yet'}
+                      <span className="nav-row-text">
+                        <span className="nav-row-label">{s.name}</span>
+                        <span className="nav-row-sub">{names.length ? `Coached by ${names.join(', ')}` : 'No coach yet'}</span>
+                      </span>
+                      <span className="squad-count">
+                        <strong>{count}</strong>
+                        {s.ageGroup && <span>{s.ageGroup}</span>}
+                      </span>
+                      <span className="row-chevron" aria-hidden="true">
+                        <ChevronIcon />
                       </span>
                     </button>
-                  </li>
+                  </m.li>
                 );
               })}
             </ul>
@@ -164,14 +203,19 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
       {!loading && (
         <Section title={`Everyone · ${onBooks.length}`}>
           {onBooks.length > 6 && (
-            <input
-              className="input"
-              type="search"
-              placeholder="Find a player"
-              aria-label="Find a player"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <label className="search-field">
+              <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6" />
+                <path d="M15 15l5 5" />
+              </svg>
+              <input
+                type="search"
+                placeholder="Find a player"
+                aria-label="Find a player"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </label>
           )}
           {onBooks.length === 0 ? (
             <p className="muted small">
@@ -179,19 +223,13 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
               they can ask to join. Players without the app can go on the list by name, so squad lists are complete.
             </p>
           ) : (
-            <ul className="player-list">
-              {shown.map((p) => (
-                <li key={p.id}>
-                  <button className="player-row" onClick={() => setPlayerId(p.id)}>
-                    <span className="player-row-main">
-                      <strong>{p.name}</strong>
-                      <span className="muted small">{playerFacts(p, squadNames(p.id))}</span>
-                    </span>
-                    <StatusChip status={p.status} />
-                  </button>
-                </li>
+            <ul className="list-group person-group">
+              {shown.map((p, i) => (
+                <m.li key={p.id} layout="position" {...stagger(i)}>
+                  <PlayerRow player={p} facts={playerFacts(p, squadNames(p.id))} onOpen={() => setPlayerId(p.id)} />
+                </m.li>
               ))}
-              {shown.length === 0 && <li className="muted small">Nobody called that.</li>}
+              {shown.length === 0 && <li className="list-empty">Nobody called that.</li>}
             </ul>
           )}
           {gone.length > 0 && (
@@ -200,16 +238,10 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
             </button>
           )}
           {showGone && (
-            <ul className="player-list">
+            <ul className="list-group person-group">
               {gone.map((p) => (
                 <li key={p.id}>
-                  <button className="player-row" onClick={() => setPlayerId(p.id)}>
-                    <span className="player-row-main">
-                      <strong>{p.name}</strong>
-                      <span className="muted small">{playerFacts(p)}</span>
-                    </span>
-                    <StatusChip status={p.status} />
-                  </button>
+                  <PlayerRow player={p} facts={playerFacts(p)} onOpen={() => setPlayerId(p.id)} />
                 </li>
               ))}
             </ul>
@@ -217,6 +249,17 @@ export function PlayersScreen({ academy }: { academy: StaffAcademy }) {
         </Section>
       )}
 
+      <Sheet open={newSquad} title="New squad" subtitle="A player can be in several" onClose={() => setNewSquad(false)}>
+        <NewSquadForm
+          academy={academy}
+          onDone={async (id) => {
+            setNewSquad(false);
+            if (!id) return;
+            await roster.reload();
+            setSquadId(id);
+          }}
+        />
+      </Sheet>
       <AddPlayerSheet
         open={adding}
         academy={academy}

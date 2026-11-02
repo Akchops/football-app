@@ -46,7 +46,7 @@ import { AddButton } from './components/AddButton';
 import { PullToRefresh } from './components/PullToRefresh';
 import { UndoProvider } from './components/UndoToast';
 import { UpdatePrompt } from './components/UpdatePrompt';
-import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, ShieldIcon } from './components/icons';
+import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, PasteIcon, RunIcon, ShieldIcon, TrophyIcon } from './components/icons';
 
 type Tab = 'calendar' | 'matches' | 'media' | 'coach' | 'stats' | 'setup';
 
@@ -316,12 +316,12 @@ function Shell() {
             <Fragment key={t.id}>
               {i === 2 && (
                 <AddButton
-                  actions={{
-                    match: () => setMatchForm({ mode: 'create', dateISO: todayISO(now) }),
-                    tournament: () => setTournamentOpen(true),
-                    training: () => setTrainingForm({ mode: 'create', dateISO: todayISO(now) }),
-                    importFixtures: () => setImportOpen(true),
-                  }}
+                  items={[
+                    { label: 'Match', hint: 'A game on the calendar', Icon: BallIcon, run: () => setMatchForm({ mode: 'create', dateISO: todayISO(now) }) },
+                    { label: 'Tournament', hint: 'A day of games, with groups', Icon: TrophyIcon, run: () => setTournamentOpen(true) },
+                    { label: 'Training', hint: 'A session you went to', Icon: RunIcon, run: () => setTrainingForm({ mode: 'create', dateISO: todayISO(now) }) },
+                    { label: 'Import fixtures', hint: 'From a photo or a message', Icon: PasteIcon, run: () => setImportOpen(true) },
+                  ]}
                 />
               )}
               <button

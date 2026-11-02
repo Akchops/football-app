@@ -2,7 +2,9 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { createPortal } from 'react-dom';
 import { AnimatePresence, animate, m, useDragControls, useMotionValue, useTransform, type PanInfo } from 'motion/react';
 import { prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
-import { BallIcon, CalendarIcon, ChartIcon, NoEntryIcon, RunIcon, ShieldIcon, TrophyIcon } from './icons';
+import {
+  BallIcon, CalendarIcon, ChartIcon, ChevronIcon, MediaIcon, NoEntryIcon, PencilIcon, RunIcon, ShieldIcon, ShirtIcon, TrophyIcon,
+} from './icons';
 
 export function Sheet({
   open,
@@ -345,6 +347,19 @@ export function Stepper({
   );
 }
 
+/** Emoji the screens already pass in, drawn as the app's own symbols instead. */
+const EMPTY_ICONS: Record<string, () => JSX.Element> = {
+  '🎬': () => <MediaIcon on />,
+  '⚽': () => <BallIcon on />,
+  '📅': () => <CalendarIcon on />,
+  '🏆': TrophyIcon,
+  '📊': () => <ChartIcon on />,
+  '👕': () => <ShirtIcon on />,
+  '📝': PencilIcon,
+  '🔎': ChartIcon,
+};
+
+/** Apple's "content unavailable" view: a symbol, a line, a way forward. */
 export function EmptyState({
   icon,
   title,
@@ -356,15 +371,27 @@ export function EmptyState({
   message: string;
   action?: ReactNode;
 }) {
+  const Icon = EMPTY_ICONS[icon];
   return (
-    <div className="empty">
-      <div className="empty-icon" aria-hidden="true">
-        {icon}
-      </div>
+    <m.div
+      className="empty"
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={springs.smooth}
+    >
+      <m.div
+        className="empty-icon"
+        aria-hidden="true"
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ ...springs.bouncy, delay: 0.06 }}
+      >
+        {Icon ? <Icon /> : icon}
+      </m.div>
       <h3>{title}</h3>
       <p>{message}</p>
       {action}
-    </div>
+    </m.div>
   );
 }
 
@@ -433,6 +460,60 @@ export function Section({
       </div>
       {grouped ? <div className="section-card">{children}</div> : children}
     </section>
+  );
+}
+
+/**
+ * A Settings-style row that opens to show more below it: the chevron turns
+ * and the contents grow into place, rather than a link that makes things
+ * appear from nowhere.
+ */
+export function Disclosure({
+  label,
+  detail,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string;
+  /** What's set inside, shown while it's shut so nothing hides there unseen. */
+  detail?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <div className={open ? 'disclosure open' : 'disclosure'}>
+      <button type="button" className="disclosure-row" aria-expanded={open} aria-controls={id} onClick={onToggle}>
+        <span className="disclosure-text">
+          <span className="disclosure-label">{label}</span>
+          {detail && !open && <span className="disclosure-detail">{detail}</span>}
+        </span>
+        <m.span
+          className="disclosure-chevron"
+          animate={{ rotate: open ? 90 : 0 }}
+          transition={springs.snappy}
+          aria-hidden="true"
+        >
+          <ChevronIcon />
+        </m.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <m.div
+            id={id}
+            className="disclosure-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={springs.smooth}
+          >
+            <div className="disclosure-inner">{children}</div>
+          </m.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
