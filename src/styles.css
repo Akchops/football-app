@@ -3906,3 +3906,58 @@ button.nav-row:active { background: var(--surface-2); }
 .perf-stat-value { font-family: var(--font-display); font-size: 26px; font-weight: 700; }
 .perf-stat-label { font-size: 12px; }
 .perf-breakdown { border: 0; border-radius: 14px; }
+
+/* The pass, plain black and lifted off the page: light falls on it from
+   above, a little bounces up from below, and it casts a soft shadow. */
+.pass-stage { position: relative; padding-bottom: 6px; }
+.pass-stage::after {
+  /* The shadow on the "floor" beneath it. */
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -10px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), transparent);
+  filter: blur(6px);
+  z-index: -1;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .pass-stage::after {
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.07), transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] .pass-stage::after { background: radial-gradient(closest-side, rgba(255, 255, 255, 0.07), transparent); }
+}
+.pass-face {
+  background:
+    radial-gradient(120% 75% at 50% -18%, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.04) 45%, transparent 62%),
+    radial-gradient(85% 45% at 50% 118%, rgba(255, 255, 255, 0.08), transparent 70%),
+    linear-gradient(180deg, #17181b 0%, #0b0b0c 48%, #060607 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.09),
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 10px 20px -6px rgba(0, 0, 0, 0.5),
+    0 30px 60px -18px rgba(0, 0, 0, 0.75);
+}
+.pass-tier { color: rgba(255, 255, 255, 0.8); }
+.pass-glare { background: radial-gradient(circle at var(--gx, 50%) var(--gy, 30%), rgba(255, 255, 255, 0.12), transparent 45%); }
+.pass-photo .avatar { background: linear-gradient(180deg, #2a2b2f, #141416); border-color: rgba(255, 255, 255, 0.16); }
+
+/* Its miniature on Calendar: the same black, lit from above, sitting up. */
+.player-card-mini {
+  border-radius: 50%;
+  color: #fff;
+  background:
+    radial-gradient(90% 60% at 50% -5%, rgba(255, 255, 255, 0.2), transparent 65%),
+    linear-gradient(180deg, #1a1b1e, #070708);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 8px 18px -6px rgba(0, 0, 0, 0.6);
+}
+.player-card-mini .ring-track { stroke: rgba(255, 255, 255, 0.12); }
