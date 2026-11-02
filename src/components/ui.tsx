@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } f
 import { createPortal } from 'react-dom';
 import { AnimatePresence, animate, m, useDragControls, useMotionValue, useTransform, type PanInfo } from 'motion/react';
 import { prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
+import { sheetBackStack } from '../lib/backStack';
 import {
   BallIcon, CalendarIcon, ChartIcon, ChevronIcon, MediaIcon, NoEntryIcon, PencilIcon, RunIcon, ShieldIcon, ShirtIcon, TrophyIcon,
 } from './icons';
@@ -39,6 +40,9 @@ export function Sheet({
  * follows a finger pulled down from its top - let go past a third of the way,
  * or with a flick, and it carries on down at that speed; otherwise it springs
  * back. However it closes, it slides away rather than vanishing.
+ *
+ * The phone's back button puts it away too, newest sheet first (see
+ * lib/backStack), instead of closing the app.
  */
 function SheetFrame({
   title,
@@ -66,13 +70,31 @@ function SheetFrame({
   const height = () => panelRef.current?.offsetHeight ?? 600;
   const dim = useTransform(y, (v) => 1 - Math.min(1, Math.max(0, v) / height()) * 0.9);
 
+  // This sheet's entry in the browser history; given back as soon as it starts to leave.
+  const release = useRef<() => void>(() => {});
+
   // Slide down and away, then hand over. Starts from the finger's speed when there is one.
   const leave = (velocity = 0) => {
     if (leaving.current) return;
     leaving.current = true;
+    release.current();
     if (prefersReducedMotion()) return onClose();
     animate(y, height(), { ...springs.smooth, velocity }).then(onClose);
   };
+
+  // Back reaches the sheet after renders it never saw, so it needs the latest of these.
+  const latest = useRef({ leave, dismissible });
+  latest.current = { leave, dismissible };
+
+  useEffect(() => {
+    release.current = sheetBackStack().open(() => {
+      if (!latest.current.dismissible) return false;
+      latest.current.leave();
+      return true;
+    });
+    // Closed from outside - saved, or another sheet took over - gives the entry back as well.
+    return () => release.current();
+  }, []);
 
   useEffect(() => {
     const done = sheetOpened();
