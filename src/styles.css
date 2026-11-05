@@ -2403,7 +2403,9 @@ button:disabled:active { transform: none; }
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas: 'top top' 'nav main';
   }
-  .academy-app.with-nav > .topbar { grid-area: top; position: static; }
+  /* In its own row here, not floating over the page - but still positioned, so
+     its frosted glass (absolute, inset 0) fills the bar and not the whole app. */
+  .academy-app.with-nav > .topbar { grid-area: top; position: relative; }
   .academy-app.with-nav > .content { grid-area: main; padding-top: 8px; padding-bottom: 24px; }
   .academy-app.with-nav > .tabbar {
     grid-area: nav;
