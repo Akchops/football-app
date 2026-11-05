@@ -9,7 +9,7 @@ import {
 } from '../store/media';
 import { MediaTile, MediaViewer } from './MediaViewer';
 import { MatchPickerSheet } from './MatchPickerSheet';
-import { EmptyState } from './ui';
+import { Bone, BusyLabel, EmptyState, Skeleton } from './ui';
 import { ChevronIcon } from './icons';
 
 type Filter = 'all' | 'video' | 'photo';
@@ -23,6 +23,9 @@ interface Group {
 export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Match) => void; onBack?: () => void }) {
   const { matches, competitionOf, teamOf, teams } = useStore();
   const [items, setItems] = useState<MediaMeta[]>([]);
+  // Saved clips come off the phone's own storage, which takes a moment; until
+  // then the screen is outlined rather than claiming there are none.
+  const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [viewing, setViewing] = useState<MediaMeta | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,7 +39,8 @@ export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Matc
   const refresh = useCallback(() => {
     listAllMedia()
       .then(setItems)
-      .catch(() => setError('Could not read saved media on this device.'));
+      .catch(() => setError('Could not read saved media on this device.'))
+      .finally(() => setLoaded(true));
   }, []);
 
   useEffect(refresh, [refresh]);
@@ -104,7 +108,9 @@ export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Matc
       <div className="screen-head">
         <h1>Clips</h1>
         <button className="primary-btn small" onClick={() => fileRef.current?.click()} disabled={busy}>
-          {busy ? 'Saving…' : '+ Add'}
+          <BusyLabel busy={busy} text="Saving…">
+            + Add
+          </BusyLabel>
         </button>
       </div>
 
@@ -124,7 +130,9 @@ export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Matc
 
       {error && <p className="form-error">{error}</p>}
 
-      {items.length === 0 ? (
+      {!loaded ? (
+        <ClipsSkeleton />
+      ) : items.length === 0 ? (
         <EmptyState
           icon="🎬"
           title="No photos or clips yet"
@@ -257,5 +265,31 @@ export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Matc
         onClose={() => setReassigning(null)}
       />
     </div>
+  );
+}
+
+/** The Clips screen while saved media is read off the phone: filters, a match, its tiles. */
+function ClipsSkeleton() {
+  return (
+    <Skeleton label="Loading your clips…">
+      <div className="sk-chips">
+        <Bone w={70} h={34} r={17} />
+        <Bone w={84} h={34} r={17} />
+        <Bone w={92} h={34} r={17} />
+      </div>
+      {[6, 3].map((tiles, g) => (
+        <div key={g} className="media-group">
+          <div className="sk-lines">
+            <Bone w={g ? '38%' : '46%'} h={14} />
+            <Bone w={g ? '52%' : '60%'} h={10} />
+          </div>
+          <div className="media-grid">
+            {Array.from({ length: tiles }, (_, i) => (
+              <Bone key={i} className="sk-tile" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </Skeleton>
   );
 }

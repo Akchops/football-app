@@ -22,10 +22,218 @@
       } catch (e) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
+      // Which outline to show while the app itself downloads (#boot below): the
+      // calendar for a player who's set up, the academy for staff who've opened
+      // one here, and just the icon on a phone that has never been set up.
+      try {
+        var mode = localStorage.getItem('matchday.mode.v1');
+        var boot = 'splash';
+        if (mode === 'academy') {
+          if (localStorage.getItem('matchday.academy.v1')) boot = 'academy';
+        } else if (/"onboardedAt":"/.test(localStorage.getItem('matchday.data.v1') || '')) {
+          boot = 'home';
+        }
+        document.documentElement.setAttribute('data-boot', boot);
+      } catch (e) {
+        document.documentElement.setAttribute('data-boot', 'splash');
+      }
     </script>
+    <style>
+      /* The first-open skeleton. Plain HTML and CSS so it shows the moment the
+         page arrives, before any of the app's code has downloaded; React
+         replaces all of it on its first render. Colours follow the theme
+         chosen above. */
+      :root {
+        --boot-bg: #000000;
+        --boot-bone: #1b1b1d;
+        --boot-bar: #1c1c1e;
+        --boot-bone-on-bar: #323235;
+        --boot-line: rgba(255, 255, 255, 0.08);
+        --boot-shine: rgba(255, 255, 255, 0.06);
+      }
+      :root[data-theme='light'] {
+        --boot-bg: #f2f2f7;
+        --boot-bone: #e0e0e5;
+        --boot-bar: #ffffff;
+        --boot-bone-on-bar: #e9e9ee;
+        --boot-line: rgba(0, 0, 0, 0.08);
+        --boot-shine: rgba(255, 255, 255, 0.6);
+      }
+      @media (prefers-color-scheme: light) {
+        :root[data-theme='auto'] {
+          --boot-bg: #f2f2f7;
+          --boot-bone: #e0e0e5;
+          --boot-bar: #ffffff;
+          --boot-bone-on-bar: #e9e9ee;
+          --boot-line: rgba(0, 0, 0, 0.08);
+          --boot-shine: rgba(255, 255, 255, 0.6);
+        }
+      }
+      body { margin: 0; background: var(--boot-bg); }
+      .boot {
+        position: fixed;
+        inset: 0;
+        max-width: 560px;
+        margin: 0 auto;
+        overflow: hidden;
+        box-sizing: border-box;
+        padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 0;
+        /* Held back a beat: when the app is already on the phone it starts before this shows. */
+        animation: boot-in 0.3s ease 0.12s both;
+      }
+      @keyframes boot-in { from { opacity: 0; } }
+      .boot-home, .boot-academy, .boot-splash { display: none; flex-direction: column; }
+      [data-boot='home'] .boot-home,
+      [data-boot='academy'] .boot-academy { display: flex; }
+      [data-boot='splash'] .boot-splash { display: flex; height: 80%; align-items: center; justify-content: center; }
+      [data-boot='splash'] .boot-tabbar { display: none; }
+      .boot i {
+        display: block;
+        flex: none;
+        position: relative;
+        overflow: hidden;
+        height: 12px;
+        border-radius: 7px;
+        background: var(--boot-bone);
+      }
+      .boot i::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, var(--boot-shine), transparent);
+        animation: boot-sweep 1.6s ease-in-out infinite;
+      }
+      @keyframes boot-sweep { 60%, 100% { transform: translateX(100%); } }
+      .boot .o { border-radius: 50%; }
+      .boot-row { display: flex; align-items: center; gap: 8px; }
+      .boot-split { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .boot-col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+      .boot-pills { display: flex; gap: 8px; overflow: hidden; margin: 0 -16px; padding: 0 16px; }
+      .boot-pills i { height: 37px; border-radius: 19px; }
+      .boot-week, .boot-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+      .boot-week i { width: 11px; height: 10px; margin: 0 auto; border-radius: 3px; }
+      .boot-days i { height: auto; aspect-ratio: 1; border-radius: 14px; }
+      .boot-card { background: var(--boot-bar); border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+      .boot-card i, .boot-tabbar i { background: var(--boot-bone-on-bar); }
+      .boot-stats { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 0.5px solid var(--boot-line); padding-top: 14px; }
+      .boot-stats span { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+      .boot-list { background: var(--boot-bar); border-radius: 16px; }
+      .boot-list .boot-row { gap: 12px; min-height: 52px; padding: 0 14px; }
+      .boot-list .boot-row + .boot-row { border-top: 0.5px solid var(--boot-line); }
+      .boot-list i { background: var(--boot-bone-on-bar); }
+      .boot-tabbar {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+        height: 61px;
+        box-sizing: border-box;
+        padding: 5px;
+        border-radius: 30px;
+        background: var(--boot-bar);
+        border: 0.5px solid var(--boot-line);
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        align-items: center;
+      }
+      .boot-tabbar span { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      .boot-tabbar .boot-add { width: 58px; height: 58px; margin: -18px auto 0; border-radius: 50%; box-shadow: 0 0 0 4px var(--boot-bg); }
+      .boot-splash img { width: 76px; height: 76px; animation: boot-breathe 1.8s ease-in-out infinite alternate; }
+      @keyframes boot-breathe { to { opacity: 0.55; transform: scale(0.96); } }
+      .boot-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+      @media (prefers-reduced-motion: reduce) {
+        .boot i::after { display: none; }
+        .boot-splash img { animation: none; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot" role="status">
+        <span class="boot-label">Opening Matchday…</span>
+
+        <!-- The calendar: the bar, the player's card, the month, the quick buttons and the grid. -->
+        <div class="boot-home" aria-hidden="true">
+          <div class="boot-split" style="height: 38px">
+            <div class="boot-row"><i class="o" style="width: 22px; height: 22px"></i><i style="width: 104px; height: 18px"></i></div>
+            <i class="o" style="width: 38px; height: 38px"></i>
+          </div>
+          <div class="boot-row" style="gap: 14px; margin-top: 12px">
+            <i class="o" style="width: 50px; height: 50px"></i>
+            <div class="boot-col"><i style="width: 96px; height: 20px"></i><i style="width: 170px; height: 13px"></i></div>
+            <i style="width: 58px; height: 30px; border-radius: 15px; margin-left: auto"></i>
+          </div>
+          <div class="boot-split" style="margin-top: 20px; align-items: flex-start">
+            <i style="width: 176px; height: 34px; border-radius: 9px; margin-top: 3px"></i>
+            <div class="boot-row" style="gap: 6px">
+              <i class="o" style="width: 36px; height: 36px"></i><i style="width: 74px; height: 40px; border-radius: 14px"></i><i class="o" style="width: 36px; height: 36px"></i>
+            </div>
+          </div>
+          <i style="width: 240px; height: 13px; margin-top: 14px"></i>
+          <div class="boot-pills" style="margin-top: 24px">
+            <i style="width: 89px"></i><i style="width: 132px"></i><i style="width: 103px"></i><i style="width: 96px"></i>
+          </div>
+          <div class="boot-week" style="margin-top: 26px">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="boot-days" style="margin-top: 13px">
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="boot-split" style="margin-top: 18px">
+            <i style="width: 190px; height: 18px"></i><i style="width: 89px; height: 40px; border-radius: 14px"></i>
+          </div>
+        </div>
+
+        <!-- The academy: whose it is, its numbers, and its sections. -->
+        <div class="boot-academy" aria-hidden="true">
+          <div class="boot-split" style="height: 38px">
+            <div class="boot-row" style="gap: 10px">
+              <i style="width: 32px; height: 32px; border-radius: 9px"></i>
+              <div class="boot-col" style="gap: 6px"><i style="width: 130px; height: 14px"></i><i style="width: 92px; height: 10px"></i></div>
+            </div>
+            <i class="o" style="width: 38px; height: 38px"></i>
+          </div>
+          <div class="boot-card" style="margin-top: 14px">
+            <div class="boot-row" style="gap: 14px">
+              <i style="width: 60px; height: 60px; border-radius: 16px"></i>
+              <div class="boot-col"><i style="width: 170px; height: 22px"></i><i style="width: 120px; height: 13px"></i><i style="width: 150px; height: 13px"></i></div>
+            </div>
+            <div class="boot-stats">
+              <span><i style="width: 34px; height: 30px"></i><i style="width: 52px; height: 9px"></i></span>
+              <span><i style="width: 34px; height: 30px"></i><i style="width: 52px; height: 9px"></i></span>
+              <span><i style="width: 34px; height: 30px"></i><i style="width: 52px; height: 9px"></i></span>
+            </div>
+          </div>
+          <div class="boot-list" style="margin-top: 18px">
+            <div class="boot-row"><i style="width: 30px; height: 30px; border-radius: 8px"></i><i style="width: 90px; height: 14px"></i><i style="width: 46px; height: 12px; margin-left: auto"></i></div>
+            <div class="boot-row"><i style="width: 30px; height: 30px; border-radius: 8px"></i><i style="width: 64px; height: 14px"></i><i style="width: 30px; height: 12px; margin-left: auto"></i></div>
+            <div class="boot-row"><i style="width: 30px; height: 30px; border-radius: 8px"></i><i style="width: 76px; height: 14px"></i></div>
+          </div>
+          <div class="boot-card" style="margin-top: 18px; gap: 12px">
+            <i style="width: 80px; height: 10px"></i><i style="width: 190px; height: 34px"></i><i style="width: 100%; height: 12px"></i><i style="width: 70%; height: 12px"></i>
+          </div>
+        </div>
+
+        <!-- A phone that has never been set up: just the icon. -->
+        <div class="boot-splash" aria-hidden="true">
+          <img src="./favicon.svg" alt="" />
+        </div>
+
+        <div class="boot-tabbar" aria-hidden="true">
+          <span><i class="o" style="width: 24px; height: 24px"></i><i style="width: 44px; height: 8px"></i></span>
+          <span><i class="o" style="width: 24px; height: 24px"></i><i style="width: 44px; height: 8px"></i></span>
+          <i class="boot-add"></i>
+          <span><i class="o" style="width: 24px; height: 24px"></i><i style="width: 44px; height: 8px"></i></span>
+          <span><i class="o" style="width: 24px; height: 24px"></i><i style="width: 44px; height: 8px"></i></span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

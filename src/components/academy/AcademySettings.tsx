@@ -2,7 +2,7 @@ import { useLayoutEffect, useState } from 'react';
 import { ROLE_LABEL, can, describeAcademyError, type AcademyDetails, type StaffAcademy } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
-import { Section } from '../ui';
+import { BusyLabel, Section } from '../ui';
 import { AcademyDetailsFields, detailsOf, detailsProblem } from './AcademyDetails';
 import { UsernameForm } from './UsernameForm';
 import { VerificationSection } from './Verification';
@@ -99,7 +99,7 @@ export function AcademySettings({ academy, hasPlayer }: { academy: StaffAcademy;
             {note && !changed && <p className="notice">{note}</p>}
             <div className="button-row">
               <button className="primary-btn" disabled={busy || !changed} onClick={save}>
-                {busy ? 'Saving…' : 'Save changes'}
+                <BusyLabel busy={busy} text="Saving…">Save changes</BusyLabel>
               </button>
               {changed && (
                 <button className="ghost-btn" disabled={busy} onClick={() => setDraft(saved)}>

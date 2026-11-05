@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, animate, m, useDragControls, useMotionValue, useTransform, type PanInfo } from 'motion/react';
 import { prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
@@ -558,5 +558,152 @@ export function DurationPicker({
         <span className="duration-unit">minutes</span>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- loading
+
+/**
+ * One grey shape standing in for something on its way: a line of text, a
+ * badge, a tile. Shapes are decoration only - the Skeleton around them says
+ * "Loading" once, for whoever can't see them.
+ */
+export function Bone({
+  w,
+  h,
+  r,
+  circle = false,
+  className,
+  style,
+}: {
+  w?: number | string;
+  h?: number | string;
+  r?: number | string;
+  circle?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  return (
+    <span
+      className={className ? `sk ${className}` : 'sk'}
+      style={{ width: w, height: h, borderRadius: circle ? '50%' : r, ...style }}
+    />
+  );
+}
+
+/**
+ * A screen, or part of one, in outline while it loads. It fades in only after
+ * a moment, so a quick load never flashes it. `label` is what a screen reader
+ * hears instead of the shapes.
+ */
+export function Skeleton({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={className ? `skeleton ${className}` : 'skeleton'} role="status">
+      <span className="sr-only">{label}</span>
+      <div className="skeleton-shapes" aria-hidden="true">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Widths that make a column of placeholder lines look like real, uneven text. */
+const LINE_WIDTHS = [62, 46, 74, 55, 68, 40];
+export const lineWidth = (i: number, less = 0) => `${LINE_WIDTHS[i % LINE_WIDTHS.length] - less}%`;
+
+/**
+ * Rows of a grouped list on their way: a leading tile (a coloured square, or a
+ * round face for people), a line or two, and what sits at the end of the row.
+ */
+export function SkeletonRows({
+  rows = 3,
+  lead = 'square',
+  sub = true,
+  trail,
+}: {
+  rows?: number;
+  lead?: 'square' | 'circle';
+  sub?: boolean;
+  trail?: 'chip' | 'count';
+}) {
+  return (
+    <div className={lead === 'circle' ? 'list-group person-group' : 'list-group nav-group'}>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="sk-row">
+          {lead === 'circle' ? <Bone w={36} h={36} circle /> : <Bone w={30} h={30} r={8} />}
+          <span className="sk-lines">
+            <Bone w={lineWidth(i)} h={14} />
+            {sub && <Bone w={lineWidth(i + 2, 20)} h={10} />}
+          </span>
+          {trail === 'chip' && <Bone w={62} h={24} r={12} />}
+          {trail === 'count' && <Bone w={24} h={24} r={6} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A section's small heading still loading, over whatever goes under it. */
+export function SkeletonSection({ title = 110, children }: { title?: number; children: ReactNode }) {
+  return (
+    <div className="section">
+      <div className="section-head">
+        <Bone w={title} h={11} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Plain cards stacked up, each a name and a line of detail. */
+export function SkeletonCards({ count = 3 }: { count?: number }) {
+  return (
+    <div className="sk-cards">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="sk-card">
+          <Bone w={lineWidth(i)} h={14} />
+          <Bone w={lineWidth(i + 3, 22)} h={10} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Spinner({ small = false }: { small?: boolean }) {
+  return <span className={small ? 'spinner small' : 'spinner'} aria-hidden="true" />;
+}
+
+/** A wait with no shape to show - signing in, reading a schedule: a spinner and what's happening. */
+export function Waiting({ text, hint }: { text: string; hint?: string }) {
+  return (
+    <div className="reading-state" role="status">
+      <Spinner />
+      <p className="muted small">{text}</p>
+      {hint && <p className="muted small">{hint}</p>}
+    </div>
+  );
+}
+
+/** A line saying what's happening, with a small spinner in front - for a wait inside a screen. */
+export function LoadingLine({ children }: { children: ReactNode }) {
+  return (
+    <p className="loading-line" role="status">
+      <Spinner small />
+      <span>{children}</span>
+    </p>
+  );
+}
+
+/**
+ * What a button says while it works: a small spinner and the word for it
+ * ("Saving…"), so a tap clearly took.
+ */
+export function BusyLabel({ busy, text, children }: { busy: boolean; text: string; children: ReactNode }) {
+  if (!busy) return <>{children}</>;
+  return (
+    <span className="busy-label">
+      <span className="btn-spinner" aria-hidden="true" />
+      {text}
+    </span>
   );
 }

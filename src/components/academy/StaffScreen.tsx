@@ -6,9 +6,10 @@ import {
 import { useAcademy } from '../../store/AcademyProvider';
 import { m } from 'motion/react';
 import { stagger } from '../../lib/motion';
-import { Field, Section, Segmented, Sheet } from '../ui';
+import { BusyLabel, Field, Section, Segmented, Sheet } from '../ui';
 import { ChevronIcon, PlusIcon } from '../icons';
 import { Initials, RoleChip, useAddRequest, useLoad, type AddRequest } from './parts';
+import { StaffSkeleton } from './skeletons';
 
 const ROLE_ORDER: StaffRole[] = ['owner', 'manager', 'coach', 'admin'];
 
@@ -85,7 +86,7 @@ export function StaffScreen({
       )}
 
       <Section title={staff.data ? `On the staff · ${staff.data.length}` : 'On the staff'}>
-        {!staff.data && !staff.error && <p className="muted small">Loading…</p>}
+        {!staff.data && !staff.error && <StaffSkeleton />}
         {staff.data && (
           <ul className="list-group person-group">
             {staff.data.map((member, i) => {
@@ -243,7 +244,7 @@ function InviteStaff({ academy, onInvited }: { academy: StaffAcademy; onInvited:
       {note && <p className="notice">{note}</p>}
       <div className="button-row">
         <button className="primary-btn" disabled={busy || !name} onClick={() => void send()}>
-          {busy ? 'Sending…' : 'Send invite'}
+          <BusyLabel busy={busy} text="Sending…">Send invite</BusyLabel>
         </button>
       </div>
     </>

@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { cleanUsername, describeAcademyError, usernameProblem } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
+import { BusyLabel } from '../ui';
 
 type Check = { name: string; state: 'checking' | 'free' | 'taken' | 'unknown' };
 
@@ -72,6 +73,7 @@ export function UsernameForm({
   };
 
   let hint: { text: string; tone: '' | 'good' | 'bad' } = { text: '3 to 20 letters, numbers or _', tone: '' };
+  const checking = !problem && !unchanged && state === 'checking';
   if (problem) hint = { text: problem, tone: 'bad' };
   else if (unchanged) hint = { text: "That's yours already", tone: '' };
   else if (state === 'checking') hint = { text: 'Checking…', tone: '' };
@@ -107,13 +109,20 @@ export function UsernameForm({
           />
         </span>
         <span id={`${id}-hint`} className={hint.tone ? `field-hint ${hint.tone}` : 'field-hint'} role="status">
-          {hint.text}
+          {checking ? (
+            <span className="busy-label">
+              <span className="btn-spinner" aria-hidden="true" />
+              {hint.text}
+            </span>
+          ) : (
+            hint.text
+          )}
         </span>
       </div>
       {error && <p className="notice warn">{error}</p>}
       <div className="button-row">
         <button className="primary-btn" disabled={blocked} onClick={() => void save()}>
-          {busy ? 'Saving…' : submitLabel}
+          <BusyLabel busy={busy} text="Saving…">{submitLabel}</BusyLabel>
         </button>
         {onCancel && (
           <button className="ghost-btn" disabled={busy} onClick={onCancel}>

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { formatBytes, formatDuration, getMediaBlob, type MediaMeta } from '../store/media';
+import { Spinner } from './ui';
 
 /** Full-screen playback for one photo or clip. */
 export function MediaViewer({
@@ -56,7 +57,10 @@ export function MediaViewer({
         </div>
 
         {!url ? (
-          <p className="muted small">Loading…</p>
+          <div className="viewer-media viewer-loading" role="status">
+            <Spinner />
+            <span className="sr-only">Opening {item.kind === 'video' ? 'the clip' : 'the photo'}…</span>
+          </div>
         ) : item.kind === 'video' ? (
           <video src={url} controls autoPlay playsInline className="viewer-media" />
         ) : (

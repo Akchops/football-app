@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { addMedia, deleteMedia, formatBytes, listMedia, type MediaMeta } from '../store/media';
 import { MediaTile, MediaViewer } from './MediaViewer';
+import { Bone, BusyLabel, Skeleton } from './ui';
 
 /**
  * Videos and photos for one match, shown on the match itself. Files live in
@@ -8,6 +9,7 @@ import { MediaTile, MediaViewer } from './MediaViewer';
  */
 export function MediaGallery({ matchId, onSeeAll }: { matchId: string; onSeeAll?: () => void }) {
   const [items, setItems] = useState<MediaMeta[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [viewing, setViewing] = useState<MediaMeta | null>(null);
@@ -16,7 +18,8 @@ export function MediaGallery({ matchId, onSeeAll }: { matchId: string; onSeeAll?
   const refresh = useCallback(() => {
     listMedia(matchId)
       .then(setItems)
-      .catch(() => setError('Could not read saved media on this device.'));
+      .catch(() => setError('Could not read saved media on this device.'))
+      .finally(() => setLoaded(true));
   }, [matchId]);
 
   useEffect(refresh, [refresh]);
@@ -48,7 +51,9 @@ export function MediaGallery({ matchId, onSeeAll }: { matchId: string; onSeeAll?
       <div className="section-head">
         <h3>Video & photos</h3>
         <button className="ghost-btn" onClick={() => fileRef.current?.click()} disabled={busy}>
-          {busy ? 'Saving…' : '+ Add'}
+          <BusyLabel busy={busy} text="Saving…">
+            + Add
+          </BusyLabel>
         </button>
       </div>
 
@@ -66,7 +71,15 @@ export function MediaGallery({ matchId, onSeeAll }: { matchId: string; onSeeAll?
 
       {error && <p className="form-error">{error}</p>}
 
-      {items.length === 0 ? (
+      {!loaded ? (
+        <Skeleton label="Loading clips…">
+          <div className="media-grid">
+            <Bone className="sk-tile" />
+            <Bone className="sk-tile" />
+            <Bone className="sk-tile" />
+          </div>
+        </Skeleton>
+      ) : items.length === 0 ? (
         <p className="muted small">
           Add clips of your game — saves, goals, big moments. Everything stays on this device.
         </p>

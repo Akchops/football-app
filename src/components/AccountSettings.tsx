@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { describeAuthError, googleAvailable, sendCode, signInWithGoogle, verifyCode } from '../lib/auth';
 import type { Invite, Person, SentInvite } from '../lib/syncEngine';
 import { useSync, type SyncValue } from '../store/SyncProvider';
-import { Field, Section } from './ui';
+import { BusyLabel, Field, LoadingLine, Section } from './ui';
 
 /**
  * Signing in, and the family this phone shares with. Hidden entirely until the
@@ -18,7 +18,7 @@ export function AccountSection() {
       {sync.account ? (
         <SignedIn sync={sync} />
       ) : sync.status === 'checking' ? (
-        <p className="muted small">Checking…</p>
+        <LoadingLine>Checking your account…</LoadingLine>
       ) : (
         <SignInForm />
       )}
@@ -98,7 +98,7 @@ export function SignInForm({
           </Field>
           <div className="button-row">
             <button className="primary-btn" disabled={busy || !email.includes('@')} onClick={() => void send()}>
-              {busy ? 'Sending…' : 'Email me a code'}
+              <BusyLabel busy={busy} text="Sending…">Email me a code</BusyLabel>
             </button>
           </div>
         </>
@@ -120,7 +120,7 @@ export function SignInForm({
           </Field>
           <div className="button-row">
             <button className="primary-btn" disabled={busy || code.length < 6} onClick={() => void verify()}>
-              {busy ? 'Signing in…' : 'Sign in'}
+              <BusyLabel busy={busy} text="Signing in…">Sign in</BusyLabel>
             </button>
           </div>
           <div className="button-row">

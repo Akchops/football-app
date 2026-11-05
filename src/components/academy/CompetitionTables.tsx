@@ -9,6 +9,7 @@ import { StandingsTable } from '../StandingsTable';
 import { TableResultSheet, type ResultSaver, type TableResultTarget } from '../TableResultSheet';
 import { Section } from '../ui';
 import { useLoad } from './parts';
+import { StandingsSkeleton } from './skeletons';
 
 /** "League · 2026/27 · U16 Elite" */
 export function competitionFacts(competition: AcademyCompetition, squadName?: string): string {
@@ -91,7 +92,7 @@ export function CompetitionTables({ competition, editable }: { competition: Acad
   return (
     <>
       {results.error && <p className="notice warn">{results.error}</p>}
-      {!results.data && !results.error && <p className="muted small">Loading…</p>}
+      {!results.data && !results.error && <StandingsSkeleton />}
 
       {tables.map((group) => (
         <Section key={group.name || 'table'} title={group.name ? `${group.name} table` : 'Table'}>

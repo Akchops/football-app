@@ -3,7 +3,7 @@ import { ROLE_LABEL, cleanJoinCode, describeAcademyError, type Membership, type 
 import { useAcademy } from '../../store/AcademyProvider';
 import { useStore } from '../../store/AppStore';
 import { useSync } from '../../store/SyncProvider';
-import { Section } from '../ui';
+import { BusyLabel, Section } from '../ui';
 import { FamilyTablesSheet } from './FamilyTables';
 import { AcademyLogo, StaffInviteCard, VerificationBadge } from './parts';
 import { UsernameForm } from './UsernameForm';
@@ -372,7 +372,7 @@ function JoinByCode({ name, onSent, onCancel }: { name: string; onSent: () => vo
       {error && <p className="notice warn">{error}</p>}
       <div className="button-row">
         <button className="primary-btn" disabled={busy || code.length !== 6 || !consent} onClick={() => void send()}>
-          {busy ? 'Asking…' : 'Ask to join'}
+          <BusyLabel busy={busy} text="Asking…">Ask to join</BusyLabel>
         </button>
         {onCancel && (
           <button className="ghost-btn" disabled={busy} onClick={onCancel}>

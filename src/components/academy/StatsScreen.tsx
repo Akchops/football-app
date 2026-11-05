@@ -15,6 +15,7 @@ import { Section, Segmented, Sheet, StatTile } from '../ui';
 import { useLoad, type AddRequest } from './parts';
 import { TeamPicks } from './TeamPicks';
 import { isActive, playerFacts, useRoster } from './useRoster';
+import { LeaderboardSkeleton } from './skeletons';
 
 const POSITIONS: { value: PositionGroup | ''; label: string }[] = [
   { value: '', label: 'Everyone' },
@@ -120,7 +121,7 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
       </p>
 
       {data.error && <p className="notice warn">{data.error}</p>}
-      {data.loading && !data.error && <p className="muted small">Loading players&apos; stats…</p>}
+      {data.loading && !data.error && <LeaderboardSkeleton />}
 
       {!data.loading && (
         <>

@@ -4,6 +4,7 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { Sheet } from '../ui';
 import { CompetitionTables, competitionFacts } from './CompetitionTables';
 import { useLoad } from './parts';
+import { CardsSkeleton } from './skeletons';
 
 /** An academy's tables, as a linked family sees them: to read, not to change. */
 export function FamilyTablesSheet({ membership, onClose }: { membership: Membership | null; onClose: () => void }) {
@@ -37,7 +38,7 @@ export function FamilyTablesSheet({ membership, onClose }: { membership: Members
       ) : (
         <>
           {competitions.error && <p className="notice warn">{competitions.error}</p>}
-          {!competitions.data && !competitions.error && <p className="muted small">Loading…</p>}
+          {!competitions.data && !competitions.error && <CardsSkeleton label="Loading competitions…" />}
           {competitions.data && list.length === 0 && (
             <p className="muted small">The academy hasn&apos;t added any competitions yet.</p>
           )}

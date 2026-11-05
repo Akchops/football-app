@@ -5,12 +5,13 @@ import {
 import { seasonLabel } from '../../lib/date';
 import { useAcademy } from '../../store/AcademyProvider';
 import { COMPETITION_TYPE_LABEL, type CompetitionType } from '../../types';
-import { Field, Section, Sheet, Stepper } from '../ui';
+import { BusyLabel, Field, Section, Sheet, Stepper } from '../ui';
 import { CompetitionTables, competitionFacts } from './CompetitionTables';
 import { useAddRequest, useLoad, type AddRequest } from './parts';
 import { m } from 'motion/react';
 import { stagger } from '../../lib/motion';
 import { ChevronIcon, PlusIcon, TableIcon, TrophyIcon } from '../icons';
+import { CompetitionsSkeleton } from './skeletons';
 
 /** Friendlies have no table, so they are not offered here. */
 const TYPES: CompetitionType[] = ['league', 'tournament', 'cup', 'other'];
@@ -89,7 +90,7 @@ export function TablesScreen({ academy, request }: { academy: StaffAcademy; requ
       </div>
 
       {competitions.error && <p className="notice warn">{competitions.error}</p>}
-      {!competitions.data && !competitions.error && <p className="muted small">Loading…</p>}
+      {!competitions.data && !competitions.error && <CompetitionsSkeleton />}
 
       {competitions.data && list.length === 0 && (
         <p className="muted small">
@@ -202,7 +203,7 @@ function CompetitionForm({
             Cancel
           </button>
           <button className="primary-btn wide" disabled={busy} onClick={() => void save()}>
-            {busy ? 'Saving…' : 'Save'}
+            <BusyLabel busy={busy} text="Saving…">Save</BusyLabel>
           </button>
         </>
       }

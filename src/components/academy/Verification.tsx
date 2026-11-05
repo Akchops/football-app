@@ -4,8 +4,9 @@ import {
 } from '../../lib/academy';
 import { openDataUrl, toDocument } from '../../lib/photo';
 import { useAcademy } from '../../store/AcademyProvider';
-import { Field, Section } from '../ui';
+import { BusyLabel, Field, Section } from '../ui';
 import { VerificationBadge, useLoad } from './parts';
+import { CardsSkeleton } from './skeletons';
 
 const KINDS = Object.keys(DOCUMENT_KIND_LABEL) as DocumentKind[];
 
@@ -102,6 +103,7 @@ export function VerificationSection({ academy }: { academy: StaffAcademy }) {
             Registration with your FA or league, coaching qualifications and safeguarding certificates. Photos are
             shrunk before sending; a PDF can be up to 2 MB. Only you and Matchday&apos;s admins can see them.
           </p>
+          {!docs.data && !docs.error && <CardsSkeleton label="Loading documents…" count={2} />}
           {list.length > 0 && (
             <ul className="doc-list">
               {list.map((doc) => (
@@ -138,7 +140,7 @@ export function VerificationSection({ academy }: { academy: StaffAcademy }) {
                   &nbsp;
                 </span>
                 <button className="ghost-btn" disabled={busy} onClick={() => fileRef.current?.click()}>
-                  {busy ? 'Working…' : 'Add a photo or PDF'}
+                  <BusyLabel busy={busy} text="Working…">Add a photo or PDF</BusyLabel>
                 </button>
                 <input
                   ref={fileRef}

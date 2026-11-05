@@ -34,6 +34,7 @@ import { OnboardingScreen } from './components/OnboardingScreen';
 import { WhoIsThisFor } from './components/WhoIsThisFor';
 import { ACADEMY } from './lib/features';
 import { MediaScreen } from './components/MediaScreen';
+import { AcademyShellSkeleton, CoachSkeleton } from './components/Skeletons';
 import { listAllMedia } from './store/media';
 // The Anthropic SDK is only needed on the Coach tab, so it stays out of the
 // bundle that has to load before the calendar appears.
@@ -199,7 +200,7 @@ function Shell() {
   // (ACADEMY first each time: with the release switched off, the build drops all of this.)
   if (ACADEMY && academy.enabled && academy.mode === 'academy') {
     return (
-      <Suspense fallback={<div className="app" />}>
+      <Suspense fallback={<AcademyShellSkeleton />}>
         <AcademyShell hasPlayer={Boolean(profile.onboardedAt)} />
       </Suspense>
     );
@@ -291,7 +292,7 @@ function Shell() {
         )}
         {tab === 'media' && <MediaScreen onOpenMatch={setDetailMatch} onBack={() => setTab('matches')} />}
         {tab === 'coach' && (
-          <Suspense fallback={<div className="screen"><p className="muted small">Loading the coach…</p></div>}>
+          <Suspense fallback={<CoachSkeleton />}>
             <AIScreen onOpenSetup={() => setTab('setup')} />
           </Suspense>
         )}

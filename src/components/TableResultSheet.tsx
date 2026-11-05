@@ -4,7 +4,7 @@ import type { Competition, MatchStage, Result } from '../types';
 import { todayISO } from '../lib/date';
 import { STAGES, STAGE_LABEL } from '../lib/stage';
 import { teamKey } from '../lib/standings';
-import { Field, Sheet, Stepper } from './ui';
+import { BusyLabel, Field, Sheet, Stepper } from './ui';
 
 /**
  * Where results go. The player app keeps them on the phone; an academy's go to
@@ -148,7 +148,7 @@ export function TableResultSheet({
             {editing ? 'Cancel' : 'Save & add another'}
           </button>
           <button className="primary-btn wide" disabled={busy} onClick={() => void save(false)}>
-            {busy ? 'Saving…' : 'Save'}
+            <BusyLabel busy={busy} text="Saving…">Save</BusyLabel>
           </button>
         </>
       }

@@ -4,6 +4,7 @@ import { openDataUrl } from '../../lib/photo';
 import { useAcademy } from '../../store/AcademyProvider';
 import { Field, Section, Sheet } from '../ui';
 import { VerificationBadge, useLoad } from './parts';
+import { CardsSkeleton } from './skeletons';
 
 function day(iso: string): string {
   return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
@@ -93,7 +94,7 @@ export function AdminScreen({ onBack }: { onBack: () => void }) {
       </Section>
 
       {list.error && <p className="notice warn">{list.error}</p>}
-      {!list.data && !list.error && <p className="muted small">Loading…</p>}
+      {!list.data && !list.error && <CardsSkeleton label="Loading academies…" />}
 
       {list.data && (
         <Section title={`Waiting for review · ${waiting.length}`}>
@@ -187,6 +188,7 @@ function ReviewSheet({ item, onClose, onDone }: { item: ReviewItem; onClose: () 
 
       <Field group label={`Documents · ${docs.data?.length ?? item.documents}`}>
         {docs.error && <p className="notice warn">{docs.error}</p>}
+        {!docs.data && !docs.error && <CardsSkeleton label="Loading documents…" count={Math.min(Math.max(item.documents, 1), 3)} />}
         {docs.data && docs.data.length === 0 && <p className="muted small">None sent.</p>}
         <ul className="doc-list">
           {(docs.data ?? []).map((doc) => (

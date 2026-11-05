@@ -4,8 +4,9 @@ import { ROLE_LABEL, can, describeAcademyError, type StaffAcademy } from '../../
 import { useAcademy } from '../../store/AcademyProvider';
 import { springs, stagger } from '../../lib/motion';
 import { CheckIcon, ChevronIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon } from '../icons';
-import { RollingNumber, Section } from '../ui';
+import { Bone, RollingNumber, Section } from '../ui';
 import { AcademyLogo, VerificationBadge, useLoad } from './parts';
+import { ChecklistSkeleton } from './skeletons';
 
 /** A Settings-style row: a coloured symbol, what it is, what's there, a chevron. */
 function NavRow({
@@ -19,7 +20,7 @@ function NavRow({
   icon: ReactNode;
   color: string;
   label: string;
-  detail: string;
+  detail: ReactNode;
   alert?: string;
   onClick: () => void;
 }) {
@@ -68,10 +69,17 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
     steps.push({ label: 'Add your players', done: (onBooks?.length ?? 0) > 0, go: 'players' });
   }
   const allDone = steps.every((s) => s.done);
+  // Which steps are done is only known once everything has loaded - until then
+  // the list is outlined, rather than shown with every step looking undone.
+  const lists = [staff, pending, squads, players];
+  const known = lists.every((l) => l.data !== null);
+  const failed = lists.some((l) => l.error);
 
-  const stat = (value: number | null, label: string) => (
+  const stat = (value: number | null, label: string, error: string) => (
     <span className="ac-hero-stat">
-      <span className="ac-hero-num">{value === null ? '–' : <RollingNumber value={value} />}</span>
+      <span className="ac-hero-num">
+        {value !== null ? <RollingNumber value={value} /> : error ? '–' : <Bone />}
+      </span>
       <span className="ac-hero-label">{label}</span>
     </span>
   );
@@ -97,9 +105,9 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
           </div>
         </div>
         <div className="ac-hero-stats">
-          {stat(onBooks?.length ?? null, onBooks?.length === 1 ? 'Player' : 'Players')}
-          {stat(squadCount, squadCount === 1 ? 'Squad' : 'Squads')}
-          {stat(staffCount, 'Staff')}
+          {stat(onBooks?.length ?? null, onBooks?.length === 1 ? 'Player' : 'Players', players.error)}
+          {stat(squadCount, squadCount === 1 ? 'Squad' : 'Squads', squads.error)}
+          {stat(staffCount, 'Staff', staff.error)}
         </div>
       </m.div>
 
@@ -114,7 +122,8 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
         </p>
       )}
 
-      {!allDone && (
+      {!known && !failed && <ChecklistSkeleton />}
+      {known && !allDone && (
         <Section title="Getting started">
           <ol className="checklist ac-steps">
             {steps.map((step, i) => (
@@ -142,7 +151,7 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
           label="Players"
           detail={
             onBooks === null || squadCount === null
-              ? players.error || squads.error || '…'
+              ? players.error || squads.error || <Bone />
               : `${onBooks.length} · ${squadCount} squad${squadCount === 1 ? '' : 's'}`
           }
           alert={asking > 0 ? `${asking} asking to join` : undefined}
@@ -152,7 +161,7 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
           icon={<PeopleIcon on />}
           color="#bf5af2"
           label="Staff"
-          detail={staffCount === null ? staff.error || '…' : `${staffCount}${invited ? ` · ${invited} invited` : ''}`}
+          detail={staffCount === null ? staff.error || <Bone /> : `${staffCount}${invited ? ` · ${invited} invited` : ''}`}
           onClick={() => onGo('staff')}
         />
         <NavRow icon={<TableIcon on />} color="#30d158" label="Tables" detail="" onClick={() => onGo('tables')} />

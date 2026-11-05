@@ -4,7 +4,7 @@ import { toLogoDataUrl } from '../../lib/photo';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { AGE_GROUPS } from '../../types';
-import { Field } from '../ui';
+import { BusyLabel, Field } from '../ui';
 import { AcademyLogo } from './parts';
 
 export function detailsOf(academy: Academy): AcademyDetails {
@@ -181,7 +181,7 @@ export function CreateAcademyForm({ onCreated, onCancel }: { onCreated: (id: str
       {error && <p className="form-error">{error}</p>}
       <div className="button-row">
         <button className="primary-btn" disabled={busy} onClick={() => void create()}>
-          {busy ? 'Creating…' : 'Create academy'}
+          <BusyLabel busy={busy} text="Creating…">Create academy</BusyLabel>
         </button>
         {onCancel && (
           <button className="ghost-btn" disabled={busy} onClick={onCancel}>

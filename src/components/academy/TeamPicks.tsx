@@ -4,10 +4,11 @@ import {
   BOARDS, BOARD_BY_ID, boardApplies, selectionText, statsFor, type Board, type BoardId, type SquadPlayer, type StatsFilter,
 } from '../../lib/academyStats';
 import { useAcademy } from '../../store/AcademyProvider';
-import { Field, Section, Sheet } from '../ui';
+import { BusyLabel, Field, Section, Sheet } from '../ui';
 import { useAddRequest, useLoad, type AddRequest } from './parts';
 import type { SquadData } from './StatsScreen';
 import { playerFacts } from './useRoster';
+import { CardsSkeleton } from './skeletons';
 
 /** Team picks: named lists of players for a tournament or a match, saved, shared and printed. */
 export function TeamPicks({
@@ -39,6 +40,7 @@ export function TeamPicks({
       }
     >
       {picks.error && <p className="notice warn">{picks.error}</p>}
+      {!picks.data && !picks.error && <CardsSkeleton label="Loading team picks…" count={2} />}
       {picks.data && picks.data.length === 0 && (
         <p className="muted small">
           Picking a team for a tournament? Sort a squad by what matters, tick the players, name it - &quot;Dubai Cup
@@ -185,7 +187,7 @@ function PickSheet({
             Print
           </button>
           <button className="primary-btn wide" disabled={busy} onClick={() => void save()}>
-            {busy ? 'Saving…' : 'Save'}
+            <BusyLabel busy={busy} text="Saving…">Save</BusyLabel>
           </button>
         </>
       }

@@ -5,7 +5,8 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { SignInForm } from '../AccountSettings';
 import { BallIcon, ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon } from '../icons';
-import { Section, Sheet } from '../ui';
+import { BusyLabel, Section, Sheet, Waiting } from '../ui';
+import { AcademyHomeSkeleton } from '../Skeletons';
 import { AddButton, type AddItem } from '../AddButton';
 import { springs } from '../../lib/motion';
 import { CreateAcademyForm } from './AcademyDetails';
@@ -102,7 +103,7 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   if (!sync.account) {
     gate =
       sync.status === 'checking' ? (
-        <Waiting text="Opening…" />
+        academySaved() ? <AcademyHomeSkeleton /> : <Opening text="Opening…" />
       ) : (
         <SignInGate hasPlayer={hasPlayer} onLeave={leaveArea} />
       );
@@ -113,7 +114,7 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
       ) : academy.status === 'error' ? (
         <Problem text={academy.error} />
       ) : (
-        <Waiting text="Opening the academy…" />
+        <Opening text="Opening the academy…" />
       );
   } else if (!academy.username) {
     gate = <UsernameGate />;
@@ -283,15 +284,21 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   );
 }
 
-function Waiting({ text }: { text: string }) {
+function Opening({ text }: { text: string }) {
   return (
     <div className="screen">
-      <div className="reading-state">
-        <div className="spinner" />
-        <p className="muted small">{text}</p>
-      </div>
+      <Waiting text={text} />
     </div>
   );
+}
+
+/** Whether this phone has opened an academy before, so it's worth outlining one while it opens. */
+function academySaved(): boolean {
+  try {
+    return Boolean(localStorage.getItem('matchday.academy.v1'));
+  } catch {
+    return false;
+  }
 }
 
 function Problem({ text }: { text: string }) {
@@ -406,7 +413,7 @@ function StartGate() {
                 {copied ? 'Copied' : 'Copy my username'}
               </button>
               <button className="ghost-btn" disabled={checking} onClick={() => void check()}>
-                {checking ? 'Checking…' : 'Check for invites'}
+                <BusyLabel busy={checking} text="Checking…">Check for invites</BusyLabel>
               </button>
             </div>
           </>

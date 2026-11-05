@@ -4,7 +4,7 @@ import {
   pushStatus, reminderPrefs, sendTestReminder, setReminderPrefs, turnOffReminders, turnOnReminders, type PushStatus,
 } from '../lib/push';
 import type { ReminderPrefs } from '../lib/reminders';
-import { Section } from './ui';
+import { BusyLabel, Section } from './ui';
 
 /** Setup's switch for match reminders on this phone. Hidden in a build with no server to send them. */
 export function ReminderSettings() {
@@ -65,7 +65,7 @@ export function ReminderSettings() {
               disabled={busy}
               onClick={() => void run(() => turnOnReminders(data), 'Reminders are on for this phone.')}
             >
-              {busy ? 'Turning on…' : '🔔 Turn on reminders'}
+              <BusyLabel busy={busy} text="Turning on…">🔔 Turn on reminders</BusyLabel>
             </button>
           </div>
         </>

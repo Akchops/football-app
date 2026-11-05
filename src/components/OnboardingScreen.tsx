@@ -5,7 +5,7 @@ import {
   type PositionGroup,
 } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
-import { Field } from './ui';
+import { Field, Spinner } from './ui';
 import { accountsAvailable } from '../lib/auth';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard, SignInForm } from './AccountSettings';
@@ -318,7 +318,14 @@ function JoinFamily() {
     );
 
     if (sync.joinQuestion) return <JoinQuestionCard sync={sync} />;
-    if (searching) return <p className="notice">Signed in as {email}. Looking for your family…</p>;
+    if (searching) {
+      return (
+        <p className="notice notice-loading" role="status">
+          <Spinner small />
+          <span>Signed in as {email}. Looking for your family…</span>
+        </p>
+      );
+    }
     if (sync.household) {
       return <p className="notice">Signed in as {email}, in {sync.household.name}. Finish setting up below.</p>;
     }

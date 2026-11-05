@@ -3,7 +3,7 @@ import { PROVIDER_LABEL, type Provider } from '../lib/aiTypes';
 import { getApiKey, getModel, getProvider, setApiKey, setModel, setProvider } from '../lib/apiKey';
 import { proxyAvailable, sharedUsage } from '../lib/proxy';
 import { DEFAULT_PROFILE } from '../types';
-import { Field, Section } from './ui';
+import { BusyLabel, Field, Section } from './ui';
 
 interface Option {
   id: string;
@@ -152,7 +152,7 @@ export function AiSection() {
           {visible ? 'Hide key' : 'Show key'}
         </button>
         <button className="ghost-btn" onClick={() => void checkKey()} disabled={!key.trim() || checking}>
-          {checking ? 'Checking…' : 'Check key'}
+          <BusyLabel busy={checking} text="Checking…">Check key</BusyLabel>
         </button>
         {key && (
           <button

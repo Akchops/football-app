@@ -5,7 +5,7 @@ import {
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { AGE_GROUPS, ALL_POSITIONS } from '../../types';
-import { Field, Section, Segmented, Sheet } from '../ui';
+import { BusyLabel, Field, Section, Segmented, Sheet } from '../ui';
 import { Initials, StatusChip, useAddRequest, type AddRequest } from './parts';
 import { m } from 'motion/react';
 import { rememberOrigin, stagger } from '../../lib/motion';
@@ -43,6 +43,7 @@ function PlayerRow({ player, facts, onOpen }: { player: AcademyPlayer; facts: st
 }
 import { PlayerSheet, SquadSheet } from './RosterSheets';
 import { isActive, playerFacts, useRoster } from './useRoster';
+import { PlayersSkeleton } from './skeletons';
 
 /** A squad picker's choices, with a first option for none. */
 export function SquadSelect({
@@ -129,7 +130,7 @@ export function PlayersScreen({ academy, request }: { academy: StaffAcademy; req
           </div>
         </div>
       )}
-      {loading && !roster.error && <p className="muted small">Loading…</p>}
+      {loading && !roster.error && <PlayersSkeleton />}
       {requireVerification && academy.verification !== 'verified' && (
         <p className="notice warn">
           Matchday needs to verify the academy before it can add players or accept requests to join.{' '}
@@ -421,7 +422,7 @@ function NewSquadForm({ academy, onDone }: { academy: StaffAcademy; onDone: (id:
       {error && <p className="form-error">{error}</p>}
       <div className="button-row">
         <button className="primary-btn" disabled={busy} onClick={() => void create()}>
-          {busy ? 'Making…' : 'Make squad'}
+          <BusyLabel busy={busy} text="Making…">Make squad</BusyLabel>
         </button>
         <button className="ghost-btn" disabled={busy} onClick={() => void onDone(null)}>
           Cancel
@@ -588,11 +589,11 @@ function AddPlayerSheet({
       <div className="button-row">
         {mode === 'invite' ? (
           <button className="primary-btn" disabled={busy || !username} onClick={invite}>
-            {busy ? 'Sending…' : 'Send invite'}
+            <BusyLabel busy={busy} text="Sending…">Send invite</BusyLabel>
           </button>
         ) : (
           <button className="primary-btn" disabled={busy || !name.trim()} onClick={addName}>
-            {busy ? 'Adding…' : 'Add to the list'}
+            <BusyLabel busy={busy} text="Adding…">Add to the list</BusyLabel>
           </button>
         )}
         <button className="ghost-btn" disabled={busy} onClick={onClose}>
