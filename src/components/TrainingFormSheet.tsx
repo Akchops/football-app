@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/AppStore';
 import { TRAINING_LENGTHS, TRAINING_TYPE_LABEL, type TrainingSession, type TrainingType } from '../types';
-import { todayISO } from '../lib/date';
+import { DAY_NAMES_SHORT, formatDateShort, fromISODate, todayISO } from '../lib/date';
+import { defaultRepeatUntil, describeRepeat, repeatDates, repeatLimit } from '../lib/repeat';
 import { DurationPicker, Field, Sheet } from './ui';
 import { useTrainingActions } from './UndoToast';
 
@@ -33,9 +34,16 @@ export function TrainingFormSheet({
   const [intensity, setIntensity] = useState(3);
   const [focus, setFocus] = useState('');
   const [notes, setNotes] = useState('');
+  // Only for a new session: the same again on these weekdays, up to `until`.
+  const [repeat, setRepeat] = useState(false);
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+  const [until, setUntil] = useState('');
 
   useEffect(() => {
     if (!target) return;
+    setRepeat(false);
+    setWeekdays([]);
+    setUntil('');
     if (editing) {
       setType(editing.type);
       setDate(editing.date);
@@ -59,6 +67,23 @@ export function TrainingFormSheet({
 
   if (!target) return null;
 
+  const repeating = !editing && repeat;
+  const dates = repeating ? repeatDates(date, weekdays, until) : [];
+  const limit = date ? repeatLimit(date) : '';
+  // The days of the week in the order this phone shows them, as numbers Date.getDay() uses.
+  const week = Array.from({ length: 7 }, (_, i) => (i + settings.weekStartsOn) % 7);
+
+  const switchRepeat = (on: boolean) => {
+    setRepeat(on);
+    if (!on || !date) return;
+    // Starts as "this day each week, for four weeks" - the usual case is a tweak away.
+    if (weekdays.length === 0) setWeekdays([fromISODate(date).getDay()]);
+    if (!until) setUntil(defaultRepeatUntil(date));
+  };
+
+  const toggleDay = (day: number) =>
+    setWeekdays((days) => (days.includes(day) ? days.filter((d) => d !== day) : [...days, day]));
+
   const submit = () => {
     const payload = {
       type,
@@ -71,6 +96,7 @@ export function TrainingFormSheet({
       notes: notes.trim(),
     };
     if (editing) updateTraining(editing.id, payload);
+    else if (repeating) actions.addMany(dates.map((day) => ({ ...payload, date: day })));
     else addTraining(payload);
     onClose();
   };
@@ -86,8 +112,12 @@ export function TrainingFormSheet({
           <button className="ghost-btn wide" onClick={onClose}>
             Cancel
           </button>
-          <button className="primary-btn wide" onClick={submit}>
-            {editing ? 'Save' : 'Add session'}
+          <button className="primary-btn wide" onClick={submit} disabled={repeating && dates.length === 0}>
+            {editing
+              ? 'Save'
+              : repeating && dates.length > 0
+                ? `Add ${dates.length} session${dates.length === 1 ? '' : 's'}`
+                : 'Add session'}
           </button>
         </>
       }
@@ -108,13 +138,60 @@ export function TrainingFormSheet({
       </Field>
 
       <div className="row two">
-        <Field label="Date">
+        <Field label={repeating ? 'From' : 'Date'}>
           <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Field label="Start time">
           <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
         </Field>
       </div>
+
+      {!editing && (
+        <label className="toggle-row">
+          <input type="checkbox" checked={repeat} onChange={(e) => switchRepeat(e.target.checked)} />
+          <span>Repeat every week</span>
+        </label>
+      )}
+
+      {repeating && (
+        <>
+          <Field group label="On">
+            <div className="day-chips">
+              {week.map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  className={weekdays.includes(day) ? 'filter-chip on' : 'filter-chip'}
+                  aria-pressed={weekdays.includes(day)}
+                  onClick={() => toggleDay(day)}
+                >
+                  {DAY_NAMES_SHORT[day]}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Until" hint={limit ? `Up to ${formatDateShort(limit)}, six months on` : undefined}>
+            <input
+              className="input"
+              type="date"
+              value={until}
+              min={date}
+              max={limit}
+              onChange={(e) => setUntil(e.target.value)}
+            />
+          </Field>
+
+          {/* Said before saving: how many sessions this makes, and when. Each is its own session afterwards. */}
+          {dates.length > 0 ? (
+            <p className="notice">{describeRepeat(dates, weekdays, settings.weekStartsOn)}</p>
+          ) : (
+            <p className="form-error">
+              {weekdays.length === 0 ? 'Choose at least one day.' : 'None of those days fall between the two dates.'}
+            </p>
+          )}
+        </>
+      )}
 
       <Field group label="How long">
         <DurationPicker value={durationMinutes} onChange={setDuration} presets={TRAINING_LENGTHS} />

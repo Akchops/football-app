@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, m } from 'motion/react';
-import { useStore } from '../store/AppStore';
+import { useStore, type NewTrainingInput } from '../store/AppStore';
 import type { Match, TrainingSession } from '../types';
 import { springs } from '../lib/motion';
 
@@ -101,14 +101,21 @@ export function useMatchActions() {
   };
 }
 
-/** Deleting a training session, with the same Undo. */
+/** Deleting a training session, and adding a repeat's worth at once - each with the same Undo. */
 export function useTrainingActions() {
   const { offer } = useUndo();
-  const { deleteTraining, undeleteTraining } = useStore();
+  const { addTraining, deleteTraining, undeleteTraining } = useStore();
   return {
     remove(session: TrainingSession) {
       deleteTraining(session.id);
       offer('Session deleted', () => undeleteTraining(session.id));
+    },
+    /** One ordinary session per input. A repeat set up wrong comes off in one tap, not one per day. */
+    addMany(inputs: NewTrainingInput[]) {
+      const added = inputs.map((input) => addTraining(input));
+      offer(`${added.length} session${added.length === 1 ? '' : 's'} added`, () =>
+        added.forEach((session) => deleteTraining(session.id)),
+      );
     },
   };
 }
