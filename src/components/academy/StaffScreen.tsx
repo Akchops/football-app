@@ -5,8 +5,8 @@ import {
 } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { m } from 'motion/react';
-import { stagger } from '../../lib/motion';
-import { Field, Section, Segmented, Sheet } from '../ui';
+import { isPulsing, pulse, stagger, usePulseTick } from '../../lib/motion';
+import { ChipPill, Field, Section, Segmented, Sheet } from '../ui';
 import { ChevronIcon, PlusIcon } from '../icons';
 import { Initials, RoleChip, useAddRequest, useLoad, type AddRequest } from './parts';
 
@@ -50,6 +50,7 @@ export function StaffScreen({
   };
 
   useAddRequest(request, 'staff', () => setInviting(true));
+  usePulseTick();
 
   const manageable = (m: StaffMember) =>
     !m.isMe && (rolesToGive(me, m.role).length > 0 || canRemove(me, m.role, false) || (can(me, 'hand-over') && m.role !== 'owner'));
@@ -125,7 +126,7 @@ export function StaffScreen({
           {error && <p className="notice warn">{error}</p>}
           <ul className="list-group person-group">
             {pending.data.map((p) => (
-              <li key={p.id}>
+              <li key={p.id} className={isPulsing(`invite:${p.username}`) ? 'pulse' : undefined}>
                 <div className="nav-row">
                   <Initials name={p.username} />
                   <span className="nav-row-text">
@@ -202,6 +203,7 @@ function InviteStaff({ academy, onInvited }: { academy: StaffAcademy; onInvited:
     setBusy(true);
     try {
       await api.inviteStaff(academy.id, name, role);
+      pulse(`invite:${name}`, 300);
       setUsername('');
       setNote(
         `Invited @${name} as ${role === 'admin' ? 'an' : 'a'} ${ROLE_LABEL[role]}. They say yes in their Matchday: under Setup → Academies, or straight away if they're new and pick "An academy".`,
@@ -324,6 +326,7 @@ function ManageStaffSheet({
                 aria-pressed={r === role}
                 onClick={() => setRole(r)}
               >
+                {r === role && <ChipPill group="staff-role-1" />}
                 {ROLE_LABEL[r]}
               </button>
             ))}

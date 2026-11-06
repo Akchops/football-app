@@ -1,4 +1,5 @@
 import { useStore } from '../store/AppStore';
+import { usePulse } from '../lib/motion';
 import type { Match } from '../types';
 import { VENUE_LABEL } from '../types';
 import { countdown, formatDateShort, formatTime, kickoffAt } from '../lib/date';
@@ -33,6 +34,7 @@ export function MatchCard({
   now?: Date;
 }) {
   const { competitionOf, teamOf, colorOf, teams } = useStore();
+  const justSaved = usePulse(match.id);
   const competition = competitionOf(match);
   const team = teamOf(match);
   const kickoff = kickoffAt(match.date, match.time);
@@ -41,7 +43,7 @@ export function MatchCard({
   const performance = match.result?.didPlay ? matchScore(match.result, match.durationMinutes) : null;
 
   return (
-    <div className={`match-card${match.status === 'cancelled' ? ' is-cancelled' : ''}`}>
+    <div className={`match-card${match.status === 'cancelled' ? ' is-cancelled' : ''}${justSaved ? ' pulse' : ''}`}>
       <button className="match-main" onClick={onOpen}>
         <span className="match-rail" style={{ background: colorOf(match) }} aria-hidden="true" />
         <span className="match-when">

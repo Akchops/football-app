@@ -1,7 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, animate, m, useDragControls, useMotionValue, useTransform, type PanInfo } from 'motion/react';
-import { prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
+import { exitOf, prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
 import {
   BallIcon, CalendarIcon, ChartIcon, ChevronIcon, MediaIcon, NoEntryIcon, PencilIcon, RunIcon, ShieldIcon, ShirtIcon, TrophyIcon,
 } from './icons';
@@ -66,12 +66,46 @@ function SheetFrame({
   const height = () => panelRef.current?.offsetHeight ?? 600;
   const dim = useTransform(y, (v) => 1 - Math.min(1, Math.max(0, v) / height()) * 0.9);
 
-  // Slide down and away, then hand over. Starts from the finger's speed when there is one.
+  // The row a sheet grew out of, as a clip-path inset on the open sheet.
+  const insetFor = (panel: HTMLElement, rect: DOMRect) => {
+    const to = panel.getBoundingClientRect();
+    return [
+      Math.max(0, rect.top - to.top),
+      Math.max(0, to.right - rect.right),
+      Math.max(0, to.bottom - rect.bottom),
+      Math.max(0, rect.left - to.left),
+    ];
+  };
+  // How far across the row sat from the sheet's middle: the sheet drifts that
+  // way as it shrinks, so it travels on a curve rather than straight down.
+  const sideways = (panel: HTMLElement, rect: DOMRect) => {
+    const to = panel.getBoundingClientRect();
+    return (rect.left + rect.width / 2 - (to.left + to.width / 2)) * 0.15;
+  };
+
+  // Slide down and away, then hand over. Starts from the finger's speed when
+  // there is one. Opened from a row and closed with a tap: shrink back into
+  // that row - exit to where it came from - 20% quicker than it opened.
   const leave = (velocity = 0) => {
     if (leaving.current) return;
     leaving.current = true;
     if (prefersReducedMotion()) return onClose();
-    animate(y, height(), { ...springs.smooth, velocity }).then(onClose);
+    const panel = panelRef.current;
+    if (from && panel && velocity === 0 && y.get() === 0) {
+      const inset = insetFor(panel, from);
+      const body = panel.querySelectorAll<HTMLElement>('.sheet-head, .sheet-body, .sheet-foot');
+      animate(body, { opacity: 0.15 }, { duration: 0.2, ease: 'easeIn' });
+      animate(backdropRef.current!, { opacity: 0 }, exitOf(springs.smooth));
+      animate(panel, { x: sideways(panel, from) }, exitOf({ type: 'spring', visualDuration: 0.3, bounce: 0 }));
+      animate(
+        panel,
+        { clipPath: `inset(${inset.map((v) => `${v}px`).join(' ')} round 16px)`, opacity: [1, 1, 0] },
+        exitOf(springs.smooth),
+      ).then(onClose);
+      return;
+    }
+    // A flick keeps the finger's speed; a tap leaves 20% quicker than it came.
+    animate(y, height(), velocity ? { ...springs.smooth, velocity } : exitOf(springs.smooth)).then(onClose);
   };
 
   useEffect(() => {
@@ -92,13 +126,9 @@ function SheetFrame({
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!from || !panel) return;
-    const to = panel.getBoundingClientRect();
-    const inset = [
-      Math.max(0, from.top - to.top),
-      Math.max(0, to.right - from.right),
-      Math.max(0, to.bottom - from.bottom),
-      Math.max(0, from.left - to.left),
-    ];
+    const inset = insetFor(panel, from);
+    // Across quickly, open more slowly: the row's growth bends on an arc.
+    animate(panel, { x: [sideways(panel, from), 0] }, { type: 'spring', visualDuration: 0.3, bounce: 0.15 });
     animate(
       panel,
       // Ends on the sheet's own shape (round on top, square at the foot), so nothing is cut off.
@@ -151,7 +181,7 @@ function SheetFrame({
         dragControls={drag}
         dragConstraints={{ top: 0, bottom: 0 }}
         // Pulling up gives a little and stops, like the real thing; pulling down follows the finger.
-        dragElastic={{ top: 0.04, bottom: 1 }}
+        dragElastic={{ top: 0.12, bottom: 1 }}
         dragMomentum={false}
         onDragEnd={onDragEnd}
       >
@@ -203,10 +233,11 @@ function ghostAway(backdrop: HTMLElement): void {
   const ghostPanel = copy.querySelector<HTMLElement>('.sheet');
   const ghostBackdrop = copy.querySelector<HTMLElement>('.sheet-backdrop');
   const ease = 'cubic-bezier(0.32, 0.72, 0, 1)';
-  ghostBackdrop?.animate([{ opacity: getComputedStyle(backdrop).opacity }, { opacity: 0 }], { duration: 320, easing: ease, fill: 'forwards' });
+  // 20% quicker than a sheet takes to rise.
+  ghostBackdrop?.animate([{ opacity: getComputedStyle(backdrop).opacity }, { opacity: 0 }], { duration: 290, easing: ease, fill: 'forwards' });
   const run = ghostPanel?.animate(
     [{ transform: getComputedStyle(panel).transform === 'none' ? 'translateY(0)' : getComputedStyle(panel).transform }, { transform: 'translateY(100%)' }],
-    { duration: 380, easing: ease, fill: 'forwards' },
+    { duration: 360, easing: ease, fill: 'forwards' },
   );
   const drop = () => copy.remove();
   if (run) run.onfinish = drop;
@@ -245,6 +276,73 @@ export function Field({
   );
 }
 
+/**
+ * The selection pill that slides from option to option (one layoutId per
+ * group, so it's the same pill travelling). Mid-way it stretches 12% and
+ * settles back, like a knob being pulled - the stretch is on an inner layer
+ * so it never fights the slide.
+ */
+// Pills that have been drawn before: the next time one appears it has moved.
+const seenPills = new Set<string>();
+
+export function Pill({ layoutId, className, moved: movedProp }: { layoutId: string; className: string; moved?: boolean }) {
+  const [moved] = useState(() => movedProp ?? seenPills.has(layoutId));
+  seenPills.add(layoutId);
+  return (
+    <m.span layoutId={layoutId} className={className} transition={springs.snappy} aria-hidden="true">
+      <m.span
+        className="pill-fill"
+        // Only when it has been moved: no stretch as the screen first draws.
+        initial={moved ? { scaleX: 1 } : false}
+        animate={{ scaleX: [1, 1.12, 1] }}
+        transition={{ duration: 0.34, times: [0, 0.4, 1], ease: [0.65, 0, 0.35, 1] }}
+      />
+    </m.span>
+  );
+}
+
+/** The sliding selection on a row of chips: the same pill travelling between them. */
+export function ChipPill({ group }: { group: string }) {
+  return <Pill layoutId={group} className="chip-pill" />;
+}
+
+/**
+ * Two icons in one spot, swapped by cross-fading through a soft blur rather
+ * than cutting from one to the other - a tab's outline filling in, say.
+ */
+export function IconSwap({ off, on, active }: { off: ReactNode; on: ReactNode; active: boolean }) {
+  const t = { duration: 0.24, ease: [0.23, 1, 0.32, 1] as [number, number, number, number] };
+  return (
+    <span className="icon-swap">
+      <m.span initial={false} animate={{ opacity: active ? 0 : 1, filter: active ? 'blur(3px)' : 'blur(0px)' }} transition={t}>
+        {off}
+      </m.span>
+      <m.span initial={false} animate={{ opacity: active ? 1 : 0, filter: active ? 'blur(0px)' : 'blur(3px)' }} transition={t}>
+        {on}
+      </m.span>
+    </span>
+  );
+}
+
+/** A label that changes (Copy -> Copied) by cross-fading through a blur. */
+export function SwapText({ text }: { text: string }) {
+  return (
+    <span className="swap-text">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <m.span
+          key={text}
+          initial={{ opacity: 0, filter: 'blur(4px)', y: 4 }}
+          animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
+          exit={{ opacity: 0, filter: 'blur(4px)', y: -4, transition: { duration: 0.16 } }}
+          transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+        >
+          {text}
+        </m.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
 export function Segmented<T extends string>({
   options,
   value,
@@ -256,6 +354,7 @@ export function Segmented<T extends string>({
 }) {
   // One sliding pill per control, so two segmented controls on a screen don't trade theirs.
   const pill = useId();
+  const moved = useRef(false);
   return (
     <div className="segmented" role="group">
       {options.map((o) => (
@@ -264,9 +363,12 @@ export function Segmented<T extends string>({
           type="button"
           className={o.value === value ? 'seg on' : 'seg'}
           aria-pressed={o.value === value}
-          onClick={() => onChange(o.value)}
+          onClick={() => {
+            moved.current = true;
+            onChange(o.value);
+          }}
         >
-          {o.value === value && <m.span layoutId={pill} className="seg-pill" transition={springs.snappy} />}
+          {o.value === value && <Pill layoutId={pill} className="seg-pill" moved={moved.current} />}
           <span className="seg-label">{o.label}</span>
         </button>
       ))}
@@ -537,6 +639,7 @@ export function DurationPicker({
             className={minutes === value ? 'filter-chip on' : 'filter-chip'}
             onClick={() => onChange(minutes)}
           >
+            {minutes === value && <ChipPill group="duration-1" />}
             {minutes} min
           </button>
         ))}

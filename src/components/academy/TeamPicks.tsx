@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AFTER_SHEET, isPulsing, pulse, usePulseTick } from '../../lib/motion';
 import { describeAcademyError, type Selection, type StaffAcademy } from '../../lib/academy';
 import {
   BOARDS, BOARD_BY_ID, boardApplies, selectionText, statsFor, type Board, type BoardId, type SquadPlayer, type StatsFilter,
@@ -28,6 +29,7 @@ export function TeamPicks({
   const [editing, setEditing] = useState<{ selection: Selection | null } | null>(null);
   useAddRequest(request, 'pick', () => setEditing({ selection: null }));
   const squadName = (id: string | null) => data.squads.find((s) => s.id === id)?.name;
+  usePulseTick();
 
   return (
     <Section
@@ -48,7 +50,7 @@ export function TeamPicks({
       {picks.data && picks.data.length > 0 && (
         <ul className="squad-list">
           {picks.data.map((s) => (
-            <li key={s.id}>
+            <li key={s.id} className={isPulsing(s.id) ? 'pulse' : undefined}>
               <button className="squad-card" onClick={() => setEditing({ selection: s })}>
                 <strong>{s.name}</strong>
                 <span className="muted small">
@@ -136,8 +138,9 @@ function PickSheet({
     setBusy(true);
     setError('');
     try {
-      await api.saveSelection(academy.id, { name, squadId: squadId || null, playerIds: picked, notes }, selection?.id);
+      const saved = await api.saveSelection(academy.id, { name, squadId: squadId || null, playerIds: picked, notes }, selection?.id);
       await onSaved();
+      pulse(saved, AFTER_SHEET);
     } catch (e) {
       setError(describeAcademyError(e));
       setBusy(false);

@@ -6,7 +6,7 @@ import type { Match } from '../types';
 import { countdown, kickoffAt } from '../lib/date';
 import { isWalkover, outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { stageName } from '../lib/stage';
-import { rememberOrigin, springs } from '../lib/motion';
+import { exitOf, rememberOrigin, springs, usePulse } from '../lib/motion';
 import { ChevronIcon, NoEntryIcon, PencilIcon, TrashIcon, WhistleResultIcon } from './icons';
 import { useMatchActions } from './UndoToast';
 
@@ -43,6 +43,7 @@ export function MatchRow({
   const dragged = useRef(false);
 
   const competition = competitionOf(match);
+  const justSaved = usePulse(match.id);
   const kickoff = kickoffAt(match.date, match.time);
   const date = new Date(`${match.date}T00:00:00`);
   const awaiting = match.status === 'scheduled' && kickoff.getTime() <= now.getTime();
@@ -108,7 +109,10 @@ export function MatchRow({
   );
 
   return (
-    <div className={match.status === 'cancelled' ? 'row-wrap is-cancelled' : 'row-wrap'} data-match={match.id}>
+    <div
+      className={`row-wrap${match.status === 'cancelled' ? ' is-cancelled' : ''}${justSaved ? ' pulse' : ''}`}
+      data-match={match.id}
+    >
       {/* Behind the row: what a swipe uncovers. */}
       <m.div className="row-actions" style={{ opacity: revealed }} aria-hidden="true">
         <button
@@ -230,7 +234,7 @@ function RowMenu({
         style={{ top, left: rect.left, width: rect.width }}
         initial={{ y: rect.top - top, scale: 1 }}
         animate={{ y: 0, scale: 1.03 }}
-        exit={{ y: rect.top - top, scale: 1, opacity: 0 }}
+        exit={{ y: rect.top - top, scale: 1, opacity: 0, transition: exitOf(springs.snappy) }}
         transition={springs.snappy}
         aria-hidden="true"
       >
@@ -240,10 +244,11 @@ function RowMenu({
         className="row-menu"
         role="menu"
         style={{ top: top + rect.height + 12, left: rect.left + 8 }}
-        initial={{ opacity: 0, scale: 0.7, y: -10 }}
+        // Grows down out of the row it belongs to, and folds back up into it.
+        initial={{ opacity: 0, scale: 0.95, y: -8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.8, y: -6 }}
-        transition={springs.snappy}
+        exit={{ opacity: 0, scale: 0.95, y: -8, transition: exitOf(springs.menu) }}
+        transition={springs.menu}
       >
         {items.map(({ label, Icon, run, danger }) => (
           <button

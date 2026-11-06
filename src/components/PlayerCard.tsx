@@ -3,7 +3,7 @@ import { animate, m, useMotionValue, useSpring, useTransform } from 'motion/reac
 import { useStore } from '../store/AppStore';
 import { playerCard, type CardTier } from '../lib/playerCard';
 import { formatDateShort } from '../lib/date';
-import { prefersReducedMotion, springs } from '../lib/motion';
+import { details, prefersReducedMotion, press, springs } from '../lib/motion';
 import { Avatar } from './Avatar';
 
 const SEEN_KEY = 'matchday.card.v1';
@@ -109,8 +109,17 @@ export function PlayerCard() {
   const track = (e: React.PointerEvent<HTMLDivElement>) => {
     if (prefersReducedMotion()) return;
     const box = e.currentTarget.getBoundingClientRect();
-    px.set((e.clientX - box.left) / box.width);
-    py.set((e.clientY - box.top) / box.height);
+    // Leans a little past the edge, then gives no further (a soft clamp).
+    const clamp = (v: number) => Math.max(-0.1, Math.min(1.1, v));
+    const x = clamp((e.clientX - box.left) / box.width);
+    const y = clamp((e.clientY - box.top) / box.height);
+    px.set(x);
+    py.set(y);
+    // Under a finger it follows exactly - nothing eases while it's held.
+    if (e.buttons > 0 || e.pointerType === 'touch') {
+      tiltX.jump(6 - 12 * y);
+      tiltY.jump(-8 + 16 * x);
+    }
   };
   const settle = () => {
     px.set(0.5);
@@ -135,17 +144,17 @@ export function PlayerCard() {
         initial={{ opacity: 0, y: 18, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={springs.smooth}
-        whileTap={{ scale: 0.98 }}
+        whileTap={{ scale: press, transition: { duration: 0 } }}
       >
         {/* Front */}
         <span className="pass-face pass-front" aria-hidden="true">
           <span className="pass-glare" />
           {sweep > 0 && <span key={sweep} className="pass-sweep" />}
-          <span className="pass-top">
+          <m.span className="pass-top" {...details(0, 0.12)}>
             <span className="pass-brand">MATCHDAY</span>
             <span className="pass-tier">{TIER_NAME[card.tier]}</span>
-          </span>
-          <span className="pass-main">
+          </m.span>
+          <m.span className="pass-main" {...details(1, 0.12)}>
             <span className="pass-ring">
               <RatingRing value={shown} />
               <span className="pass-ovr">{shown ?? '–'}</span>
@@ -157,13 +166,13 @@ export function PlayerCard() {
             <span className="pass-photo">
               <Avatar photo={profile.photo} name={profile.name} size={46} />
             </span>
-          </span>
+          </m.span>
           <span className="pass-stats">
-            {card.stats.map((s) => (
-              <span key={s.code} className="pass-stat">
+            {card.stats.map((s, i) => (
+              <m.span key={s.code} className="pass-stat" {...details(2 + i * 0.4, 0.12)}>
                 <span className="pass-stat-value">{s.value}</span>
                 <span className="pass-stat-code">{s.code}</span>
-              </span>
+              </m.span>
             ))}
           </span>
         </span>

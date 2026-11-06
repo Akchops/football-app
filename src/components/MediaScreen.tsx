@@ -9,7 +9,7 @@ import {
 } from '../store/media';
 import { MediaTile, MediaViewer } from './MediaViewer';
 import { MatchPickerSheet } from './MatchPickerSheet';
-import { EmptyState } from './ui';
+import { ChipPill, EmptyState } from './ui';
 import { ChevronIcon } from './icons';
 
 type Filter = 'all' | 'video' | 'photo';
@@ -144,6 +144,7 @@ export function MediaScreen({ onOpenMatch, onBack }: { onOpenMatch: (match: Matc
                 className={filter === f ? 'filter-chip on' : 'filter-chip'}
                 onClick={() => setFilter(f)}
               >
+                {filter === f && <ChipPill group="media-1" />}
                 {f === 'all' ? `All (${items.length})` : f === 'video' ? `Video (${videoCount})` : `Photos (${items.length - videoCount})`}
               </button>
             ))}

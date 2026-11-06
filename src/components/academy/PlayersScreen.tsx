@@ -8,7 +8,7 @@ import { AGE_GROUPS, ALL_POSITIONS } from '../../types';
 import { Field, Section, Segmented, Sheet } from '../ui';
 import { Initials, StatusChip, useAddRequest, type AddRequest } from './parts';
 import { m } from 'motion/react';
-import { rememberOrigin, stagger } from '../../lib/motion';
+import { AFTER_SHEET, isPulsing, pulse, rememberOrigin, stagger, usePulseTick } from '../../lib/motion';
 import { ChevronIcon, PeopleIcon, PlusIcon } from '../icons';
 
 /** A steady colour per squad, so a squad looks the same everywhere. */
@@ -85,6 +85,7 @@ export function PlayersScreen({ academy, request }: { academy: StaffAcademy; req
   const [query, setQuery] = useState('');
   const [showGone, setShowGone] = useState(false);
 
+  usePulseTick();
   useAddRequest(request, 'player', () => setAdding(true));
   useAddRequest(request, 'squad', () => setNewSquad(true));
 
@@ -169,7 +170,7 @@ export function PlayersScreen({ academy, request }: { academy: StaffAcademy; req
                 const count = inSquad(s);
                 const names = coaches(s);
                 return (
-                  <m.li key={s.id} {...stagger(i)}>
+                  <m.li key={s.id} className={isPulsing(s.id) ? 'pulse' : undefined} {...stagger(i)}>
                     <button
                       className="nav-row"
                       onClick={(e) => {
@@ -225,7 +226,7 @@ export function PlayersScreen({ academy, request }: { academy: StaffAcademy; req
           ) : (
             <ul className="list-group person-group">
               {shown.map((p, i) => (
-                <m.li key={p.id} layout="position" {...stagger(i)}>
+                <m.li key={p.id} layout="position" className={isPulsing(p.id) ? 'pulse' : undefined} {...stagger(i)}>
                   <PlayerRow player={p} facts={playerFacts(p, squadNames(p.id))} onOpen={() => setPlayerId(p.id)} />
                 </m.li>
               ))}
@@ -256,6 +257,7 @@ export function PlayersScreen({ academy, request }: { academy: StaffAcademy; req
             setNewSquad(false);
             if (!id) return;
             await roster.reload();
+            pulse(id, AFTER_SHEET);
             setSquadId(id);
           }}
         />
@@ -324,6 +326,7 @@ function RequestCard({
     try {
       await api.answerJoinRequest(player.id, accept, accept && squad ? squad : undefined);
       await onDone();
+      if (accept) pulse(player.id, 120);
     } catch (e) {
       setError(describeAcademyError(e));
       setBusy(false);
@@ -495,7 +498,7 @@ function AddPlayerSheet({
     const problem = usernameProblem(handle);
     if (problem) return setError(handle ? `@${handle} can't be anyone's username - ${problem.toLowerCase()}.` : 'Type their username.');
     void run(async () => {
-      await api!.invitePlayer(academy.id, handle, { squadId: squad || undefined });
+      pulse(await api!.invitePlayer(academy.id, handle, { squadId: squad || undefined }), 400);
       setUsername('');
       return `Invited @${handle}. Their family says yes in their Matchday before you see anything of theirs.`;
     });
@@ -505,6 +508,7 @@ function AddPlayerSheet({
     if (!name.trim()) return setError('Type their name.');
     void run(async () => {
       const id = await api!.addRosterPlayer(academy.id, { name, position, ageGroup });
+      pulse(id, 400);
       if (squad) await api!.setSquadMember(squad, id, true);
       setName('');
       return `${name.trim()} is on the list.`;

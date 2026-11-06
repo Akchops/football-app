@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { m } from 'motion/react';
+import { details, usePulse } from '../lib/motion';
 import { stageName } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import { METRIC_BY_ID, VENUE_LABEL, type Competition, type Match, type MetricId } from '../types';
@@ -33,6 +35,7 @@ export function MatchDetailSheet({
   const { competitionOf, teamOf, restoreMatch, profile, settings } = useStore();
   const actions = useMatchActions();
   const [shareState, setShareState] = useState<'idle' | 'working' | 'done' | 'failed'>('idle');
+  const justSaved = usePulse(match?.id);
   if (!match) return null;
 
   const competition = competitionOf(match);
@@ -100,15 +103,15 @@ export function MatchDetailSheet({
       }
     >
       {result && (
-        <div className={`result-hero outcome-${outcomeOf(result).toLowerCase()}`}>
-          <div className="result-score">{scoreline(result)}</div>
-          <div className="result-caption">
+        <div className={`result-hero outcome-${outcomeOf(result).toLowerCase()}${justSaved ? ' pulse' : ''}`}>
+          <m.div className="result-score" {...details(0, 0.15)}>{scoreline(result)}</m.div>
+          <m.div className="result-caption" {...details(1, 0.15)}>
             {outcomeOf(result) === 'W' ? 'Win' : outcomeOf(result) === 'L' ? 'Defeat' : 'Draw'}
             {isWalkover(result) && ' · walkover'}
             {shootoutWinner(result) === 'us' && ' · won on penalties'}
             {shootoutWinner(result) === 'them' && ' · lost on penalties'}
             {` · ${us} ${match.venue === 'away' ? 'away' : match.venue === 'home' ? 'at home' : 'neutral venue'}`}
-          </div>
+          </m.div>
         </div>
       )}
 
@@ -245,7 +248,7 @@ export function MatchDetailSheet({
           </button>
         )}
       </div>
-      {shareState === 'done' && <p className="notice">Image ready — saved or shared.</p>}
+      {shareState === 'done' && <p className="notice pulse">Image ready — saved or shared.</p>}
       {shareState === 'failed' && <p className="form-error">Couldn't make the image on this device.</p>}
 
       <div className="sheet-actions">

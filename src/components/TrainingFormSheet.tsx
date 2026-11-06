@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { AFTER_SHEET, pulse } from '../lib/motion';
 import { useStore } from '../store/AppStore';
 import { TRAINING_LENGTHS, TRAINING_TYPE_LABEL, type TrainingSession, type TrainingType } from '../types';
 import { todayISO } from '../lib/date';
-import { DurationPicker, Field, Sheet } from './ui';
+import { ChipPill, DurationPicker, Field, Sheet } from './ui';
 
 export interface TrainingFormTarget {
   mode: 'create' | 'edit';
@@ -68,9 +69,10 @@ export function TrainingFormSheet({
       focus: focus.trim(),
       notes: notes.trim(),
     };
+    const id = editing ? editing.id : addTraining(payload).id;
     if (editing) updateTraining(editing.id, payload);
-    else addTraining(payload);
     onClose();
+    pulse(id, AFTER_SHEET);
   };
 
   return (
@@ -99,6 +101,7 @@ export function TrainingFormSheet({
               className={t === type ? 'filter-chip on' : 'filter-chip'}
               onClick={() => setType(t)}
             >
+              {t === type && <ChipPill group="training-1" />}
               {TRAINING_TYPE_LABEL[t]}
             </button>
           ))}
@@ -127,6 +130,7 @@ export function TrainingFormSheet({
               className={n === intensity ? 'filter-chip on' : 'filter-chip'}
               onClick={() => setIntensity(n)}
             >
+              {n === intensity && <ChipPill group="training-2" />}
               {n}
             </button>
           ))}

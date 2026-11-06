@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { m } from 'motion/react';
-import { springs } from '../lib/motion';
+import { isPulsing, springs, usePulseTick } from '../lib/motion';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import {
@@ -40,6 +40,8 @@ export function CalendarScreen({
   onOpenCard?: () => void;
 }) {
   const { matches, settings, colorOf, teams, competitions, updateSettings, profile, training } = useStore();
+  // Redraw when something on the day list has just been saved, so it can pulse.
+  usePulseTick();
   const [cursor, setCursorState] = useState(() => startOfMonth(now));
   // Which way the last month change went, so the next grid slides in from that side.
   const [direction, setDirection] = useState(0);
@@ -227,7 +229,11 @@ export function CalendarScreen({
         {selectedTraining.length > 0 && (
           <div className="list">
             {selectedTraining.map((session) => (
-              <button key={session.id} className="training-row" onClick={() => onOpenTraining(session.id)}>
+              <button
+                key={session.id}
+                className={isPulsing(session.id) ? 'training-row pulse' : 'training-row'}
+                onClick={() => onOpenTraining(session.id)}
+              >
                 <span className="training-rail" aria-hidden="true" />
                 <span className="training-time">{session.time}</span>
                 <span className="training-body">

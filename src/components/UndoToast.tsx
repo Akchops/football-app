@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { AnimatePresence, m } from 'motion/react';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
-import { springs } from '../lib/motion';
+import { arc, exitOf, pulse, springs } from '../lib/motion';
 
 interface Offer {
   id: number;
@@ -49,10 +49,11 @@ export function UndoProvider({ children }: { children: ReactNode }) {
             key={current.id}
             className="undo-toast"
             role="status"
-            initial={{ opacity: 0, y: 30, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.96 }}
-            transition={springs.snappy}
+            // Swoops up off the tab bar on a gentle curve.
+            initial={{ opacity: 0, x: -36, y: 34, scale: 0.94 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.96, transition: exitOf(springs.snappy) }}
+            transition={arc(springs.snappy)}
           >
             <span>{current.message}</span>
             <button
@@ -79,12 +80,18 @@ export function useMatchActions() {
   return {
     remove(match: Match) {
       deleteMatch(match.id);
-      offer(`Deleted ${name(match)}`, () => updateMatch(match.id, { deletedAt: null }));
+      offer(`Deleted ${name(match)}`, () => {
+        updateMatch(match.id, { deletedAt: null });
+        pulse(match.id, 120);
+      });
     },
     callOff(match: Match) {
       const before = { status: match.status, result: match.result, remindAfter: match.remindAfter };
       cancelMatch(match.id);
-      offer(`${name(match)} called off`, () => updateMatch(match.id, before));
+      offer(`${name(match)} called off`, () => {
+        updateMatch(match.id, before);
+        pulse(match.id, 120);
+      });
     },
   };
 }

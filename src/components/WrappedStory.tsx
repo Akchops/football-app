@@ -385,7 +385,7 @@ export function WrappedStory({ year, complete, onClose }: { year: number; comple
               Watch again
             </button>
           </div>
-          {shareState === 'done' && <p className="wr-line">Image ready — saved or shared.</p>}
+          {shareState === 'done' && <p className="wr-line pulse">Image ready — saved or shared.</p>}
           {shareState === 'failed' && <p className="wr-line">Couldn't make the image on this phone.</p>}
         </div>
       ) : (

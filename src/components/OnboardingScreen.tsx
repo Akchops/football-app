@@ -5,7 +5,7 @@ import {
   type PositionGroup,
 } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
-import { Field } from './ui';
+import { ChipPill, Field } from './ui';
 import { accountsAvailable } from '../lib/auth';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard, SignInForm } from './AccountSettings';
@@ -189,6 +189,7 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
                       className={p === position ? 'filter-chip on' : 'filter-chip'}
                       onClick={() => setPosition(p)}
                     >
+                      {p === position && <ChipPill group="onboard-pos-1" />}
                       {p}
                     </button>
                   ))}

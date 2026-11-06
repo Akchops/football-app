@@ -3,7 +3,7 @@ import { PROVIDER_LABEL, type Provider } from '../lib/aiTypes';
 import { getApiKey, getModel, getProvider, setApiKey, setModel, setProvider } from '../lib/apiKey';
 import { proxyAvailable, sharedUsage } from '../lib/proxy';
 import { DEFAULT_PROFILE } from '../types';
-import { Field, Section } from './ui';
+import { ChipPill, Field, Section } from './ui';
 
 interface Option {
   id: string;
@@ -125,6 +125,7 @@ export function AiSection() {
               className={p === provider ? 'filter-chip on' : 'filter-chip'}
               onClick={() => switchProvider(p)}
             >
+              {p === provider && <ChipPill group="ai-1" />}
               {PROVIDER_LABEL[p]}
               {p === 'gemini' ? ' · free' : ''}
             </button>

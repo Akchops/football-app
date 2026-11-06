@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, m } from 'motion/react';
-import { springs } from '../lib/motion';
+import { arc, exitOf, press, springs } from '../lib/motion';
 import { PlusIcon } from './icons';
 
 export interface AddItem {
@@ -20,6 +20,9 @@ const HOLD_MS = 450;
  */
 export function AddButton({ items, onHold }: { items: AddItem[]; onHold?: () => void }) {
   const [open, setOpen] = useState(false);
+  // Where the + sits, so the menu grows out of it and folds back into it.
+  const [from, setFrom] = useState<{ x: number; y: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const held = useRef<number | null>(null);
   const fired = useRef(false);
 
@@ -61,11 +64,14 @@ export function AddButton({ items, onHold }: { items: AddItem[]; onHold?: () => 
           onPointerUp={endHold}
           onPointerLeave={endHold}
           onContextMenu={(e) => e.preventDefault()}
+          ref={buttonRef}
           onClick={() => {
             if (fired.current) return;
+            const box = buttonRef.current?.getBoundingClientRect();
+            if (box) setFrom({ x: box.left + box.width / 2, y: box.top });
             setOpen((o) => !o);
           }}
-          whileTap={{ scale: 0.9 }}
+          whileTap={{ scale: press, transition: { duration: 0 } }}
           transition={springs.snappy}
         >
           <m.span className="add-btn-icon" animate={{ rotate: open ? 45 : 0 }} transition={springs.snappy}>
@@ -82,17 +88,23 @@ export function AddButton({ items, onHold }: { items: AddItem[]; onHold?: () => 
                 onClick={() => setOpen(false)}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={springs.smooth}
+                exit={{ opacity: 0, transition: exitOf({ duration: 0.2 }) }}
+                transition={{ duration: 0.2 }}
               />
               <m.div
                 className="add-menu"
                 role="menu"
                 aria-label="Add"
-                initial={{ opacity: 0, scale: 0.6, y: 40 }}
+                ref={(el) => {
+                  // Grow from the + itself, wherever the menu ends up on screen.
+                  // Its own place on the page, not where an animation has it right now.
+                  if (!el || !from) return;
+                  el.style.transformOrigin = `${from.x - el.offsetLeft}px ${from.y - el.offsetTop}px`;
+                }}
+                initial={{ opacity: 0, scale: 0.95, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.7, y: 30 }}
-                transition={springs.snappy}
+                exit={{ opacity: 0, scale: 0.95, y: 12, transition: exitOf(springs.menu) }}
+                transition={springs.menu}
               >
                 {items.map(({ label, hint, Icon, run }, i) => (
                   <m.button
@@ -101,9 +113,10 @@ export function AddButton({ items, onHold }: { items: AddItem[]; onHold?: () => 
                     role="menuitem"
                     className="add-item"
                     onClick={pick(run)}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ ...springs.snappy, delay: 0.03 * (items.length - i) }}
+                    // Fanning up out of the +, on a curve.
+                    initial={{ opacity: 0, y: 18, x: from ? Math.sign(from.x - window.innerWidth / 2) * 6 - 10 : -10 }}
+                    animate={{ opacity: 1, y: 0, x: 0 }}
+                    transition={arc(springs.snappy, 0.03 * (items.length - i))}
                   >
                     <span className="add-item-icon">
                       <Icon />

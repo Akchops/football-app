@@ -4,7 +4,7 @@ import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import { formatDateShort, formatTime, kickoffAt } from '../lib/date';
 import { stageName } from '../lib/stage';
-import { rememberOrigin, springs } from '../lib/motion';
+import { details, press, rememberOrigin, springs } from '../lib/motion';
 
 /** Days, hours, minutes and seconds to kick-off - for the ticking countdown. */
 function untilKickoff(at: Date, now: number): { d: number; h: number; m: number; s: number } {
@@ -47,23 +47,24 @@ export function NextMatchHero({ match, onOpen }: { match: Match; onOpen: () => v
       initial={{ opacity: 0, y: 18, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={springs.smooth}
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: press, transition: { duration: 0 } }}
     >
-      <span className="hero-eyebrow">{eyebrow}</span>
-      <span className="hero-title">
+      {/* The details settle in order: what it is, who, how long, where. */}
+      <m.span className="hero-eyebrow" {...details(0)}>{eyebrow}</m.span>
+      <m.span className="hero-title" {...details(1)}>
         <span className="vs">{match.venue === 'away' ? '@' : 'vs'}</span> {match.opponent || 'TBC'}
-      </span>
-      <span className="hero-count" aria-label={`Kick-off in ${left.d} days, ${left.h} hours and ${left.m} minutes`}>
+      </m.span>
+      <m.span {...details(2)} className="hero-count" aria-label={`Kick-off in ${left.d} days, ${left.h} hours and ${left.m} minutes`}>
         {units.map(([value, label]) => (
           <span key={label} className="hero-unit" aria-hidden="true">
             <span className="hero-num">{String(value).padStart(2, '0')}</span>
             <span className="hero-label">{label}</span>
           </span>
         ))}
-      </span>
-      <span className="hero-meta">
+      </m.span>
+      <m.span className="hero-meta" {...details(3)}>
         {[formatDateShort(match.date), formatTime(match.time), match.location].filter(Boolean).join(' · ')}
-      </span>
+      </m.span>
     </m.button>
   );
 }

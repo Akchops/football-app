@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { m } from 'motion/react';
+import { AnimatePresence, m } from 'motion/react';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import { MONTH_NAMES, fromISODate, kickoffAt } from '../lib/date';
 import { pendingResultMatches, playedMatches, statsByTournament, upcomingMatches } from '../lib/stats';
-import { stagger } from '../lib/motion';
+import { exitOf, springs, stagger } from '../lib/motion';
 import { useMatchesTop } from '../useAppearance';
 import { MatchRow } from './MatchRow';
 import { NextMatchHero } from './NextMatchHero';
@@ -155,6 +155,16 @@ export function MatchesScreen({
         onChange={setTab}
       />
 
+      {/* The old list fades out over the new one as it arrives: no blank moment between. */}
+      <AnimatePresence mode="popLayout" initial={false}>
+        <m.div
+          key={tab}
+          className="seg-panel"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, transition: exitOf({ duration: 0.22 }) }}
+          transition={springs.smooth}
+        >
       {tab === 'upcoming' && (
         <>
           {pending.length > 0 && (
@@ -229,6 +239,9 @@ export function MatchesScreen({
         </>
       )}
 
+        </m.div>
+      </AnimatePresence>
+
       {tab !== 'tournaments' && <p className="list-hint">Swipe a match left for more, or hold it for a menu.</p>}
 
       <Sheet open={filtering} title="Filter" subtitle="Show matches for" onClose={() => setFiltering(false)}>
@@ -245,7 +258,11 @@ export function MatchesScreen({
                   onClick={() => setTeamId(t.id)}
                 >
                   <span>{t.name}</span>
-                  {teamId === t.id && <span className="choice-check">✓</span>}
+                  {teamId === t.id && (
+                    <m.span layoutId="filter-team-check" className="choice-check" transition={springs.snappy}>
+                      ✓
+                    </m.span>
+                  )}
                 </button>
               ))}
             </div>
@@ -264,7 +281,11 @@ export function MatchesScreen({
                   onClick={() => setCompetitionId(c.id)}
                 >
                   <span>{c.name}</span>
-                  {competitionId === c.id && <span className="choice-check">✓</span>}
+                  {competitionId === c.id && (
+                    <m.span layoutId="filter-comp-check" className="choice-check" transition={springs.snappy}>
+                      ✓
+                    </m.span>
+                  )}
                 </button>
               ))}
             </div>

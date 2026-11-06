@@ -13,8 +13,10 @@ import { AcademySection } from './academy/AcademySection';
 import { ACADEMY } from '../lib/features';
 import { useSync } from '../store/SyncProvider';
 import { AiSection } from './AiSettings';
-import { DurationPicker, EmptyState, Field, Section, Segmented } from './ui';
+import { ChipPill, DurationPicker, EmptyState, Field, Section, Segmented } from './ui';
 import { useMatchesTop, useTheme } from '../useAppearance';
+import { applyAppearance, type Theme } from '../lib/appearance';
+import { prefersReducedMotion } from '../lib/motion';
 import { AvatarPicker } from './Avatar';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
 import type { TeamFormTarget } from './TeamFormSheet';
@@ -170,6 +172,7 @@ export function SetupScreen({
                   className={p === profile.position ? 'filter-chip on' : 'filter-chip'}
                   onClick={() => updateProfile({ position: p })}
                 >
+                  {p === profile.position && <ChipPill group="setup-pos-1" />}
                   {p}
                 </button>
               ))}
@@ -424,9 +427,40 @@ export function SetupScreen({
 function AppearanceSection() {
   const [theme, setTheme] = useTheme();
   const [top, setTop] = useMatchesTop();
+  const tapped = useRef<{ x: number; y: number } | null>(null);
+
+  // The new look spreads out in a circle from where you tapped - a mask, not
+  // a cut. Where the browser can't do that, it simply changes.
+  const changeTheme = (next: Theme) => {
+    const doc = document as Document & {
+      startViewTransition?: (cb: () => Promise<void> | void) => { ready: Promise<void>; finished: Promise<void> };
+    };
+    const at = tapped.current;
+    if (!doc.startViewTransition || !at || prefersReducedMotion()) return setTheme(next);
+    // The page's own colour fades would show half-changed in the new picture.
+    document.documentElement.classList.add('theme-switching');
+    const transition = doc.startViewTransition(() => {
+      setTheme(next);
+      // Put the new colours on now, so the new picture is taken in them. (The
+      // page doesn't draw frames during this step, so nothing can wait for one.)
+      const kit = getComputedStyle(document.documentElement).getPropertyValue('--kit').trim();
+      applyAppearance(next, kit || undefined);
+    });
+    const radius = Math.hypot(Math.max(at.x, window.innerWidth - at.x), Math.max(at.y, window.innerHeight - at.y));
+    const settle = () => document.documentElement.classList.remove('theme-switching');
+    void transition.finished.then(settle, settle);
+    void transition.ready.then(() => {
+      document.documentElement.animate(
+        { clipPath: [`circle(0px at ${at.x}px ${at.y}px)`, `circle(${radius}px at ${at.x}px ${at.y}px)`] },
+        { duration: 560, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', pseudoElement: '::view-transition-new(root)' },
+      );
+    });
+  };
+
   return (
     <Section grouped title="Appearance">
       <Field group label="Look">
+        <div onPointerDown={(e) => (tapped.current = { x: e.clientX, y: e.clientY })}>
         <Segmented
           options={[
             { value: 'dark', label: 'Dark' },
@@ -434,8 +468,9 @@ function AppearanceSection() {
             { value: 'auto', label: 'Automatic' },
           ]}
           value={theme}
-          onChange={setTheme}
+          onChange={changeTheme}
         />
+        </div>
       </Field>
       <p className="muted small">Automatic follows your phone. The accent colour is your first team's colour.</p>
       <Field group label="Top of Matches">

@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { AFTER_SHEET, pulse } from '../lib/motion';
 import { useStore, type NewMatchInput } from '../store/AppStore';
 import { MATCH_LENGTHS, VENUE_LABEL, type Match, type MatchStage, type Venue } from '../types';
 import { formatDateShort, formatTime, todayISO } from '../lib/date';
@@ -333,9 +334,11 @@ export function MatchFormSheet({
     if (editing) {
       updateMatch(editing.id, payload);
       onClose();
+      pulse(editing.id, AFTER_SHEET);
     } else {
       const created = addMatch(payload);
       onClose();
+      pulse(created.id, AFTER_SHEET);
       onCreated?.(created);
     }
   };

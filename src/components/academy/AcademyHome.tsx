@@ -2,9 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { m } from 'motion/react';
 import { ROLE_LABEL, can, describeAcademyError, type StaffAcademy } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
-import { springs, stagger } from '../../lib/motion';
+import { details, ease, springs, stagger } from '../../lib/motion';
 import { CheckIcon, ChevronIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon } from '../icons';
-import { RollingNumber, Section } from '../ui';
+import { RollingNumber, Section, SwapText } from '../ui';
 import { AcademyLogo, VerificationBadge, useLoad } from './parts';
 
 /** A Settings-style row: a coloured symbol, what it is, what's there, a chevron. */
@@ -85,7 +85,7 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={springs.smooth}
       >
-        <div className="ac-hero-top">
+        <m.div className="ac-hero-top" {...details(0)}>
           <AcademyLogo name={academy.name} logo={academy.logo} size={60} />
           <div className="ac-hero-text">
             <h1>{academy.name}</h1>
@@ -95,12 +95,12 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
               <span>You&apos;re the {ROLE_LABEL[academy.role].toLowerCase()}</span>
             </p>
           </div>
-        </div>
-        <div className="ac-hero-stats">
+        </m.div>
+        <m.div className="ac-hero-stats" {...details(1)}>
           {stat(onBooks?.length ?? null, onBooks?.length === 1 ? 'Player' : 'Players')}
           {stat(squadCount, squadCount === 1 ? 'Squad' : 'Squads')}
           {stat(staffCount, 'Staff')}
-        </div>
+        </m.div>
       </m.div>
 
       {academy.verification === 'rejected' && academy.verificationNote && (
@@ -227,7 +227,14 @@ function JoinCode({ academy }: { academy: StaffAcademy }) {
       transition={{ ...springs.smooth, delay: 0.08 }}
     >
       <span className="code-label">Join code</span>
-      <span className="join-code">
+      {/* Revealed left to right under a mask, each letter settling as it's uncovered. */}
+      <m.span
+        key={academy.joinCode}
+        className="join-code"
+        initial={{ clipPath: 'inset(0 100% 0 0)' }}
+        animate={{ clipPath: 'inset(0 0% 0 0)' }}
+        transition={{ duration: 0.6, ease: ease.inOut, delay: 0.1 }}
+      >
         {academy.joinCode.split('').map((ch, i) => (
           <m.span
             key={`${academy.joinCode}-${i}`}
@@ -238,15 +245,15 @@ function JoinCode({ academy }: { academy: StaffAcademy }) {
             {ch}
           </m.span>
         ))}
-      </span>
+      </m.span>
       <p className="code-help">
         Players enter it in their Matchday to ask to join. Your coaching staff say yes to each one, and the family
         agrees to share their stats.
       </p>
       {error && <p className="notice warn">{error}</p>}
       <div className="code-actions">
-        <button className="code-btn" onClick={() => void copy()}>
-          {copied ? 'Copied' : 'Copy'}
+        <button className={copied ? 'code-btn pulse' : 'code-btn'} onClick={() => void copy()}>
+          <SwapText text={copied ? 'Copied' : 'Copy'} />
         </button>
         {typeof navigator.share === 'function' && (
           <button className="code-btn" onClick={() => void share()}>

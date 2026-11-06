@@ -6,9 +6,9 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { SignInForm } from '../AccountSettings';
 import { ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon } from '../icons';
-import { Section, Sheet } from '../ui';
+import { IconSwap, Pill, Section, Sheet, SwapText } from '../ui';
 import { AddButton, type AddItem } from '../AddButton';
-import { springs } from '../../lib/motion';
+import { exitOf, springs } from '../../lib/motion';
 import { CreateAcademyForm } from './AcademyDetails';
 import { AcademyHome, type AcademyTab } from './AcademyHome';
 import { AcademySettings } from './AcademySettings';
@@ -77,6 +77,7 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   const [tab, setTab] = useState<AcademyTab>('home');
   const [switching, setSwitching] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
+  const tabMoved = useRef(false);
   const current = academy.current;
   const [request, setRequest] = useState<AddRequest | null>(null);
   const ask = (what: AddWhat) => {
@@ -222,7 +223,14 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
         )}
         {gate ??
           (current && (
-            <m.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={springs.smooth}>
+            <AnimatePresence mode="popLayout" initial={false}>
+            <m.div
+              key={tab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: exitOf({ duration: 0.25 }) }}
+              transition={springs.smooth}
+            >
               {tab === 'home' && <AcademyHome academy={current} onGo={setTab} />}
               {tab === 'players' && <PlayersScreen academy={current} request={request} />}
               {tab === 'tables' && <TablesScreen academy={current} request={request} />}
@@ -236,6 +244,7 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
               )}
               {tab === 'settings' && <AcademySettings academy={current} hasPlayer={hasPlayer} />}
             </m.div>
+            </AnimatePresence>
           ))}
       </main>
 
@@ -249,14 +258,21 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
             return (
               <Fragment key={t.id}>
                 {i === 2 && items.length > 0 && <AddButton items={items} />}
-                <button className={on ? 'tab on' : 'tab'} onClick={() => setTab(t.id)} aria-current={on ? 'page' : undefined}>
-                  {on && <m.span layoutId="academy-tab-pill" className="tab-pill" transition={springs.snappy} />}
+                <button
+                  className={on ? 'tab on' : 'tab'}
+                  onClick={() => {
+                    tabMoved.current = true;
+                    setTab(t.id);
+                  }}
+                  aria-current={on ? 'page' : undefined}
+                >
+                  {on && <Pill layoutId="academy-tab-pill" className="tab-pill" moved={tabMoved.current} />}
                   <m.span
                     className="tab-icon"
                     animate={on ? { scale: [1, 1.22, 0.94, 1] } : { scale: 1 }}
                     transition={{ duration: 0.45, ease: 'easeOut' }}
                   >
-                    <t.Icon on={on} />
+                    <IconSwap off={<t.Icon />} on={<t.Icon on />} active={on} />
                   </m.span>
                   <span className="tab-label">{t.label}</span>
                 </button>
@@ -426,8 +442,8 @@ function StartGate() {
               </p>
             )}
             <div className="button-row">
-              <button className="ghost-btn" onClick={() => void copy()}>
-                {copied ? 'Copied' : 'Copy my username'}
+              <button className={copied ? 'ghost-btn pulse' : 'ghost-btn'} onClick={() => void copy()}>
+                <SwapText text={copied ? 'Copied' : 'Copy my username'} />
               </button>
               <button className="ghost-btn" disabled={checking} onClick={() => void check()}>
                 {checking ? 'Checking…' : 'Check for invites'}

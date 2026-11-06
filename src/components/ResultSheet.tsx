@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { m } from 'motion/react';
+import { AFTER_SHEET, ease, pulse, springs } from '../lib/motion';
 import { fixtureContext } from '../lib/stage';
 import { useStore } from '../store/AppStore';
 import {
@@ -140,6 +142,7 @@ export function ResultSheet({
     if (notes !== match.notes) updateMatch(match.id, { notes });
     onSaved?.();
     onClose();
+    pulse(match.id, AFTER_SHEET);
   };
 
   return (
@@ -210,6 +213,15 @@ export function ResultSheet({
           </div>
 
           <div className={`score-preview band-${scoreBand(preview.score)}`}>
+            {/* A new band's colour wipes across under a mask rather than snapping. */}
+            <m.span
+              key={scoreBand(preview.score)}
+              className="band-wipe"
+              aria-hidden="true"
+              initial={{ clipPath: 'inset(0 100% 0 0 round 16px)' }}
+              animate={{ clipPath: 'inset(0 0% 0 0 round 16px)' }}
+              transition={{ duration: 0.45, ease: ease.inOut }}
+            />
             <span className="score-preview-value">{preview.score}</span>
             <span className="score-preview-text">
               <strong>{scoreVerdict(preview.score)}</strong>
@@ -317,7 +329,11 @@ export function ResultSheet({
                   onClick={() => patch({ walkover: value })}
                 >
                   <span>{label}</span>
-                  {walkover === value && <span className="choice-check">✓</span>}
+                  {walkover === value && (
+                    <m.span layoutId="walkover-check" className="choice-check" transition={springs.snappy}>
+                      ✓
+                    </m.span>
+                  )}
                 </button>
               ))}
             </div>

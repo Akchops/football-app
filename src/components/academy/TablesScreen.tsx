@@ -5,11 +5,11 @@ import {
 import { seasonLabel } from '../../lib/date';
 import { useAcademy } from '../../store/AcademyProvider';
 import { COMPETITION_TYPE_LABEL, type CompetitionType } from '../../types';
-import { Field, Section, Sheet, Stepper } from '../ui';
+import { ChipPill, Field, Section, Sheet, Stepper } from '../ui';
 import { CompetitionTables, competitionFacts } from './CompetitionTables';
 import { useAddRequest, useLoad, type AddRequest } from './parts';
 import { m } from 'motion/react';
-import { stagger } from '../../lib/motion';
+import { AFTER_SHEET, isPulsing, pulse, stagger, usePulseTick } from '../../lib/motion';
 import { ChevronIcon, PlusIcon, TableIcon, TrophyIcon } from '../icons';
 
 /** Friendlies have no table, so they are not offered here. */
@@ -24,6 +24,7 @@ export function TablesScreen({ academy, request }: { academy: StaffAcademy; requ
   const [form, setForm] = useState<{ competition: AcademyCompetition | null } | null>(null);
 
   const editable = can(academy.role, 'coach');
+  usePulseTick();
   useAddRequest(request, 'competition', () => {
     setOpenId(null);
     setForm({ competition: null });
@@ -42,6 +43,7 @@ export function TablesScreen({ academy, request }: { academy: StaffAcademy; requ
         setForm(null);
         await competitions.reload();
         setOpenId(id);
+        pulse(id, AFTER_SHEET);
       }}
       onDeleted={async () => {
         setForm(null);
@@ -61,7 +63,7 @@ export function TablesScreen({ academy, request }: { academy: StaffAcademy; requ
           Tables
         </button>
         <div className="screen-head">
-          <div>
+          <div className={isPulsing(open.id) ? 'pulse comp-title' : 'comp-title'}>
             <h1>{open.name}</h1>
             <p className="muted small">{competitionFacts(open, squadName(open.squadId))}</p>
           </div>
@@ -220,6 +222,7 @@ function CompetitionForm({
               aria-pressed={draft.type === t}
               onClick={() => set({ type: t })}
             >
+              {draft.type === t && <ChipPill group="comp-type-1" />}
               {COMPETITION_TYPE_LABEL[t]}
             </button>
           ))}

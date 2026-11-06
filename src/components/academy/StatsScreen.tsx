@@ -11,7 +11,7 @@ import { STAGE_SHORT } from '../../lib/stage';
 import { placingLabel, recordSummary, scoreline, statsByStage, statsByTournament } from '../../lib/stats';
 import { useAcademy } from '../../store/AcademyProvider';
 import type { PositionGroup } from '../../types';
-import { Section, Segmented, Sheet, StatTile } from '../ui';
+import { ChipPill, Section, Segmented, Sheet, StatTile } from '../ui';
 import { useLoad, type AddRequest } from './parts';
 import { TeamPicks } from './TeamPicks';
 import { isActive, playerFacts, useRoster } from './useRoster';
@@ -168,6 +168,7 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
                 aria-pressed={f.positionGroup === p.value}
                 onClick={() => set({ positionGroup: p.value })}
               >
+                {f.positionGroup === p.value && <ChipPill group="ac-stats-1" />}
                 {p.label}
               </button>
             ))}
@@ -183,6 +184,7 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
                   aria-pressed={b.id === board.id}
                   onClick={() => setBoardId(b.id)}
                 >
+                  {b.id === board.id && <ChipPill group="ac-stats-2" />}
                   {b.label}
                 </button>
               ))}

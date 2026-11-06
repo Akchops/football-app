@@ -11,7 +11,7 @@ import { ClipTooLongError, MAX_CLIP_SECONDS } from '../lib/frames';
 import { scoreBand, scoreVerdict } from '../lib/score';
 import { getMediaBlob, listAllMedia, type MediaMeta } from '../store/media';
 import { formatDateShort } from '../lib/date';
-import { springs } from '../lib/motion';
+import { arc, details, press, springs } from '../lib/motion';
 import { Field, Sheet } from './ui';
 import { CoachIcon, ComposeIcon, FilmIcon, SendIcon } from './icons';
 
@@ -309,10 +309,11 @@ function Bubble({
   return (
     <m.div
       className={`bubble-row ${from}`}
-      initial={still ? false : { opacity: 0, y: 14, scale: 0.92 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      // Yours arcs up out of the text box; the coach's rises from its side.
+      initial={still ? false : from === 'me' ? { opacity: 0, x: 24, y: 40, scale: 0.92 } : { opacity: 0, y: 14, scale: 0.92 }}
+      animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
-      transition={springs.bouncy}
+      transition={from === 'me' ? arc(springs.bouncy) : springs.bouncy}
       style={{ transformOrigin: from === 'me' ? '100% 100%' : '0% 100%' }}
       layout={typing ? 'position' : undefined}
     >
@@ -376,29 +377,29 @@ function MessageView({ message, showTime }: { message: Message; showTime: boolea
 function PlanView({ plan }: { plan: DrillPlan }) {
   return (
     <div className="plan">
-      <div className="plan-head">
+      <m.div className="plan-head" {...details(0, 0.15)}>
         <span className="plan-eyebrow">Session</span>
         <h2>{plan.title}</h2>
         <p>{plan.focus}</p>
-      </div>
+      </m.div>
       {plan.kit.length > 0 && (
-        <div className="plan-kit">
+        <m.div className="plan-kit" {...details(1, 0.15)}>
           {plan.kit.map((k) => (
             <span key={k} className="plan-kit-item">
               {k}
             </span>
           ))}
-        </div>
+        </m.div>
       )}
-      <div className="plan-part">
+      <m.div className="plan-part" {...details(2, 0.15)}>
         <h3>Warm up</h3>
         <ol className="plan-list">
           {plan.warmup.map((w, i) => (
             <li key={i}>{w}</li>
           ))}
         </ol>
-      </div>
-      <div className="plan-part">
+      </m.div>
+      <m.div className="plan-part" {...details(3, 0.15)}>
         <h3>Drills</h3>
         {plan.drills.map((d, i) => (
           <div key={i} className="drill">
@@ -413,11 +414,11 @@ function PlanView({ plan }: { plan: DrillPlan }) {
             </p>
           </div>
         ))}
-      </div>
-      <div className="plan-part">
+      </m.div>
+      <m.div className="plan-part" {...details(4, 0.15)}>
         <h3>Make it harder</h3>
         <p>{plan.progression}</p>
-      </div>
+      </m.div>
     </div>
   );
 }
@@ -660,7 +661,7 @@ function ClipSheet({
                   key={clip.id}
                   className={on ? 'clip-option on' : 'clip-option'}
                   aria-pressed={on}
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={{ scale: press, transition: { duration: 0 } }}
                   onClick={() => {
                     setUploaded(null);
                     setSelected(clip);

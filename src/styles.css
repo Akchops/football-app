@@ -772,7 +772,7 @@ p { margin: 0; }
   position: absolute;
   inset: 0;
   border-radius: 24px;
-  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  --pill-bg: color-mix(in srgb, var(--accent) 13%, transparent);
 }
 .tab-icon, .tab-label { position: relative; }
 .tab-icon { font-size: 22px; line-height: 0; display: block; }
@@ -927,8 +927,16 @@ select.input {
   position: absolute;
   inset: 0;
   border-radius: 9px;
-  background: var(--seg-pill);
-  box-shadow: var(--seg-pill-shadow);
+  --pill-bg: var(--seg-pill);
+  --pill-shadow: var(--seg-pill-shadow);
+}
+/* The pill's colour, on an inner layer that can stretch while the pill slides. */
+.pill-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--pill-bg);
+  box-shadow: var(--pill-shadow, none);
 }
 .seg-label { position: relative; }
 
@@ -2840,14 +2848,18 @@ a.ground-link { text-decoration: none; }
    because they're tapped all the time. Off with Reduce Motion. */
 @media (prefers-reduced-motion: no-preference) {
   .primary-btn, .ghost-btn, .mini-btn, .icon-btn, .topbar-btn, .pending-pill, .filter-chip, .chip,
-  .match-card, .tile, .cal-day, .tab, .who-card, .position-card, .picker-row, .player-card-mini {
+  .match-card, .tile, .cal-day, .tab, .who-card, .position-card, .picker-row, .player-card-mini,
+  .toolbar-btn, .code-btn, .suggest-chip, .composer-clip, .academy-exit {
     transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1), background-color 0.2s, color 0.2s, border-color 0.2s;
   }
   .primary-btn:active, .ghost-btn:active, .mini-btn:active, .icon-btn:active, .topbar-btn:active, .pending-pill:active,
   .filter-chip:active, .chip:active, .match-card:active, .tile:active, .cal-day:active, .tab:active, .who-card:active,
-  .position-card:active, .picker-row:active, .player-card-mini:active {
-    transform: scale(0.96);
-    transition-duration: 0.12s;
+  .position-card:active, .picker-row:active, .player-card-mini:active, .toolbar-btn:active, .code-btn:active,
+  .suggest-chip:active, .composer-clip:active, .academy-exit:active {
+    transform: scale(0.97);
+    /* Down at once with the finger - nothing tweens while it's held - and
+       back on a gentle curve when it lets go. */
+    transition-duration: 0s;
   }
 }
 
@@ -2906,7 +2918,8 @@ a.ground-link { text-decoration: none; }
   inset: -30% -60%;
   background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.4) 50%, transparent 58%);
   transform: translateX(-70%);
-  animation: card-sweep 1.2s cubic-bezier(0.32, 0.72, 0, 1) 0.4s forwards;
+  /* A move across the card: ease in and out. */
+  animation: card-sweep 1.2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s forwards;
   pointer-events: none;
 }
 @keyframes card-sweep { to { transform: translateX(70%); } }
@@ -3303,7 +3316,7 @@ a.ground-link { text-decoration: none; }
     #0b0d10;
   box-shadow: 0 14px 34px color-mix(in srgb, var(--glow) 25%, transparent);
 }
-.hero-eyebrow { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; }
+.hero-eyebrow { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: color-mix(in srgb, currentColor 80%, transparent); }
 .hero-title { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
 .hero-title .vs { opacity: 0.6; font-weight: 600; }
 .hero-count { display: flex; gap: 14px; margin-top: 4px; }
@@ -3511,8 +3524,11 @@ a.ground-link { text-decoration: none; }
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
-  transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+  transition: transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1), width 0.25s cubic-bezier(0.23, 1, 0.32, 1);
 }
+/* The knob stretches 12% under a finger, as iOS's does, towards where it will go. */
+.toggle-row input[type='checkbox']:active::after { width: 30px; }
+.toggle-row input[type='checkbox']:checked:active::after { transform: translateX(17px); }
 .toggle-row input[type='checkbox']:checked { background: #34c759; }
 .toggle-row input[type='checkbox']:checked::after { transform: translateX(20px); }
 .toggle-row input[type='checkbox']:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -4012,3 +4028,48 @@ button.nav-row:active { background: var(--surface-2); }
 .alert-actions button + button { border-left: 0.5px solid var(--line); }
 .alert-actions button.strong { font-weight: 600; }
 .alert-actions button:active { background: color-mix(in srgb, var(--text) 8%, transparent); }
+
+
+/* ======================================================================
+   Motion pass: the success pulse
+   ====================================================================== */
+/* Something that just worked gives one soft green pulse: a ring spreading
+   out and a small swell. Rows, which sit inside clipped lists, flash a
+   green tint instead of a ring that would be cut off. */
+@media (prefers-reduced-motion: no-preference) {
+  .pulse { animation: success-pulse 0.9s cubic-bezier(0.23, 1, 0.32, 1); }
+  .row-wrap.pulse { animation: none; }
+  .row-wrap.pulse > .match-row,
+  .list-group > .pulse,
+  .training-row.pulse { animation: row-pulse 1.1s cubic-bezier(0.23, 1, 0.32, 1); }
+}
+@keyframes success-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.55); }
+  30% { transform: scale(1.03); }
+  100% { transform: scale(1); box-shadow: 0 0 0 14px rgba(52, 199, 89, 0); }
+}
+@keyframes row-pulse {
+  0% { background-color: var(--surface); }
+  25% { background-color: color-mix(in srgb, #34c759 22%, var(--surface)); }
+  100% { background-color: var(--surface); }
+}
+
+/* Two icons in one place, cross-fading. */
+.icon-swap { display: inline-grid; line-height: 0; }
+.icon-swap > * { grid-area: 1 / 1; display: block; }
+.swap-text { display: inline-grid; }
+.swap-text > * { grid-area: 1 / 1; }
+
+/* A chip row's selection: one pill sliding from chip to chip. */
+.filter-chip { position: relative; isolation: isolate; }
+.filter-chip.on:has(> .chip-pill) { background: transparent; }
+.chip-pill { position: absolute; inset: 0; border-radius: inherit; z-index: -1; --pill-bg: var(--text); }
+
+/* The rating's colour, wiped across under a mask when its band changes. */
+.score-preview { position: relative; isolation: isolate; overflow: hidden; background: var(--surface); }
+.band-wipe { position: absolute; inset: 0; z-index: -1; background: color-mix(in srgb, var(--band) 14%, var(--surface)); }
+
+/* The theme changing: no default cross-fade - the new look grows in a circle. */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.seg-panel { display: flex; flex-direction: column; gap: 18px; }
+html.theme-switching, html.theme-switching * { transition: none !important; }

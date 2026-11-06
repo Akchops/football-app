@@ -1,6 +1,7 @@
 import { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { LazyMotion, MotionConfig, domMax, m, useScroll, useTransform } from 'motion/react';
-import { springs } from './lib/motion';
+import { AnimatePresence, LazyMotion, MotionConfig, domMax, m, useScroll, useTransform } from 'motion/react';
+import { exitOf, springs } from './lib/motion';
+import { IconSwap, Pill } from './components/ui';
 import { useAppearance } from './useAppearance';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { SyncProvider, useSync } from './store/SyncProvider';
@@ -113,6 +114,7 @@ function Shell() {
     }
   };
   const contentRef = useRef<HTMLElement>(null);
+  const tabMoved = useRef(false);
   // How many clips are saved, for the Clips row on Matches.
   const [clipCount, setClipCount] = useState(0);
   useEffect(() => {
@@ -258,8 +260,16 @@ function Shell() {
       <main className="content" ref={contentRef}>
         <InstallBanner />
         <PullToRefresh scroller={contentRef} enabled={Boolean(sync.account)} onRefresh={sync.syncNow}>
-        {/* Screens cross-fade and rise a touch; nothing slides sideways, as on iOS's tab bar. */}
-        <m.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={springs.smooth}>
+        {/* Screens cross-fade and rise a touch; nothing slides sideways, as on iOS's tab bar.
+            The old one fades out over the new as it arrives - never a blank frame between. */}
+        <AnimatePresence mode="popLayout" initial={false}>
+        <m.div
+          key={tab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, transition: exitOf({ duration: 0.25 }) }}
+          transition={springs.smooth}
+        >
         {tab === 'calendar' && (
           <CalendarScreen
             now={now}
@@ -305,6 +315,7 @@ function Shell() {
         )}
         {tab === 'setup' && <SetupScreen onEditCompetition={setCompetitionForm} onEditTeam={setTeamForm} />}
         </m.div>
+        </AnimatePresence>
         </PullToRefresh>
       </main>
 
@@ -326,17 +337,20 @@ function Shell() {
               )}
               <button
                 className={on ? 'tab on' : 'tab'}
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  tabMoved.current = true;
+                  setTab(t.id);
+                }}
                 aria-current={on ? 'page' : undefined}
               >
-                {on && <m.span layoutId="tab-pill" className="tab-pill" transition={springs.snappy} />}
+                {on && <Pill layoutId="tab-pill" className="tab-pill" moved={tabMoved.current} />}
                 {/* A small bounce when chosen - Apple's symbol "bounce". */}
                 <m.span
                   className="tab-icon"
                   animate={on ? { scale: [1, 1.22, 0.94, 1] } : { scale: 1 }}
                   transition={{ duration: 0.45, ease: 'easeOut' }}
                 >
-                  <t.Icon on={on} />
+                  <IconSwap off={<t.Icon />} on={<t.Icon on />} active={on} />
                 </m.span>
                 <span className="tab-label">{t.label}</span>
               </button>

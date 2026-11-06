@@ -14,7 +14,7 @@ import { TRAINING_TYPE_LABEL } from '../types';
 import { PlayerCard } from './PlayerCard';
 import { MissionBoard } from './MissionBoard';
 import { TournamentList } from './TournamentList';
-import { EmptyState, Section, StatTile } from './ui';
+import { ChipPill, EmptyState, Section, StatTile } from './ui';
 
 export function StatsScreen({
   now,
@@ -87,10 +87,12 @@ export function StatsScreen({
       {seasons.length > 1 && (
         <div className="chip-scroll" role="group" aria-label="Season">
           <button className={season === 'all' ? 'filter-chip on' : 'filter-chip'} onClick={() => setSeason('all')}>
+            {season === 'all' && <ChipPill group="stats-season" />}
             All seasons
           </button>
           {seasons.map((s) => (
             <button key={s} className={season === s ? 'filter-chip on' : 'filter-chip'} onClick={() => setSeason(s)}>
+              {season === s && <ChipPill group="stats-season" />}
               {s}
             </button>
           ))}
@@ -100,6 +102,7 @@ export function StatsScreen({
       {teams.length > 1 && (
         <div className="chip-scroll">
           <button className={teamId === 'all' ? 'filter-chip on' : 'filter-chip'} onClick={() => setTeamId('all')}>
+            {teamId === 'all' && <ChipPill group="stats-team" />}
             All teams
           </button>
           {teams.map((t) => (
@@ -109,6 +112,7 @@ export function StatsScreen({
               onClick={() => setTeamId(t.id)}
               style={teamId === t.id ? { borderColor: t.color, color: t.color } : undefined}
             >
+              {teamId === t.id && <ChipPill group="stats-team" />}
               {t.name}
             </button>
           ))}
@@ -121,6 +125,7 @@ export function StatsScreen({
             className={competitionId === 'all' ? 'filter-chip on' : 'filter-chip'}
             onClick={() => setCompetitionId('all')}
           >
+            {competitionId === 'all' && <ChipPill group="stats-competition" />}
             All competitions
           </button>
           {competitions.map((c) => (
@@ -130,6 +135,7 @@ export function StatsScreen({
               onClick={() => setCompetitionId(c.id)}
               style={competitionId === c.id ? { borderColor: c.color, color: c.color } : undefined}
             >
+              {competitionId === c.id && <ChipPill group="stats-competition" />}
               {c.name}
             </button>
           ))}

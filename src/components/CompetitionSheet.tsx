@@ -17,7 +17,7 @@ import { GroundLink } from './GroundLink';
 import { MatchCard } from './MatchCard';
 import { StandingsTable } from './StandingsTable';
 import { TableResultSheet, type TableResultTarget } from './TableResultSheet';
-import { Field, Section, Sheet, StatTile } from './ui';
+import { ChipPill, Field, Section, Sheet, StatTile } from './ui';
 
 /** Other results listed before "Show all" - a whole season's can run to dozens. */
 const RECENT_RESULTS = 5;
@@ -187,6 +187,7 @@ export function CompetitionSheet({
                   setCustom('');
                 }}
               >
+                {placing === p && <ChipPill group="placing-1" />}
                 {placingLabel(p)}
               </button>
             ))}
@@ -375,7 +376,7 @@ export function CompetitionSheet({
           </button>
         </div>
       )}
-      {shareState === 'done' && <p className="notice">Image ready — saved or shared.</p>}
+      {shareState === 'done' && <p className="notice pulse">Image ready — saved or shared.</p>}
       {shareState === 'failed' && <p className="form-error">Couldn't make the image on this device.</p>}
 
       {/* The table first: in a league it's what the page is opened for. */}
