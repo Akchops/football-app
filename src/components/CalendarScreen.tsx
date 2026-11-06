@@ -4,12 +4,14 @@ import { springs } from '../lib/motion';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import {
-  MONTH_NAMES, addMonths, countdown, formatDateLong, kickoffAt, monthGrid, startOfMonth,
+  MONTH_NAMES, addMonths, countdown, formatDateLong, formatDateShort, kickoffAt, monthGrid, startOfMonth,
   toISODate, todayISO, weekdayLabels,
 } from '../lib/date';
 import { matchesOnDate, upcomingMatches } from '../lib/stats';
 import { GroundLink } from './GroundLink';
 import { MatchCard } from './MatchCard';
+import { MenuButton } from './MenuButton';
+import { BallIcon, PasteIcon, RunIcon, TrophyIcon } from './icons';
 import { PlayerCardMini } from './PlayerCard';
 import { StarBadge } from './MissionBoard';
 import { TRAINING_TYPE_LABEL } from '../types';
@@ -104,47 +106,53 @@ export function CalendarScreen({
         <StarBadge group={profile.positionGroup} now={now} />
       </div>
 
-      <div className="cal-head">
-        <div>
-          <h1 className="cal-title">
-            {MONTH_NAMES[month]} <span>{year}</span>
-          </h1>
-          <p className="cal-sub">
-            {year} ·{' '}
-            {monthMatches.length === 0
-              ? 'no matches'
-              : `${monthMatches.length} ${monthMatches.length === 1 ? 'match' : 'matches'} · ${monthPlayed} played · ${monthUpcoming} to come`}
-          </p>
+      {/* What's next comes first - the calendar is opened to check it more than anything. */}
+      {next && (
+        <div className="next-up">
+          <div className="next-label">Next up · {countdown(kickoffAt(next.date, next.time), now)}</div>
+          <MatchCard match={next} showDate now={now} onOpen={() => onOpenMatch(next)} />
+          {/* Match day: one tap from the app to the satnav. */}
+          {next.location && <GroundLink location={next.location} className="link-btn next-ground" />}
         </div>
+      )}
+
+      <div className="cal-head">
+        <h1 className="cal-title">
+          {MONTH_NAMES[month]} <span>{year}</span>
+        </h1>
         <div className="cal-nav">
           <button className="icon-btn" onClick={() => setCursor(addMonths(cursor, -1))} aria-label="Previous month">
             ‹
-          </button>
-          <button className="ghost-btn" onClick={goToday}>
-            Today
           </button>
           <button className="icon-btn" onClick={() => setCursor(addMonths(cursor, 1))} aria-label="Next month">
             ›
           </button>
         </div>
+        <p className="cal-sub">
+          {monthMatches.length === 0
+            ? 'No matches'
+            : `${monthMatches.length} ${monthMatches.length === 1 ? 'match' : 'matches'} · ${monthPlayed} played · ${monthUpcoming} to come`}
+        </p>
       </div>
 
+      {/* One "+ Add" rather than a button for each kind, so the row fits a phone. */}
       <div className="quick-row">
-        <button className="quick-btn" onClick={() => onAddMatch(selected)}>
-          + Match
-        </button>
-        <button className="quick-btn" onClick={onAddTournament}>
-          + Tournament
-        </button>
-        <button className="quick-btn" onClick={() => onAddTraining(selected)}>
-          + Training
-        </button>
-        <button className="quick-btn" onClick={onImportFixtures}>
-          Import
+        <MenuButton
+          label="+ Add"
+          className="quick-btn"
+          items={[
+            { label: 'Match', detail: formatDateShort(selected), Icon: BallIcon, run: () => onAddMatch(selected) },
+            { label: 'Tournament', Icon: TrophyIcon, run: onAddTournament },
+            { label: 'Training', detail: formatDateShort(selected), Icon: RunIcon, run: () => onAddTraining(selected) },
+            { label: 'Import fixtures', Icon: PasteIcon, run: onImportFixtures },
+          ]}
+        />
+        <button className="quick-btn subtle" onClick={goToday}>
+          Today
         </button>
         {(teams.length > 1 || competitions.length > 1) && (
           <button
-            className="quick-btn subtle"
+            className="quick-btn subtle end"
             onClick={() =>
               updateSettings({ calendarColorBy: settings.calendarColorBy === 'team' ? 'competition' : 'team' })
             }
@@ -257,14 +265,7 @@ export function CalendarScreen({
         )}
       </div>
 
-      {next ? (
-        <div className="next-up">
-          <div className="next-label">Next up · {countdown(kickoffAt(next.date, next.time), now)}</div>
-          <MatchCard match={next} showDate now={now} onOpen={() => onOpenMatch(next)} />
-          {/* Match day: one tap from the app to the satnav. */}
-          {next.location && <GroundLink location={next.location} className="link-btn next-ground" />}
-        </div>
-      ) : matches.length === 0 ? (
+      {matches.length === 0 && (
         <EmptyState
           icon="⚽"
           title="No matches yet"
@@ -275,7 +276,7 @@ export function CalendarScreen({
             </button>
           }
         />
-      ) : null}
+      )}
     </div>
   );
 }

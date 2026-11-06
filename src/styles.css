@@ -321,9 +321,20 @@ p { margin: 0; }
 
 /* ---------- calendar ---------- */
 .cal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.cal-title { font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; }
-/* The year sits in the line under the month, so the month and the arrows share a row. */
-.cal-title span { display: none; }
+/* Month and year share one line with the arrows: never wrapped, a touch smaller
+   on a phone so "September 2026" fits at 390px, and cut short only on the narrowest. */
+.cal-title {
+  font-size: clamp(26px, 7.7vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  padding-bottom: 0.08em;
+}
+.cal-title span { font-weight: 600; color: var(--muted); }
 .cal-sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
 .cal-nav { display: flex; align-items: center; gap: 6px; flex: none; }
 
@@ -3014,6 +3025,7 @@ a.ground-link { text-decoration: none; }
   flex: none;
 }
 .quick-btn.subtle { background: var(--surface); color: var(--muted); }
+.quick-btn.end { margin-left: auto; }
 
 /* Inputs: iOS fields. */
 .input { border-color: transparent; background: var(--surface); border-radius: 12px; padding: 12px 14px; }
@@ -3042,7 +3054,6 @@ a.ground-link { text-decoration: none; }
 .filter-chip:not(.on) { box-shadow: inset 0 0 0 0.5px var(--chip-ring); }
 /* Month and arrows share the top row; the summary line gets the full width under them. */
 .cal-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; }
-.cal-head > div:first-child { display: contents; }
 .cal-head .cal-sub { grid-column: 1 / -1; grid-row: 2; }
 .cal-nav { grid-column: 2; grid-row: 1; }
 
@@ -3283,6 +3294,14 @@ a.ground-link { text-decoration: none; }
 .row-menu-item svg { font-size: 20px; }
 .row-menu-item.danger { color: var(--loss); }
 .row-menu-item:active { background: color-mix(in srgb, var(--text) 8%, transparent); }
+
+/* ---------- pull-down menus ----------
+   The context menu's look, dropped from a button; no blur behind, as on iOS. */
+.pull-menu-layer { position: fixed; inset: 0; z-index: 30; }
+.pull-menu-scrim { position: absolute; inset: 0; }
+.pull-menu .row-menu-item { text-align: left; padding-top: 6px; padding-bottom: 6px; }
+.pull-menu-text { display: flex; flex-direction: column; min-width: 0; }
+.pull-menu-detail { font-size: 13px; color: var(--muted); }
 
 /* ---------- the next-match hero ---------- */
 .hero {
