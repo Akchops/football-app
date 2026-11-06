@@ -3,6 +3,7 @@ import { useStore } from '../store/AppStore';
 import { TRAINING_LENGTHS, TRAINING_TYPE_LABEL, type TrainingSession, type TrainingType } from '../types';
 import { todayISO } from '../lib/date';
 import { DurationPicker, Field, Sheet } from './ui';
+import { useTrainingActions } from './UndoToast';
 
 export interface TrainingFormTarget {
   mode: 'create' | 'edit';
@@ -20,7 +21,8 @@ export function TrainingFormSheet({
   target: TrainingFormTarget | null;
   onClose: () => void;
 }) {
-  const { addTraining, updateTraining, deleteTraining, teams, settings } = useStore();
+  const { addTraining, updateTraining, teams, settings } = useStore();
+  const actions = useTrainingActions();
   const editing = target?.session ?? null;
 
   const [type, setType] = useState<TrainingType>('team');
@@ -160,13 +162,12 @@ export function TrainingFormSheet({
       </Field>
 
       {editing && (
+        // No "are you sure?": it goes at once, and the toast offers Undo.
         <button
           className="danger-link"
           onClick={() => {
-            if (confirm('Delete this training session?')) {
-              deleteTraining(editing.id);
-              onClose();
-            }
+            actions.remove(editing);
+            onClose();
           }}
         >
           Delete session

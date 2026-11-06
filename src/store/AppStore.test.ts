@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildMatch, buildResult, buildTournament, cleanResultPatch, reducer } from './AppStore';
 import { emptyData, live } from './storage';
+import { mergeList } from '../lib/sync';
 import { emptyResult, type AppData, type Competition, type Match, type Team, type TrainingSession } from '../types';
 
 const STAMP = '2026-01-01T00:00:00.000Z';
@@ -107,6 +108,63 @@ describe('deleting keeps a tombstone', () => {
     expect(live(after.teams).map((t) => t.id)).toEqual(['b']);
     expect(after.matches[0].teamId).toBe('b');
     expect(after.matches[0].updatedAt).toBe(STAMP);
+  });
+});
+
+/**
+ * Undo after a delete. The record has to come back on every phone, not just
+ * this one - so the undo must be the newer thing to have happened to it, even
+ * when the phone's clock hasn't ticked between the two taps.
+ */
+describe('undoing a delete', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('brings a match back exactly as it was', () => {
+    const original = match('m1', { notes: 'Bring the blue kit', status: 'played' });
+    const deleted = reducer(dataWith({ matches: [original] }), { type: 'match/delete', id: 'm1' });
+    const back = reducer(deleted, { type: 'match/undelete', id: 'm1' });
+
+    expect(live(back.matches)).toHaveLength(1);
+    const { updatedAt: _a, ...was } = original;
+    const { updatedAt: _b, ...now } = back.matches[0];
+    expect(now).toEqual(was);
+  });
+
+  it('brings a training session back', () => {
+    const deleted = reducer(dataWith({ training: [session('t1')] }), { type: 'training/delete', id: 't1' });
+    const back = reducer(deleted, { type: 'training/undelete', id: 't1' });
+
+    expect(live(back.training).map((t) => t.id)).toEqual(['t1']);
+  });
+
+  it('stamps the undo after the delete, even in the same millisecond', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T10:00:00.000Z'));
+    const deleted = reducer(dataWith({ matches: [match('m1')] }), { type: 'match/delete', id: 'm1' });
+    const back = reducer(deleted, { type: 'match/undelete', id: 'm1' });
+
+    expect(back.matches[0].updatedAt > deleted.matches[0].updatedAt).toBe(true);
+  });
+
+  it('wins over the delete the other phone already has', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T10:00:00.000Z'));
+    const deleted = reducer(dataWith({ training: [session('t1')] }), { type: 'training/delete', id: 't1' });
+    const back = reducer(deleted, { type: 'training/undelete', id: 't1' });
+
+    // This phone has the undo; the other only ever heard about the delete.
+    // Whichever way round they merge, both keep the session.
+    expect(mergeList(back.training, deleted.training)[0].deletedAt).toBeNull();
+    expect(mergeList(deleted.training, back.training)[0].deletedAt).toBeNull();
+  });
+
+  it('leaves a record that was never deleted alone', () => {
+    const before = dataWith({ matches: [match('m1')] });
+    const after = reducer(before, { type: 'match/undelete', id: 'm1' });
+
+    expect(after.matches[0]).toBe(before.matches[0]);
   });
 });
 

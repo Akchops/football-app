@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import { useStore } from '../store/AppStore';
-import type { Match } from '../types';
+import type { Match, TrainingSession } from '../types';
 import { springs } from '../lib/motion';
 
 interface Offer {
@@ -19,8 +19,8 @@ const UndoContext = createContext<UndoValue>({ offer: () => {} });
 const SHOW_MS = 5000;
 
 /**
- * Undo instead of "Are you sure?": deleting or calling off a match happens at
- * once, and a toast offers to take it back - the way Mail and Photos work.
+ * Undo instead of "Are you sure?": deleting or calling off happens at once,
+ * and a toast offers to take it back - the way Mail and Photos work.
  */
 export function UndoProvider({ children }: { children: ReactNode }) {
   const [current, setCurrent] = useState<Offer | null>(null);
@@ -71,20 +71,44 @@ export function UndoProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Deleting and calling off matches, each with an Undo that puts back exactly what was there. */
+/**
+ * The toast, for anything that wants to offer an Undo. Do the thing first,
+ * then `offer` what puts it back: a newer offer replaces an older one, as in Mail.
+ */
+export function useUndo(): UndoValue {
+  return useContext(UndoContext);
+}
+
+/**
+ * Deleting and calling off matches, each with an Undo that puts back exactly
+ * what was there. A deleted match comes back as a later edit than the delete,
+ * so the other phones in the family get it back too.
+ */
 export function useMatchActions() {
-  const { offer } = useContext(UndoContext);
-  const { deleteMatch, cancelMatch, updateMatch } = useStore();
+  const { offer } = useUndo();
+  const { deleteMatch, undeleteMatch, cancelMatch, updateMatch } = useStore();
   const name = (match: Match) => match.opponent || 'the match';
   return {
     remove(match: Match) {
       deleteMatch(match.id);
-      offer(`Deleted ${name(match)}`, () => updateMatch(match.id, { deletedAt: null }));
+      offer('Match deleted', () => undeleteMatch(match.id));
     },
     callOff(match: Match) {
       const before = { status: match.status, result: match.result, remindAfter: match.remindAfter };
       cancelMatch(match.id);
       offer(`${name(match)} called off`, () => updateMatch(match.id, before));
+    },
+  };
+}
+
+/** Deleting a training session, with the same Undo. */
+export function useTrainingActions() {
+  const { offer } = useUndo();
+  const { deleteTraining, undeleteTraining } = useStore();
+  return {
+    remove(session: TrainingSession) {
+      deleteTraining(session.id);
+      offer('Session deleted', () => undeleteTraining(session.id));
     },
   };
 }

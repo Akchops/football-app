@@ -24,9 +24,11 @@ type Action =
   | { type: 'match/add'; match: Match }
   | { type: 'match/update'; id: string; patch: Partial<Match> }
   | { type: 'match/delete'; id: string }
+  | { type: 'match/undelete'; id: string }
   | { type: 'training/add'; session: TrainingSession }
   | { type: 'training/update'; id: string; patch: Partial<TrainingSession> }
   | { type: 'training/delete'; id: string }
+  | { type: 'training/undelete'; id: string }
   | { type: 'result/add'; result: Result }
   | { type: 'result/update'; id: string; patch: Partial<Result> }
   | { type: 'result/delete'; id: string };
@@ -43,6 +45,19 @@ function touch<T extends { updatedAt: string }>(row: T): T {
 function bury<T extends { updatedAt: string; deletedAt: string | null }>(row: T): T {
   const at = new Date().toISOString();
   return { ...row, updatedAt: at, deletedAt: at };
+}
+
+/**
+ * Undo for a delete: the record comes back exactly as it was. Its edit time
+ * moves past the delete's - even on a clock that hasn't ticked since - because
+ * a delete wins a tie, and the record coming back has to be the last thing
+ * anyone did to it, on every phone.
+ */
+function unbury<T extends { updatedAt: string; deletedAt: string | null }>(row: T): T {
+  if (row.deletedAt === null) return row;
+  const buried = Date.parse(row.updatedAt);
+  const at = Number.isNaN(buried) ? Date.now() : Math.max(Date.now(), buried + 1);
+  return { ...row, updatedAt: new Date(at).toISOString(), deletedAt: null };
 }
 
 export function reducer(state: AppData, action: Action): AppData {
@@ -110,6 +125,9 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'training/delete':
       return { ...state, training: state.training.map((t) => (t.id === action.id ? bury(t) : t)) };
+
+    case 'training/undelete':
+      return { ...state, training: state.training.map((t) => (t.id === action.id ? unbury(t) : t)) };
 
     case 'competition/add':
       return { ...state, competitions: [...state.competitions, action.competition] };
@@ -179,6 +197,9 @@ export function reducer(state: AppData, action: Action): AppData {
 
     case 'match/delete':
       return { ...state, matches: state.matches.map((m) => (m.id === action.id ? bury(m) : m)) };
+
+    case 'match/undelete':
+      return { ...state, matches: state.matches.map((m) => (m.id === action.id ? unbury(m) : m)) };
 
     default:
       return state;
@@ -381,6 +402,8 @@ interface StoreValue {
   addMatch(input: NewMatchInput): Match;
   updateMatch(id: string, patch: Partial<Match>): void;
   deleteMatch(id: string): void;
+  /** Undo for deleteMatch. */
+  undeleteMatch(id: string): void;
   saveResult(id: string, result: MatchResult): void;
   clearResult(id: string): void;
   cancelMatch(id: string): void;
@@ -398,6 +421,8 @@ interface StoreValue {
   addTraining(input: NewTrainingInput): TrainingSession;
   updateTraining(id: string, patch: Partial<TrainingSession>): void;
   deleteTraining(id: string): void;
+  /** Undo for deleteTraining. */
+  undeleteTraining(id: string): void;
   addResult(input: NewResultInput): Result;
   updateResult(id: string, patch: Partial<NewResultInput>): void;
   deleteResult(id: string): void;
@@ -466,6 +491,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       deleteMatch(id) {
         dispatch({ type: 'match/delete', id });
+      },
+
+      undeleteMatch(id) {
+        dispatch({ type: 'match/undelete', id });
       },
 
       saveResult(id, result) {
@@ -550,6 +579,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       deleteTraining(id) {
         dispatch({ type: 'training/delete', id });
+      },
+
+      undeleteTraining(id) {
+        dispatch({ type: 'training/undelete', id });
       },
 
       addResult(input) {
