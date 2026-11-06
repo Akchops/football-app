@@ -178,6 +178,9 @@ p { margin: 0; }
   font-size: 17px;
   font-weight: 700;
   align-self: center;
+  /* It shares its spot with the brand - in the academy, the button that switches
+     academies - and only ever shows over it, so taps go through to that. */
+  pointer-events: none;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -488,6 +491,11 @@ p { margin: 0; }
   scrollbar-width: none;
 }
 .chip-scroll::-webkit-scrollbar { display: none; }
+/* With a mouse there's no swiping a row sideways, and the scrollbar is hidden,
+   so the chips past the edge could never be reached: wrap them instead. */
+@media (hover: hover) and (pointer: fine) {
+  .chip-scroll { flex-wrap: wrap; overflow-x: visible; }
+}
 
 .filter-chip {
   background: var(--surface);
@@ -3005,6 +3013,10 @@ a.ground-link { text-decoration: none; }
 .filter-chip.on { background: var(--text); color: var(--bg-elev); border-color: transparent; }
 .quick-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 2px 16px 4px; }
 .quick-row::-webkit-scrollbar { display: none; }
+/* A row to swipe on a phone; with a mouse, swiping isn't there, so it wraps. */
+@media (hover: hover) and (pointer: fine) {
+  .quick-row { flex-wrap: wrap; overflow-x: visible; }
+}
 .quick-btn {
   border: 0;
   background: color-mix(in srgb, var(--accent) 12%, transparent);

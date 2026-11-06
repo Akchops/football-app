@@ -20,6 +20,10 @@ training - is kept only in this browser on this device. We never see it.
 Match photos and videos are always kept only on the phone they were added on,
 signed in or not.
 
+There are no analytics, ads, trackers or session recordings in Matchday, and
+its fonts are part of the app rather than fetched from Google or anyone else,
+so opening it tells no third party you visited.
+
 ## The AI coach and importing fixtures
 
 If you use the Coach tab, or import fixtures from a picture, the frames or
@@ -32,6 +36,10 @@ use the rest of the app without these features.
 
 Signing in is optional. If you do:
 
+- **An age check comes first.** Whoever signs in is asked the month and year
+  they were born. It is used there and then and never stored or sent. The
+  account keeps only whether it was made by someone 13 or over, or by a parent
+  or guardian who agreed to it, and when.
 - **Your email address** is used only to send sign-in codes. Nobody else in the
   app sees it - family members you invite see the addresses in the household,
   and that is all. Academies and other players only ever see a **username**
@@ -90,11 +98,27 @@ squads, competitions and team picks from the app at any time.
 
 ## Children
 
-Matchday is used by and for young players. A player under 13 needs a parent or
-guardian to set up any sharing, and only a parent or guardian, or a player of
-13 or over, can agree to an academy seeing their records. [Review against the
-ICO Children's code: high privacy by default, no nudges to share more, clear
-explanations for children.]
+Matchday is used by and for young players. Without an account it collects
+nothing, at any age. Making an account is where it starts to count:
+
+- **Signing in asks the person's age first** (month and year, not kept). Under
+  13s are not let through. They are asked to get a parent or guardian, and
+  picking an older year doesn't get round it: the answer stands for the rest of
+  the visit. The app keeps working on the phone; it just doesn't share.
+- **A parent or guardian** signs in with their own email, says they are 18 or
+  over, and ticks that they agree to the child's records being kept with the
+  account. The same applies when the profile on the phone shows the player is
+  under 13: an adult signing in is asked to agree as their parent, and a
+  teenager can't sign in with a younger child's records.
+- **Academies** see a player's records only after the family ticks "I'm 13 or
+  over, or I'm this player's parent or guardian", and the family can stop it at
+  any time.
+- A parent or guardian can ask for anything we hold about their child to be
+  deleted (see Keeping and deleting). If we find an account was made for a
+  child under 13 without a parent's agreement, we delete it.
+
+[Review against the ICO Children's code and, for US users, COPPA: high privacy
+by default, no nudges to share more, clear explanations for children.]
 
 ## Your rights
 

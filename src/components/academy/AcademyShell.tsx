@@ -323,6 +323,7 @@ function SignInGate({ hasPlayer, onLeave }: { hasPlayer: boolean; onLeave: () =>
       <Section title="Sign in to start">
         <SignInForm
           intro={false}
+          purpose="academy"
           footnote="Your email is only for signing in. Staff and players see a username you pick next, never your email."
         />
       </Section>

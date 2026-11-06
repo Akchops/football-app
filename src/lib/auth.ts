@@ -1,4 +1,5 @@
 import { authSettings, configured, returnAddress, supabase } from './supabase';
+import { holdAgeRecord, takeHeldAgeRecord, type AgeRecord } from './ageCheck';
 
 /** Somebody signed in. Not the player - the person holding the phone. */
 export interface Account {
@@ -16,7 +17,7 @@ export function accountsAvailable(): boolean {
 interface RawUser {
   id: string;
   email?: string | null;
-  user_metadata?: { full_name?: string; name?: string } | null;
+  user_metadata?: { full_name?: string; name?: string; signed_in_by?: string } | null;
 }
 
 function toAccount(user: RawUser | null | undefined): Account | null {
@@ -49,10 +50,12 @@ export async function currentAccount(): Promise<Account | null> {
  * page and comes back finishes in Safari instead, and the app itself never
  * becomes signed in. The first code to an address makes the account.
  */
-export async function sendCode(email: string): Promise<void> {
+export async function sendCode(email: string, age?: AgeRecord): Promise<void> {
+  if (age) holdAgeRecord(age);
   const { error } = await (await supabase()).auth.signInWithOtp({
     email: email.trim(),
-    options: { shouldCreateUser: true, emailRedirectTo: returnAddress() },
+    // `data` is kept on an account only when this code makes it - how its age check was passed.
+    options: { shouldCreateUser: true, emailRedirectTo: returnAddress(), ...(age ? { data: age } : {}) },
   });
   if (error) throw new Error(describeAuthError(error.message));
 }
@@ -75,7 +78,9 @@ export async function googleAvailable(): Promise<boolean> {
  * Hands off to Google and comes back to the app. Apple would be one more line
  * here, but it needs a paid Apple developer account, so it is not wired up yet.
  */
-export async function signInWithGoogle(): Promise<void> {
+export async function signInWithGoogle(age?: AgeRecord): Promise<void> {
+  // Google can't carry it, so it waits here for the trip back - see onAccountChange.
+  if (age) holdAgeRecord(age);
   const { error } = await (await supabase()).auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: returnAddress() },
@@ -105,7 +110,15 @@ export function onAccountChange(listener: (account: Account | null) => void): ()
   void supabase()
     .then((client) => {
       const { data } = client.auth.onAuthStateChange((_event, session) => {
-        listener(toAccount(session?.user));
+        const user = session?.user as RawUser | undefined;
+        // An account made through Google, or before the age check existed, is told
+        // how it was passed the first time it signs in through it. Not awaited:
+        // supabase-js calls this inside its own lock, and updateUser needs the lock.
+        const age = user ? takeHeldAgeRecord() : null;
+        if (user && age && !user.user_metadata?.signed_in_by) {
+          setTimeout(() => void client.auth.updateUser({ data: age }).catch(() => holdAgeRecord(age)), 0);
+        }
+        listener(toAccount(user));
       });
       // Unsubscribed before the client finished loading.
       if (dropped) data.subscription.unsubscribe();

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { describeAuthError, googleAvailable, sendCode, signInWithGoogle, verifyCode } from '../lib/auth';
+import { ADULT_AGE, MIN_AGE, ageFromBirthMonth, rememberUnder13, rememberedUnder13, type AgeRecord } from '../lib/ageCheck';
+import { MONTH_NAMES, ageOn } from '../lib/date';
+import { useStore } from '../store/AppStore';
 import type { Invite, Person, SentInvite } from '../lib/syncEngine';
 import { useSync, type SyncValue } from '../store/SyncProvider';
 import { Field, Section } from './ui';
@@ -30,14 +33,57 @@ function message(e: unknown): string {
   return describeAuthError(e instanceof Error ? e.message : String(e));
 }
 
-/** Email, then code. Used in Setup, on the first setup screen for joining, and to open the academy area. */
+/** Years a birth year can be picked from, newest first. */
+const BIRTH_YEARS = Array.from({ length: 101 }, (_, i) => new Date().getFullYear() - i);
+
+/**
+ * Age, then email, then code. Used in Setup, on the first setup screen for
+ * joining, and to open the academy area. The age comes first because making
+ * an account is when a player's records start leaving the phone - see
+ * lib/ageCheck.ts.
+ */
 export function SignInForm({
   intro = true,
   footnote = 'Nothing leaves this phone until you sign in, and the app works exactly as it does now if you never do.',
+  purpose = 'family',
 }: {
   intro?: boolean;
   footnote?: string;
+  /** Sharing a player's records with the family, or the academy area, which is for staff. */
+  purpose?: 'family' | 'academy';
 }) {
+  const { profile } = useStore();
+  const [month, setMonth] = useState('');
+  const [year, setYear] = useState('');
+  // An adult signing in on a younger player's phone: a parent for sharing, staff for the academy.
+  const [adult, setAdult] = useState(false);
+  const [consent, setConsent] = useState(false);
+  const [under13, setUnder13] = useState(() => rememberedUnder13());
+  const age = month && year ? ageFromBirthMonth(Number(month), Number(year)) : null;
+  const who = profile.name.trim() || 'the player';
+  // Sharing sends this phone's player's records, so their age counts too, when the profile has it.
+  const playerAge = purpose === 'family' && profile.dateOfBirth ? ageOn(profile.dateOfBirth, new Date()) : null;
+  const playerUnder13 = playerAge !== null && playerAge < MIN_AGE;
+  // A teenager can't sign in with a younger child's records; an adult who does is taken as their parent.
+  const needsParent = playerUnder13 && !adult && age !== null && age >= MIN_AGE && age < ADULT_AGE;
+  const forChild = purpose === 'family' && (adult || (playerUnder13 && age !== null && age >= ADULT_AGE));
+
+  useEffect(() => {
+    if (!adult && age !== null && age < MIN_AGE) {
+      rememberUnder13();
+      setUnder13(true);
+    }
+  }, [age, adult]);
+
+  const ageOk =
+    age !== null &&
+    (forChild
+      ? age >= ADULT_AGE && consent
+      : adult
+        ? age >= ADULT_AGE
+        : !under13 && !needsParent && age >= MIN_AGE);
+  const ageRecord = (): AgeRecord => ({ signed_in_by: forChild ? 'parent' : 'self', checked_at: new Date().toISOString() });
+
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [stage, setStage] = useState<'email' | 'code'>('email');
@@ -67,7 +113,7 @@ export function SignInForm({
 
   const send = () =>
     run(async () => {
-      await sendCode(email);
+      await sendCode(email, ageRecord());
       setCode('');
       setStage('code');
     });
@@ -84,23 +130,98 @@ export function SignInForm({
             Optional. Sign in and everyone in the family sees the same calendar - add a training session on one phone
             and it turns up on the others. A lost or wiped phone stops meaning a lost season.
           </p>)}
-          <Field label="Your email">
-            <input
-              className="input"
-              type="email"
-              autoComplete="email"
-              inputMode="email"
-              placeholder="you@gmail.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && email.includes('@') && !busy && void send()}
-            />
-          </Field>
-          <div className="button-row">
-            <button className="primary-btn" disabled={busy || !email.includes('@')} onClick={() => void send()}>
-              {busy ? 'Sending…' : 'Email me a code'}
-            </button>
-          </div>
+          {under13 && !adult ? (
+            <div className="detail-block" role="status">
+              <p>
+                {purpose === 'academy'
+                  ? "The academy area is for coaches and staff. Players join their academy from their own Matchday - with a parent or guardian if they're under 13."
+                  : "You'll need a parent or guardian for this. Ask them to sign in here with their own email. Matchday keeps working on this phone in the meantime - it just doesn't share."}
+              </p>
+              <div className="button-row">
+                <button
+                  className="ghost-btn"
+                  onClick={() => {
+                    setAdult(true);
+                    setMonth('');
+                    setYear('');
+                  }}
+                >
+                  {purpose === 'academy' ? 'An adult is signing in' : "I'm their parent or guardian"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {adult && (
+                <p className="notice">
+                  {forChild
+                    ? `Signing in as ${who}'s parent or guardian - put in your own details.`
+                    : 'Signing in as an adult - put in your own details.'}
+                </p>
+              )}
+              <Field group label="When were you born?" hint="Month and year. It isn't kept.">
+                <div className="row two">
+                  <select className="input" aria-label="Month you were born" value={month} onChange={(e) => setMonth(e.target.value)}>
+                    <option value="">Month</option>
+                    {MONTH_NAMES.map((name, i) => (
+                      <option key={name} value={i + 1}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  <select className="input" aria-label="Year you were born" value={year} onChange={(e) => setYear(e.target.value)}>
+                    <option value="">Year</option>
+                    {BIRTH_YEARS.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </Field>
+              {needsParent && (
+                <p className="form-error">
+                  {who} is under 13, going by the date of birth in this profile, so a parent or guardian needs to sign
+                  in here with their own email.
+                </p>
+              )}
+              {adult && age !== null && age < ADULT_AGE && (
+                <p className="form-error">
+                  {forChild ? 'A parent or guardian signing in needs to be 18 or over.' : 'Whoever signs in here needs to be 18 or over.'}
+                </p>
+              )}
+              {forChild && (
+                <label className="toggle-row consent">
+                  <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+                  <span>
+                    I&apos;m {who}&apos;s parent or guardian, and I agree to their football records - profile, matches, stats
+                    and training - being kept with this account so the family&apos;s phones stay in step.
+                  </span>
+                </label>
+              )}
+            </>
+          )}
+          {ageOk && (
+            <>
+              <Field label="Your email">
+                <input
+                  className="input"
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="you@gmail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && email.includes('@') && !busy && void send()}
+                />
+              </Field>
+              <div className="button-row">
+                <button className="primary-btn" disabled={busy || !email.includes('@')} onClick={() => void send()}>
+                  {busy ? 'Sending…' : 'Email me a code'}
+                </button>
+              </div>
+            </>
+          )}
         </>
       ) : (
         <>
@@ -134,10 +255,10 @@ export function SignInForm({
         </>
       )}
 
-      {google && stage === 'email' && (
+      {google && stage === 'email' && ageOk && (
         <>
           <div className="button-row">
-            <button className="ghost-btn" disabled={busy} onClick={() => void run(signInWithGoogle)}>
+            <button className="ghost-btn" disabled={busy} onClick={() => void run(() => signInWithGoogle(ageRecord()))}>
               Continue with Google
             </button>
           </div>

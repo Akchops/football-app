@@ -237,6 +237,16 @@ is, none of this shows.
 and everyone sees the same calendar - a change on one phone turns up on the
 others. Match photos and clips stay on the phone they're on.
 
+**Age check.** Signing in starts by asking the month and year the person was
+born, without hinting at the cutoff. Under 13s are sent to a parent or
+guardian, and the answer sticks for the visit, so picking an older year doesn't
+get round it. A parent signs in with their own email, must be 18 or over, and
+ticks their agreement to the child's records being kept. The same tick is asked
+of any adult signing in on a phone whose player is under 13. The birth date is
+never stored or sent: the account only gets `signed_in_by` (`self` or
+`parent`) and `checked_at` in its user metadata. The academy sign-in asks too,
+and points under 13s back to their own Matchday.
+
 **Academies.** A club or academy runs its side of things in one place, on a
 phone or a laptop:
 - **Staff and roles** - owner, manager, coach, and an office admin role that
@@ -264,7 +274,15 @@ enter other teams' results and the table, with your team marked, follows.
 Before real families and academies use accounts, the drafts in
 [docs/privacy.md](docs/privacy.md) and [docs/terms.md](docs/terms.md) need
 reviewing - it is children's data - and publishing where the app can link to
-them.
+them. Two more things only the owner can do:
+- **Copyright agent.** Users can upload photos, logos and documents, so to keep
+  the US "safe harbour" against copyright claims, register a designated agent
+  with the US Copyright Office (copyright.gov/dmca-directory - $6, renewed every
+  three years) and put the same contact in the terms' "Copyright complaints"
+  section. In the UK, acting promptly on a complaint is what protects a host.
+- **Emails.** Matchday only sends sign-in codes, which are transactional, so
+  the unsubscribe and postal-address rules for marketing email don't apply. Any
+  newsletter or launch email later needs both, plus an opt-in for UK users.
 
 ## The match score
 
