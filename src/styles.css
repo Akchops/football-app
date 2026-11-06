@@ -979,6 +979,11 @@ select.input {
   line-height: 1;
   display: grid;
   place-items: center;
+  /* Held down to count quickly: no text selection or callout, and the page can still scroll from here. */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .stepper-number { min-width: 28px; text-align: center; font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1; }
 .stepper.accent { justify-content: center; padding: 6px; }

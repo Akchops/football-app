@@ -1,8 +1,12 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect, useId, useLayoutEffect, useRef, useState,
+  type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, animate, m, useDragControls, useMotionValue, useTransform, type PanInfo } from 'motion/react';
 import { prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
 import { sheetBackStack } from '../lib/backStack';
+import { createHold } from '../lib/hold';
 import {
   BallIcon, CalendarIcon, ChartIcon, ChevronIcon, MediaIcon, NoEntryIcon, PencilIcon, RunIcon, ShieldIcon, ShirtIcon, TrophyIcon,
 } from './icons';
@@ -353,20 +357,57 @@ export function Stepper({
   accent?: boolean;
 }) {
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  // A hold steps between renders, so it reads the number as it is now, not as it was when the finger went down.
+  const latest = useRef({ value, onChange, clamp });
+  latest.current = { value, onChange, clamp };
+  const by = (delta: number) => () => {
+    const { value: from, onChange: change, clamp: fit } = latest.current;
+    const next = fit(from + delta);
+    if (next === from) return false;
+    latest.current = { ...latest.current, value: next };
+    change(next);
+    return fit(next + delta) !== next;
+  };
+  const down = useHoldToRepeat(by(-step));
+  const up = useHoldToRepeat(by(step));
   return (
     <div className={accent ? 'stepper accent' : 'stepper'}>
       <span className="stepper-label">{label}</span>
       <div className="stepper-controls">
-        <button type="button" onClick={() => onChange(clamp(value - step))} aria-label={`Decrease ${label}`}>
+        <button type="button" {...down} aria-label={`Decrease ${label}`}>
           −
         </button>
         <RollingNumber value={value} className="stepper-number" />
-        <button type="button" onClick={() => onChange(clamp(value + step))} aria-label={`Increase ${label}`}>
+        <button type="button" {...up} aria-label={`Increase ${label}`}>
           +
         </button>
       </div>
     </div>
   );
+}
+
+/** Tap for one step, hold to keep going (see lib/hold). Spread onto the button. */
+function useHoldToRepeat(step: () => boolean) {
+  const latest = useRef(step);
+  latest.current = step;
+  const [hold] = useState(() => createHold(() => latest.current()));
+  useEffect(() => () => hold.release(), [hold]);
+  return {
+    onPointerDown(e: ReactPointerEvent<HTMLButtonElement>) {
+      if (e.button !== 0) return;
+      // A finger is held to the button it landed on until it lifts; let it go,
+      // so sliding off the button counts as leaving it.
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+      hold.press();
+    },
+    onPointerUp: hold.release,
+    onPointerLeave: hold.release,
+    onPointerCancel: hold.release,
+    // A click from the keyboard has no press before it, and says so with detail 0.
+    onClick: (e: ReactMouseEvent) => hold.click(e.detail === 0),
+    // A long press would otherwise bring up the phone's own menu.
+    onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
+  };
 }
 
 /** Emoji the screens already pass in, drawn as the app's own symbols instead. */
