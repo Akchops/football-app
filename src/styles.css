@@ -193,6 +193,8 @@ p { margin: 0; }
 }
 
 .brand-mark { font-size: 20px; line-height: 0; color: var(--accent); }
+/* Matchday's own mark is a picture, not a symbol in the accent colour. */
+.brand-mark .logo { width: 24px; height: 24px; }
 /* On a narrow phone with every pill showing, the name gives way before the buttons do. */
 .topbar > .brand { min-width: 0; }
 .topbar > .brand > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1129,7 +1131,8 @@ select.input {
 }
 
 .onboard-top { padding: calc(var(--safe-top) + 16px) 20px 8px; }
-.onboard-brand { font-weight: 800; letter-spacing: -0.02em; font-size: 15px; color: var(--accent); }
+.onboard-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: -0.02em; font-size: 15px; color: var(--accent); }
+.onboard-brand .logo { width: 24px; height: 24px; flex: none; }
 
 .onboard-steps { display: flex; gap: 6px; margin-top: 12px; }
 .ostep {
