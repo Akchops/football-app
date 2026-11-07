@@ -109,7 +109,6 @@ export interface Stats extends Record_ {
   yellowCards: number;
   redCards: number;
   motm: number;
-  averageRating: number | null;
   goalsPerMatch: number;
   minutesPerGoalContribution: number | null;
   /** Average performance score out of 100 across matches played. */
@@ -158,8 +157,6 @@ export function computeStats(matches: Match[]): Stats {
   let yellowCards = 0;
   let redCards = 0;
   let motm = 0;
-  let ratingSum = 0;
-  let ratingCount = 0;
   let scoreSum = 0;
   let scoreCount = 0;
   const totals: MetricTotals = {};
@@ -185,10 +182,6 @@ export function computeStats(matches: Match[]): Stats {
       redCards += r.redCards;
       if (r.goalsAgainst === 0) cleanSheetsPlayed += 1;
       if (r.motm) motm += 1;
-      if (r.rating !== null) {
-        ratingSum += r.rating;
-        ratingCount += 1;
-      }
       scoreSum += matchScore(r, match.durationMinutes).score;
       scoreCount += 1;
     }
@@ -241,7 +234,6 @@ export function computeStats(matches: Match[]): Stats {
     yellowCards,
     redCards,
     motm,
-    averageRating: ratingCount ? ratingSum / ratingCount : null,
     goalsPerMatch: appearances ? goals / appearances : 0,
     minutesPerGoalContribution: contributions ? minutes / contributions : null,
     averageScore: scoreCount ? scoreSum / scoreCount : null,

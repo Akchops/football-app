@@ -118,7 +118,6 @@ export function ResultSheet({
           didPlay: false,
           minutes: 0,
           motm: false,
-          rating: null,
           yellowCards: 0,
           redCards: 0,
           metrics: {},
@@ -130,7 +129,6 @@ export function ResultSheet({
           penaltiesAgainst: showPens && isDraw ? result.penaltiesAgainst ?? 0 : null,
           minutes: result.didPlay ? result.minutes : 0,
           motm: result.didPlay ? result.motm : false,
-          rating: result.didPlay ? result.rating : null,
           yellowCards: result.didPlay ? result.yellowCards : 0,
           redCards: result.didPlay ? result.redCards : 0,
           metrics: result.didPlay ? pruneMetrics(result.metrics) : {},
@@ -216,69 +214,6 @@ export function ResultSheet({
               <span>Match rating out of 100, updates as you type</span>
             </span>
           </div>
-
-          <Disclosure
-            label="More detail"
-            detail="Minutes, cards, your own rating"
-            open={showDetail}
-            onToggle={() => setShowDetail((s) => !s)}
-          >
-            <div className="detail-block">
-              {secondary.length > 0 && (
-                <div className="stat-steppers">
-                  {secondary.map((m) => (
-                    <Stepper
-                      key={m.id}
-                      label={m.label}
-                      value={result.metrics[m.id] ?? 0}
-                      onChange={(v) => setMetric(m.id, v)}
-                      max={m.max}
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div className="stat-steppers">
-                <Stepper
-                  label={`Minutes (of ${duration})`}
-                  value={result.minutes}
-                  onChange={(v) => patch({ minutes: v })}
-                  max={Math.round(duration * 1.5)}
-                  step={5}
-                />
-                <Stepper label="Yellows" value={result.yellowCards} onChange={(v) => patch({ yellowCards: v })} max={2} />
-                <Stepper label="Reds" value={result.redCards} onChange={(v) => patch({ redCards: v })} max={1} />
-              </div>
-
-              <div className="row two">
-                <Field label="Position">
-                  <select
-                    className="input"
-                    value={result.position}
-                    onChange={(e) => patch({ position: e.target.value, positionGroup: groupForPosition(e.target.value) })}
-                  >
-                    {ALL_POSITIONS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Your rating" hint="Out of 10">
-                  <input
-                    className="input"
-                    type="number"
-                    min={1}
-                    max={10}
-                    step={0.5}
-                    value={result.rating ?? ''}
-                    placeholder="-"
-                    onChange={(e) => patch({ rating: e.target.value === '' ? null : Number(e.target.value) })}
-                  />
-                </Field>
-              </div>
-            </div>
-          </Disclosure>
         </>
       )}
 
@@ -292,8 +227,59 @@ export function ResultSheet({
         />
       </Field>
 
-      {/* On the main page, not tucked away: a match that never happened is common
-          enough to need one obvious tap. */}
+      {/* The extras sit at the bottom, together: minutes and cards, then the rarer
+          match-level settings. */}
+      {result.didPlay && !walkover && (
+        <Disclosure
+          label="More detail"
+          detail="Minutes played, yellow and red cards"
+          open={showDetail}
+          onToggle={() => setShowDetail((s) => !s)}
+        >
+          <div className="detail-block">
+            <div className="stat-steppers">
+              <Stepper
+                label={`Minutes (of ${duration})`}
+                value={result.minutes}
+                onChange={(v) => patch({ minutes: v })}
+                max={Math.round(duration * 1.5)}
+                step={5}
+              />
+              <Stepper label="Yellows" value={result.yellowCards} onChange={(v) => patch({ yellowCards: v })} max={2} />
+              <Stepper label="Reds" value={result.redCards} onChange={(v) => patch({ redCards: v })} max={1} />
+            </div>
+
+            {secondary.length > 0 && (
+              <div className="stat-steppers">
+                {secondary.map((m) => (
+                  <Stepper
+                    key={m.id}
+                    label={m.label}
+                    value={result.metrics[m.id] ?? 0}
+                    onChange={(v) => setMetric(m.id, v)}
+                    max={m.max}
+                  />
+                ))}
+              </div>
+            )}
+
+            <Field label="Position">
+              <select
+                className="input"
+                value={result.position}
+                onChange={(e) => patch({ position: e.target.value, positionGroup: groupForPosition(e.target.value) })}
+              >
+                {ALL_POSITIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </Disclosure>
+      )}
+
       <Disclosure
         label="Extra settings"
         detail={extraSummary.length > 0 ? extraSummary.join(' · ') : 'Walkover, man of the match, penalties'}

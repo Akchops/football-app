@@ -175,8 +175,6 @@ export interface MatchResult {
   position: string;
   /** Stat set used for this match - a keeper who plays outfield once is recorded as such. */
   positionGroup: PositionGroup;
-  /** Self rating out of 10, or null when not rated. */
-  rating: number | null;
   motm: boolean;
   yellowCards: number;
   redCards: number;
@@ -381,7 +379,6 @@ export function emptyResult(position: string, group?: PositionGroup, durationMin
     minutes: durationMinutes,
     position,
     positionGroup: group ?? groupForPosition(position),
-    rating: null,
     motm: false,
     yellowCards: 0,
     redCards: 0,

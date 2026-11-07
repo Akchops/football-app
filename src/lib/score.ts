@@ -138,13 +138,7 @@ export function matchScore(result: MatchResult, durationMinutes = DEFAULT_MATCH_
   const substantial = fullMatch * (2 / 3);
   const minutes = Math.max(0, Math.min(fullMatch * 1.5, result.minutes));
   const weight = minutes >= substantial ? 1 : Math.max(0.45, minutes / substantial);
-  let score = BASE + (positionPoints + resultPoints + discipline + motm) * weight;
-
-  // Blend in a self rating when one was given - they watched the game, the app didn't.
-  if (result.rating !== null) {
-    score = score * 0.7 + result.rating * 10 * 0.3;
-    breakdown.push({ label: `Your rating ${result.rating}/10`, points: 0 });
-  }
+  const score = BASE + (positionPoints + resultPoints + discipline + motm) * weight;
 
   return {
     score: Math.max(1, Math.min(100, Math.round(score))),

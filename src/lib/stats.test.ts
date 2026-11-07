@@ -135,8 +135,8 @@ describe('upcomingMatches', () => {
 
 describe('computeStats', () => {
   const list = [
-    played(2, 1, { date: '2026-04-01', metrics: { goals: 1, assists: 1 }, rating: 8, motm: true }),
-    played(0, 3, { date: '2026-04-08', minutes: 65, rating: 5 }),
+    played(2, 1, { date: '2026-04-01', metrics: { goals: 1, assists: 1 }, motm: true }),
+    played(0, 3, { date: '2026-04-08', minutes: 65 }),
     played(1, 1, { date: '2026-04-15', penaltiesFor: 4, penaltiesAgainst: 3, metrics: { assists: 1 } }),
     played(3, 0, { date: '2026-04-22', metrics: { goals: 2 }, venue: 'away' }),
     match({ date: '2026-05-01' }), // still scheduled - must not count
@@ -168,7 +168,6 @@ describe('computeStats', () => {
     expect(stats.assists).toBe(2);
     expect(stats.contributions).toBe(5);
     expect(stats.appearances).toBe(4);
-    expect(stats.averageRating).toBeCloseTo(6.5);
   });
 
   it('excludes matches you sat out from personal totals but not the team record', () => {
@@ -195,7 +194,6 @@ describe('computeStats', () => {
     const empty = computeStats([]);
     expect(empty.played).toBe(0);
     expect(empty.winRate).toBe(0);
-    expect(empty.averageRating).toBeNull();
     expect(empty.streak).toBeNull();
     expect(empty.form).toEqual([]);
   });

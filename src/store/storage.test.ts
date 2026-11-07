@@ -84,7 +84,8 @@ describe('parseData', () => {
     expect(result?.metrics).toEqual({ goals: 1, assists: 2 });
     expect(result?.positionGroup).toBe('goalkeeper');
     expect(result?.goalsFor).toBe(2);
-    expect(result?.rating).toBe(8);
+    // An old self-rating in a backup is dropped, not carried over.
+    expect(result).not.toHaveProperty('rating');
   });
 
   it('gives matches from before match lengths existed the standard 90', () => {

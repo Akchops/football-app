@@ -220,7 +220,7 @@ everything on the one phone.)
   keepers — it isn't their job)
 - **Your game**: average match score, plus your last five performances out of
   100 as a trend, then the six stats that matter for your position
-- Minutes, discipline, self-rating
+- Minutes and discipline
 - **Personal bests**: most saves in a match, longest clean sheet run, longest
   unbeaten run, best match score — each showing where it happened
 - **Tournaments**: every tournament you've played in, with how far you got, its
@@ -296,7 +296,6 @@ played, so the same stat line scores differently for a keeper and a striker.
   defeat still rates well
 - Discipline: yellow −3, red −12. Man of the match +5
 - A short cameo swings the score less than a full 90
-- If you gave yourself a rating out of 10, it's blended in at 30%
 
 The breakdown is always visible on the match, so the number is never a black box.
 

@@ -54,7 +54,6 @@ function migrateResult(raw: MatchResult | null): MatchResult | null {
     minutes: raw.minutes ?? 90,
     position,
     positionGroup: legacy.positionGroup ?? groupForPosition(position),
-    rating: raw.rating ?? null,
     motm: raw.motm ?? false,
     yellowCards: raw.yellowCards ?? 0,
     redCards: raw.redCards ?? 0,
