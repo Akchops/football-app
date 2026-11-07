@@ -1,5 +1,6 @@
 import type { AppMode } from '../store/AcademyProvider';
 import { BallIcon, ShieldIcon } from './icons';
+import { Logo } from './Logo';
 
 /**
  * The very first question on a new phone, once academies exist: one player's
@@ -9,7 +10,10 @@ export function WhoIsThisFor({ onPick }: { onPick: (mode: AppMode) => void }) {
   return (
     <div className="onboarding">
       <div className="onboard-top">
-        <div className="onboard-brand">Matchday</div>
+        <div className="onboard-brand">
+          <Logo />
+          Matchday
+        </div>
       </div>
       <div className="onboard-body">
         <h1>Who&apos;s this for?</h1>

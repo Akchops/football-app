@@ -48,6 +48,7 @@ import { PullToRefresh } from './components/PullToRefresh';
 import { UndoProvider } from './components/UndoToast';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { BallIcon, CalendarIcon, ChartIcon, CoachIcon, GearIcon, PasteIcon, RunIcon, ShieldIcon, TrophyIcon } from './components/icons';
+import { Logo } from './components/Logo';
 
 type Tab = 'calendar' | 'matches' | 'media' | 'coach' | 'stats' | 'setup';
 
@@ -220,7 +221,7 @@ function Shell() {
         <div className="topbar-titles">
           <m.div className="brand" style={{ opacity: brandFade }}>
             <span className="brand-mark">
-              <BallIcon />
+              <Logo />
             </span>
             <span>Matchday</span>
           </m.div>

@@ -9,6 +9,7 @@ import { Field, Spinner } from './ui';
 import { accountsAvailable } from '../lib/auth';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard, SignInForm } from './AccountSettings';
+import { Logo } from './Logo';
 
 interface DraftTeam {
   name: string;
@@ -99,7 +100,10 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
   return (
     <div className="onboarding">
       <div className="onboard-top">
-        <div className="onboard-brand">Matchday</div>
+        <div className="onboard-brand">
+          <Logo />
+          Matchday
+        </div>
         <div className="onboard-steps">
           {STEPS.map((label, i) => (
             <span key={label} className={i === step ? 'ostep on' : i < step ? 'ostep done' : 'ostep'}>

@@ -1,10 +1,11 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
-import { m, useScroll, useTransform } from 'motion/react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, m, useScroll, useTransform } from 'motion/react';
 import { ROLE_LABEL, VERIFICATION_LABEL, can, type StaffRole } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { SignInForm } from '../AccountSettings';
-import { BallIcon, ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon } from '../icons';
+import { ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon } from '../icons';
 import { BusyLabel, Section, Sheet, Waiting } from '../ui';
 import { AcademyHomeSkeleton } from '../Skeletons';
 import { AddButton, type AddItem } from '../AddButton';
@@ -96,8 +97,31 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   }, [tab, current?.id, academy.creating]);
 
   // Leaving the academy area: to the player's app if there is one, or back to
-  // the first question if this phone has only ever been the academy's.
-  const leaveArea = () => academy.setMode(hasPlayer ? 'player' : null);
+  // the first question if this phone has only ever been the academy's - so
+  // someone who tapped "An academy" by accident is never stuck in here.
+  const [confirmExit, setConfirmExit] = useState(false);
+  const exitArea = () => {
+    setConfirmExit(false);
+    academy.setCreating(false);
+    academy.setReviewing(false);
+    academy.setMode(hasPlayer ? 'player' : null);
+  };
+
+  // Leaving or deleting the last academy closes the area too, rather than
+  // landing on "join or set one up". Only on going from some to none: someone
+  // new, with no academy yet, stays to make one.
+  const who = sync.account?.id ?? null;
+  const count = academy.loaded ? academy.academies.length : null;
+  const lastCount = useRef<{ who: string | null; count: number } | null>(null);
+  useEffect(() => {
+    if (count === null) return;
+    const before = lastCount.current;
+    lastCount.current = { who, count };
+    // A different person signing in on this phone isn't anyone leaving.
+    if (before && before.who === who && before.count > 0 && count === 0) exitArea();
+    // exitArea only reads values that are current when the count changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count, who]);
 
   let gate: ReactNode = null;
   if (!sync.account) {
@@ -105,7 +129,7 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
       sync.status === 'checking' ? (
         academySaved() ? <AcademyHomeSkeleton /> : <Opening text="Opening…" />
       ) : (
-        <SignInGate hasPlayer={hasPlayer} onLeave={leaveArea} />
+        <SignInGate />
       );
   } else if (!academy.loaded) {
     gate =
@@ -143,6 +167,12 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
     <div className={current && !gate ? 'app academy-app with-nav' : 'app academy-app'}>
       <header className="topbar">
         <m.div className="topbar-glass" style={{ opacity: barGlass }} aria-hidden="true" />
+        <button className="academy-exit" onClick={() => setConfirmExit(true)}>
+          <span className="back-chevron" aria-hidden="true">
+            <ChevronIcon />
+          </span>
+          Exit academy
+        </button>
         <div className="topbar-titles">
           {current && !gate ? (
             <m.div style={{ opacity: brandFade }}>
@@ -174,11 +204,6 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
           )}
         </div>
         <div className="topbar-actions">
-          {hasPlayer && (
-            <button className="topbar-btn" onClick={() => academy.setMode('player')} aria-label="My matches">
-              <BallIcon />
-            </button>
-          )}
           {current && !gate && (
             <button
               className={tab === 'settings' ? 'topbar-btn on' : 'topbar-btn'}
@@ -241,6 +266,8 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
           })}
         </nav>
       )}
+
+      <ExitConfirm open={confirmExit} onStay={() => setConfirmExit(false)} onExit={exitArea} />
 
       <Sheet open={switching} title="Your academies" onClose={() => setSwitching(false)}>
         <ul className="academy-list">
@@ -315,7 +342,7 @@ function Problem({ text }: { text: string }) {
   );
 }
 
-function SignInGate({ hasPlayer, onLeave }: { hasPlayer: boolean; onLeave: () => void }) {
+function SignInGate() {
   return (
     <div className="screen">
       <div className="academy-intro">
@@ -333,9 +360,6 @@ function SignInGate({ hasPlayer, onLeave }: { hasPlayer: boolean; onLeave: () =>
           footnote="Your email is only for signing in. Staff and players see a username you pick next, never your email."
         />
       </Section>
-      <button className="link-btn" onClick={onLeave}>
-        {hasPlayer ? 'Back to my matches' : 'Not an academy? Go back'}
-      </button>
     </div>
   );
 }
@@ -445,5 +469,56 @@ function StartGate() {
         )}
       </Section>
     </div>
+  );
+}
+
+/** iPhone's alert: a small card in the middle, two choices split by hairlines. */
+function ExitConfirm({ open, onStay, onExit }: { open: boolean; onStay: () => void; onExit: () => void }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onStay();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onStay]);
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <div className="alert-layer" key="exit">
+          <m.div
+            className="alert-scrim"
+            onClick={onStay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.16 } }}
+            transition={{ duration: 0.2 }}
+          />
+          <m.div
+            className="alert"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="exit-title"
+            aria-describedby="exit-text"
+            initial={{ opacity: 0, scale: 1.12 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
+            transition={springs.snappy}
+          >
+            <div className="alert-body">
+              <h2 id="exit-title">Exit the academy area?</h2>
+              <p id="exit-text">You can come back any time from the first screen.</p>
+            </div>
+            <div className="alert-actions">
+              <button type="button" onClick={onStay} autoFocus>
+                Stay
+              </button>
+              <button type="button" className="strong" onClick={onExit}>
+                Exit
+              </button>
+            </div>
+          </m.div>
+        </div>
+      )}
+    </AnimatePresence>,
+    document.body,
   );
 }

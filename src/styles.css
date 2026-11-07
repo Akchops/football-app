@@ -193,6 +193,8 @@ p { margin: 0; }
 }
 
 .brand-mark { font-size: 20px; line-height: 0; color: var(--accent); }
+/* Matchday's own mark is a picture, not a symbol in the accent colour. */
+.brand-mark .logo { width: 24px; height: 24px; }
 /* On a narrow phone with every pill showing, the name gives way before the buttons do. */
 .topbar > .brand { min-width: 0; }
 .topbar > .brand > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1129,7 +1131,8 @@ select.input {
 }
 
 .onboard-top { padding: calc(var(--safe-top) + 16px) 20px 8px; }
-.onboard-brand { font-weight: 800; letter-spacing: -0.02em; font-size: 15px; color: var(--accent); }
+.onboard-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: -0.02em; font-size: 15px; color: var(--accent); }
+.onboard-brand .logo { width: 24px; height: 24px; flex: none; }
 
 .onboard-steps { display: flex; gap: 6px; margin-top: 12px; }
 .ostep {
@@ -3961,6 +3964,57 @@ button.nav-row:active { background: var(--surface-2); }
     0 8px 18px -6px rgba(0, 0, 0, 0.6);
 }
 .player-card-mini .ring-track { stroke: rgba(255, 255, 255, 0.12); }
+
+/* The way out of the academy area: always top-left, always labelled. */
+.academy-exit {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  margin-left: -6px;
+  padding: 0 4px;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-size: 17px;
+  white-space: nowrap;
+}
+.academy-app .topbar { gap: 8px; }
+.academy-app .academy-switch-meta { display: none; }
+@media (max-width: 360px) {
+  .academy-app .academy-switch .academy-logo { display: none; }
+}
+
+/* iPhone's alert: a small frosted card, two choices split by hairlines. */
+.alert-layer { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; }
+.alert-scrim { position: absolute; inset: 0; background: var(--scrim); }
+.alert {
+  position: relative;
+  width: min(270px, 100%);
+  border-radius: 14px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  text-align: center;
+}
+:root[data-theme="light"] .alert { background: rgba(242, 242, 247, 0.92); }
+.alert-body { padding: 19px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+.alert-body h2 { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.alert-body p { font-size: 13px; line-height: 1.35; color: var(--text); }
+.alert-actions { display: grid; grid-template-columns: 1fr 1fr; border-top: 0.5px solid var(--line); }
+.alert-actions button {
+  min-height: 44px;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font-size: 17px;
+}
+.alert-actions button + button { border-left: 0.5px solid var(--line); }
+.alert-actions button.strong { font-weight: 600; }
+.alert-actions button:active { background: color-mix(in srgb, var(--text) 8%, transparent); }
 
 /* ======================================================================
    Loading. Skeletons in the shape of what's on its way, so a screen never

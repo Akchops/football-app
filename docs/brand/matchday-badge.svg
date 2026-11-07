@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="182 182 660 660" width="96" height="96">
+  <!-- The notification badge (public/icons/badge-96.png): Android draws only its
+       shape, in one colour, so the ball is solid white with its seams cut out -
+       wider than in the full logo, so they still show at status-bar size. -->
+  <defs>
+    <g id="panels">
+      <polygon points="512.4,337.6 666.1,444.6 782.7,408.4 711.9,220.1 510.7,209.7"/>
+      <polygon points="666.1,444.6 782.7,408.4 819.0,592.3 680.8,713.2 603.1,621.7"/>
+      <polygon points="603.1,621.7 680.8,713.2 512.4,814.3 353.5,721.0 420.0,621.7"/>
+      <polygon points="420.0,621.7 353.5,721.0 205.0,592.3 245.6,401.5 359.6,444.6"/>
+      <polygon points="359.6,444.6 245.6,401.5 323.3,231.3 510.7,209.7 512.4,337.6"/>
+      <polygon points="512.4,337.6 666.1,444.6 603.1,621.7 420.0,621.7 359.6,444.6"/>
+    </g>
+    <!-- Every panel filled first, then every seam cut, so all seams come out the same width. -->
+    <mask id="seams" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <use xlink:href="#panels" href="#panels" fill="#ffffff"/>
+      <use xlink:href="#panels" href="#panels" fill="none" stroke="#000000" stroke-width="44" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" fill="#ffffff" mask="url(#seams)"/>
+</svg>
