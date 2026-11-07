@@ -1,0 +1,3 @@
+Matchday starts with one question: who's this for? For a player, every match is rated for the position they actually play. For an academy, it's squads, staff and league tables, with teams picked from players' own numbers, and only after families say yes. It runs in your phone's browser: https://akchops.github.io/football-app/
+
+Music: Sascha Ende, ende.app (CC BY 4.0)

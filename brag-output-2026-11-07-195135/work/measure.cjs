@@ -1,0 +1,28 @@
+const { open } = require('./lib-academy.cjs');
+const fs = require('fs');
+(async () => {
+  const { b, p } = await open({ dpr: 1, mode: 'academy' });
+  const bx = {};
+  const get = async (k, loc) => { bx[k] = await loc.first().boundingBox().catch(() => null); };
+  await get('playersRow', p.locator('text=1 asking to join'));
+  await get('homeHero', p.locator('text=Bristol, England').locator('xpath=ancestor::*[.//text()[contains(.,"STAFF")] or contains(.,"Staff")][1]'));
+  await get('heroTitle', p.locator('text=Kingsbridge Football Academy').nth(1));
+  await get('heroStaff', p.locator('text=/^staff$/i').first());
+  await p.getByRole('button', { name: 'Players', exact: true }).last().click(); await p.waitForTimeout(1200);
+  await p.evaluate(() => { const h = [...document.querySelectorAll('*')].find((e) => /^EVERYONE/i.test(e.textContent.trim()) && e.children.length === 0); h && h.scrollIntoView({ block: 'start' }); });
+  await p.waitForTimeout(600);
+  await get('alexRow', p.locator('text=Alex Carter').first().locator('xpath=ancestor::*[self::button or self::li or self::a][1]'));
+  await p.getByRole('button', { name: 'Stats', exact: true }).last().click(); await p.waitForTimeout(1800);
+  await p.evaluate(() => { const h = [...document.querySelectorAll('*')].find((e) => /^LEADERBOARD$/i.test(e.textContent.trim()) && e.children.length === 0); h && h.scrollIntoView({ block: 'start' }); });
+  await p.waitForTimeout(600);
+  await get('leo', p.locator('text=Leo Martins').first());
+  await get('jayden', p.locator('text=Jayden Okafor').first());
+  await get('mateo', p.locator('text=Mateo Silva').first());
+  await p.getByRole('button', { name: 'Tables', exact: true }).last().click(); await p.waitForTimeout(1000);
+  await p.locator('text=Northern Junior League').first().click(); await p.waitForTimeout(1300);
+  await get('table', p.locator('table').first());
+  await get('tableRow1', p.locator('tr', { hasText: 'Kingsbridge U14' }).first());
+  console.log(JSON.stringify(bx, null, 0));
+  fs.writeFileSync('cap/measure.json', JSON.stringify(bx, null, 1));
+  await b.close();
+})();

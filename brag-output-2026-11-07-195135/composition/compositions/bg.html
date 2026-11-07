@@ -1,0 +1,268 @@
+<template>
+<style>
+
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('assets/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 500; src: url('assets/fonts/Inter-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 600; src: url('assets/fonts/Inter-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 700; src: url('assets/fonts/Inter-Bold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 800; src: url('assets/fonts/Inter-ExtraBold.otf') format('opentype'); }
+
+
+#root { position: absolute; inset: 0; color: #f2f2f7; font-family: 'Matchday Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+.display { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.005em; }
+.ln { display: block; overflow: hidden; padding: 0.04em 0.02em 0.02em; margin: -0.04em -0.02em -0.02em; }
+.ln > span { display: inline-block; }
+.green { color: #30d27c; }
+.muted { color: #a1a1a8; }
+.abs { position: absolute; }
+.col { position: absolute; left: 240px; width: 760px; }
+.phone { position: absolute; background: #0b0b0c; border-radius: 68px; padding: 14px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.16), inset 0 0 0 1.5px rgba(255,255,255,0.05), 0 40px 120px rgba(0,0,0,0.7); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 54px; overflow: hidden; background: #000; isolation: isolate; }
+.screen img { position: absolute; left: 0; width: 100%; display: block; opacity: 0; }
+.screen img.on { opacity: 1; }
+.sbar { position: absolute; left: 0; top: 0; right: 0; height: 42px; background: #000; z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 34px 0 44px; font-weight: 600; font-size: 17px; color: #fff; }
+.sbar .icons { display: flex; gap: 6px; align-items: center; }
+.lift { position: absolute; z-index: 10; opacity: 0; }
+.lift .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.lift .wrap img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+.lift .wrap img.on { opacity: 1; }
+.finger { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 12; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.8); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.ripple { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 11; opacity: 0;
+  border: 3px solid rgba(255,255,255,0.9); }
+
+
+#bg-ground { left: 0; top: 0; width: 1920px; height: 1080px; background: #000; }
+#bg-glow { left: 510px; top: -340px; width: 1800px; height: 1800px; opacity: 0; }
+#bg-glow-in { width: 100%; height: 100%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(48,210,124,0.22), rgba(48,210,124,0.08) 45%, rgba(48,210,124,0) 100%); }
+#bg-circle { left: 940px; top: 70px; width: 940px; height: 940px; border-radius: 50%; border: 4px solid rgba(255,255,255,1); opacity: 0; }
+
+</style>
+<div id="root" data-composition-id="bg" data-width="1920" data-height="1080" data-duration="24.5">
+<div id="bg-ground" class="abs"></div><div id="bg-circle" class="abs"></div><div id="bg-glow" class="abs"><div id="bg-glow-in"></div></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#bg-glow", {"opacity": 0}, {"opacity": 1, "duration": 0.8, "ease": "power2.out"}, 3.6);
+tl.fromTo("#bg-circle", {"opacity": 0}, {"opacity": 0.08, "duration": 0.8, "ease": "power2.out"}, 3.6);
+tl.fromTo("#bg-glow", {"x": 0, "y": 0, "scale": 1}, {"x": -450, "y": 40, "scale": 1.2, "duration": 0.55, "ease": "power3.inOut", "immediateRender": false}, 11.65);
+tl.fromTo("#bg-circle", {"x": 0, "y": 0, "scale": 1}, {"x": -450, "y": 50, "scale": 1.05, "duration": 0.55, "ease": "power3.inOut", "immediateRender": false}, 11.65);
+tl.fromTo("#bg-glow", {"x": -450, "y": 40, "scale": 1.2}, {"x": 0, "y": 0, "scale": 1, "duration": 0.35, "ease": "power3.inOut", "immediateRender": false}, 14.6);
+tl.fromTo("#bg-circle", {"x": -450, "y": 50, "scale": 1.05}, {"x": 0, "y": 0, "scale": 1, "duration": 0.35, "ease": "power3.inOut", "immediateRender": false}, 14.6);
+tl.to("#bg-circle", {"opacity": 0, "duration": 0.3}, 19.95);
+tl.fromTo("#bg-glow", {"x": 0, "y": 0, "scale": 1}, {"x": -450, "y": -190, "scale": 0.75, "duration": 0.7, "ease": "power2.inOut", "immediateRender": false}, 19.95);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 3.65);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 3.75);
+tl.to("#bg-glow-in", {"opacity": 0.8, "scale": 1.01, "duration": 0.1, "ease": "none"}, 3.85);
+tl.to("#bg-glow-in", {"opacity": 0.93, "scale": 1.03, "duration": 0.1, "ease": "none"}, 3.95);
+tl.to("#bg-glow-in", {"opacity": 0.93, "scale": 1.03, "duration": 0.1, "ease": "none"}, 4.05);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.15);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.25);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.35);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.45);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.55);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.65);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.75);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 4.85);
+tl.to("#bg-glow-in", {"opacity": 0.98, "scale": 1.03, "duration": 0.1, "ease": "none"}, 4.95);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.05);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.15);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.25);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.35);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.45);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.55);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.65);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.75);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.85);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 5.95);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 6.05);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 6.15);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 6.25);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.02, "duration": 0.1, "ease": "none"}, 6.35);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.02, "duration": 0.1, "ease": "none"}, 6.45);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 6.55);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 6.65);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 6.75);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 6.85);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 6.95);
+tl.to("#bg-glow-in", {"opacity": 0.82, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.05);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.15);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.25);
+tl.to("#bg-glow-in", {"opacity": 0.82, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.35);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.45);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.55);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.65);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.75);
+tl.to("#bg-glow-in", {"opacity": 0.8, "scale": 1.01, "duration": 0.1, "ease": "none"}, 7.85);
+tl.to("#bg-glow-in", {"opacity": 0.97, "scale": 1.03, "duration": 0.1, "ease": "none"}, 7.95);
+tl.to("#bg-glow-in", {"opacity": 0.97, "scale": 1.03, "duration": 0.1, "ease": "none"}, 8.05);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.15);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.25);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.35);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.45);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.55);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.65);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.75);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.85);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 8.95);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.05);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.15);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.25);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.35);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.45);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.55);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.65);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.75);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.85);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 9.95);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 10.05);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 10.15);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 10.25);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 10.35);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 10.45);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 10.55);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 10.65);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 10.75);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 10.85);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 10.95);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 11.05);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.02, "duration": 0.1, "ease": "none"}, 11.15);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.02, "duration": 0.1, "ease": "none"}, 11.25);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 11.35);
+tl.to("#bg-glow-in", {"opacity": 0.8, "scale": 1.01, "duration": 0.1, "ease": "none"}, 11.45);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 11.55);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 11.65);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 11.75);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 11.85);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 11.95);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.05);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.15);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.25);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.35);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.45);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.55);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.65);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.75);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.85);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 12.95);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.05);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.15);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.25);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.35);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.45);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.55);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.65);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.75);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.85);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 13.95);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 14.05);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 14.15);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 14.25);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 14.35);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.02, "duration": 0.1, "ease": "none"}, 14.45);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 14.55);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 14.65);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 14.75);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 14.85);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 14.95);
+tl.to("#bg-glow-in", {"opacity": 0.83, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.05);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.15);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.25);
+tl.to("#bg-glow-in", {"opacity": 0.82, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.35);
+tl.to("#bg-glow-in", {"opacity": 0.82, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.45);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.55);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.65);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.75);
+tl.to("#bg-glow-in", {"opacity": 0.81, "scale": 1.01, "duration": 0.1, "ease": "none"}, 15.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 15.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 16.05);
+tl.to("#bg-glow-in", {"opacity": 0.94, "scale": 1.03, "duration": 0.1, "ease": "none"}, 16.15);
+tl.to("#bg-glow-in", {"opacity": 0.94, "scale": 1.03, "duration": 0.1, "ease": "none"}, 16.25);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.02, "duration": 0.1, "ease": "none"}, 16.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 16.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 16.55);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 16.65);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 16.75);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 16.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 16.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 17.05);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 17.15);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.02, "duration": 0.1, "ease": "none"}, 17.25);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.03, "duration": 0.1, "ease": "none"}, 17.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 17.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 17.55);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 17.65);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 17.75);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 17.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 17.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 18.05);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.02, "duration": 0.1, "ease": "none"}, 18.15);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.02, "duration": 0.1, "ease": "none"}, 18.25);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 18.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 18.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 18.55);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 18.65);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 18.75);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 18.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 18.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 19.05);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 19.15);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 19.25);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 19.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 19.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 19.55);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 19.65);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 19.75);
+tl.to("#bg-glow-in", {"opacity": 0.86, "scale": 1.02, "duration": 0.1, "ease": "none"}, 19.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 19.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 20.05);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.02, "duration": 0.1, "ease": "none"}, 20.15);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 20.25);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 20.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 20.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 20.55);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 20.65);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 20.75);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 20.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 20.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 21.05);
+tl.to("#bg-glow-in", {"opacity": 0.89, "scale": 1.02, "duration": 0.1, "ease": "none"}, 21.15);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 21.25);
+tl.to("#bg-glow-in", {"opacity": 0.9, "scale": 1.02, "duration": 0.1, "ease": "none"}, 21.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 21.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 21.55);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 21.65);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 21.75);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 21.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 21.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 22.05);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 22.15);
+tl.to("#bg-glow-in", {"opacity": 0.91, "scale": 1.02, "duration": 0.1, "ease": "none"}, 22.25);
+tl.to("#bg-glow-in", {"opacity": 0.88, "scale": 1.02, "duration": 0.1, "ease": "none"}, 22.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 22.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 22.55);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 22.65);
+tl.to("#bg-glow-in", {"opacity": 0.87, "scale": 1.02, "duration": 0.1, "ease": "none"}, 22.75);
+tl.to("#bg-glow-in", {"opacity": 0.85, "scale": 1.02, "duration": 0.1, "ease": "none"}, 22.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 22.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 23.05);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.01, "duration": 0.1, "ease": "none"}, 23.15);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.02, "duration": 0.1, "ease": "none"}, 23.25);
+tl.to("#bg-glow-in", {"opacity": 0.84, "scale": 1.02, "duration": 0.1, "ease": "none"}, 23.35);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 23.45);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 23.55);
+tl.to("#bg-glow-in", {"opacity": 0.82, "scale": 1.01, "duration": 0.1, "ease": "none"}, 23.65);
+tl.to("#bg-glow-in", {"opacity": 0.82, "scale": 1.01, "duration": 0.1, "ease": "none"}, 23.75);
+tl.to("#bg-glow-in", {"opacity": 0.82, "scale": 1.01, "duration": 0.1, "ease": "none"}, 23.85);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 23.95);
+tl.to("#bg-glow-in", {"opacity": 1.0, "scale": 1.03, "duration": 0.1, "ease": "none"}, 24.05);
+tl.to("#bg-glow-in", {"opacity": 0.93, "scale": 1.03, "duration": 0.1, "ease": "none"}, 24.15);
+tl.to("#bg-glow-in", {"opacity": 0.93, "scale": 1.03, "duration": 0.1, "ease": "none"}, 24.25);
+tl.to("#bg-glow-in", {"opacity": 0.92, "scale": 1.03, "duration": 0.1, "ease": "none"}, 24.35);
+window.__timelines["bg"] = tl;
+</script>
+</template>

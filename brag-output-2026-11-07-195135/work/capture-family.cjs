@@ -1,0 +1,22 @@
+const { open } = require('./lib-academy.cjs');
+const fs = require('fs');
+(async () => {
+  const { b, p } = await open({ mode: 'family', seedPlayer: true });
+  await p.getByRole('button', { name: 'Setup' }).click();
+  await p.waitForTimeout(1500);
+  await p.evaluate(() => { const c = document.querySelector('.invite-card'); c && c.scrollIntoView({ block: 'center' }); });
+  await p.waitForTimeout(700);
+  await p.screenshot({ path: 'cap/family-invite.png' });
+  const card = p.locator('.invite-card').first();
+  const boxes = JSON.parse(fs.readFileSync('cap/boxes.json', 'utf8'));
+  boxes.inviteCard = await card.boundingBox();
+  boxes.consent = await p.locator('.invite-card .consent').boundingBox();
+  boxes.accept = await p.locator('.invite-card .primary-btn').boundingBox();
+  await p.locator('.invite-card .consent input').check();
+  await p.waitForTimeout(500);
+  await p.screenshot({ path: 'cap/family-consent.png' });
+  fs.writeFileSync('cap/boxes.json', JSON.stringify(boxes, null, 1));
+  console.log((await p.evaluate(() => document.body.innerText)).slice(0, 400).replace(/\n+/g, ' | '));
+  console.log(JSON.stringify({ card: boxes.inviteCard, consent: boxes.consent, accept: boxes.accept }));
+  await b.close();
+})();

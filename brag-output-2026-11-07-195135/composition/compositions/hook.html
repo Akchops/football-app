@@ -1,0 +1,90 @@
+<template>
+<style>
+
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('assets/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 500; src: url('assets/fonts/Inter-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 600; src: url('assets/fonts/Inter-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 700; src: url('assets/fonts/Inter-Bold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 800; src: url('assets/fonts/Inter-ExtraBold.otf') format('opentype'); }
+
+
+#root { position: absolute; inset: 0; color: #f2f2f7; font-family: 'Matchday Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+.display { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.005em; }
+.ln { display: block; overflow: hidden; padding: 0.04em 0.02em 0.02em; margin: -0.04em -0.02em -0.02em; }
+.ln > span { display: inline-block; }
+.green { color: #30d27c; }
+.muted { color: #a1a1a8; }
+.abs { position: absolute; }
+.col { position: absolute; left: 240px; width: 760px; }
+.phone { position: absolute; background: #0b0b0c; border-radius: 68px; padding: 14px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.16), inset 0 0 0 1.5px rgba(255,255,255,0.05), 0 40px 120px rgba(0,0,0,0.7); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 54px; overflow: hidden; background: #000; isolation: isolate; }
+.screen img { position: absolute; left: 0; width: 100%; display: block; opacity: 0; }
+.screen img.on { opacity: 1; }
+.sbar { position: absolute; left: 0; top: 0; right: 0; height: 42px; background: #000; z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 34px 0 44px; font-weight: 600; font-size: 17px; color: #fff; }
+.sbar .icons { display: flex; gap: 6px; align-items: center; }
+.lift { position: absolute; z-index: 10; opacity: 0; }
+.lift .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.lift .wrap img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+.lift .wrap img.on { opacity: 1; }
+.finger { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 12; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.8); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.ripple { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 11; opacity: 0;
+  border: 3px solid rgba(255,255,255,0.9); }
+
+
+.kicker { position: absolute; left: 240px; top: 150px; width: 470px; border-radius: 22px; overflow: hidden; }
+.kicker img { display: block; width: 100%; }
+.h { font-size: 104px; line-height: 0.92; }
+.sub { font-size: 40px; font-weight: 500; color: #a1a1a8; line-height: 1.3; }
+
+#hk-brand { left: 0; width: 1920px; top: 92px; display: flex; justify-content: center; align-items: center; gap: 16px; }
+#hk-brand .word { font-family: 'Barlow Condensed'; font-weight: 700; font-size: 50px; letter-spacing: 0.08em; color: #a1a1a8; text-transform: uppercase; }
+#hk-title { left: 0; width: 1920px; top: 190px; text-align: center; font-size: 200px; line-height: 1; }
+.who { position: absolute; top: 560px; width: 600px; border-radius: 28px; overflow: hidden; opacity: 0; }
+.who img { display: block; width: 100%; }
+#hk-player { left: 336px; }
+#hk-academy { left: 984px; }
+#hk-ring { position: absolute; left: 0; top: 0; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.9); opacity: 0; }
+#hk-finger { position: absolute; left: 0; top: 0; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.85); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+
+</style>
+<div id="root" data-composition-id="hook" data-width="1920" data-height="1080" data-duration="3.6">
+<div id="hk-brand" class="abs"><span data-layout-allow-overflow class="ln" style="padding:6px;margin:-6px"><span><svg viewBox="176 176 672 672" width="60" height="60" style="overflow:visible;display:block">
+<defs>
+<linearGradient id="lb-hklogo" gradientUnits="userSpaceOnUse" x1="0" y1="209.7" x2="0" y2="814.3"><stop offset="0" stop-color="#2a2f35"/><stop offset="1" stop-color="#16191d"/></linearGradient>
+<linearGradient id="ll-hklogo" gradientUnits="userSpaceOnUse" x1="0" y1="209.7" x2="0" y2="814.3"><stop offset="0" stop-color="#48E597"/><stop offset="1" stop-color="#30D27C"/></linearGradient>
+<filter id="lh-hklogo" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="16"/></filter>
+</defs>
+<polygon id="hklogo-halo" points="512.4,337.6 666.1,444.6 782.7,408.4 711.9,220.1 510.7,209.7" fill="#30D27C" opacity="0.55" filter="url(#lh-hklogo)"/>
+<g stroke="#000" stroke-width="15" stroke-linejoin="round"><polygon points="512.4,337.6 666.1,444.6 782.7,408.4 711.9,220.1 510.7,209.7" fill="url(#ll-hklogo)"/><polygon points="666.1,444.6 782.7,408.4 819.0,592.3 680.8,713.2 603.1,621.7" fill="url(#lb-hklogo)" stroke="rgba(255,255,255,0.10)" stroke-width="5"/><polygon points="603.1,621.7 680.8,713.2 512.4,814.3 353.5,721.0 420.0,621.7" fill="url(#lb-hklogo)" stroke="rgba(255,255,255,0.10)" stroke-width="5"/><polygon points="420.0,621.7 353.5,721.0 205.0,592.3 245.6,401.5 359.6,444.6" fill="url(#lb-hklogo)" stroke="rgba(255,255,255,0.10)" stroke-width="5"/><polygon points="359.6,444.6 245.6,401.5 323.3,231.3 510.7,209.7 512.4,337.6" fill="url(#lb-hklogo)" stroke="rgba(255,255,255,0.10)" stroke-width="5"/><polygon points="512.4,337.6 666.1,444.6 603.1,621.7 420.0,621.7 359.6,444.6" fill="url(#lb-hklogo)" stroke="rgba(255,255,255,0.10)" stroke-width="5"/></g></svg></span></span><span data-layout-allow-overflow class="ln word"><span>Matchday</span></span></div>
+<div id="hk-title" class="abs display"><span data-layout-allow-overflow class="ln"><span>Who's this <span class="green">for?</span></span></span></div>
+<div id="hk-player" class="who"><img src="assets/img/who-player.png" alt=""></div>
+<div id="hk-academy" class="who"><img src="assets/img/who-academy.png" alt=""></div>
+<div id="hk-ring"></div><div id="hk-finger"></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#hk-brand .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.42, ease: "expo.out", stagger: 0.06}, 0.05);
+tl.fromTo("#hk-title .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.5, ease: "expo.out", stagger: 0.07}, 0.3);
+tl.fromTo("#hk-player", {"y": 60, "opacity": 0}, {"y": 0, "opacity": 1, "duration": 0.5, "ease": "back.out(1.4)"}, 0.95);
+tl.fromTo("#hk-academy", {"y": 60, "opacity": 0}, {"y": 0, "opacity": 1, "duration": 0.5, "ease": "back.out(1.4)"}, 1.15);
+tl.set("#hk-finger", {"x": 636.0, "y": 642.9449999999999}, 0);
+tl.set("#hk-ring", {"x": 636.0, "y": 642.9449999999999}, 0);
+tl.fromTo("#hk-finger", {"opacity": 0}, {"opacity": 1, "duration": 0.15}, 2.55);
+tl.fromTo("#hk-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "immediateRender": false}, 2.78);
+tl.fromTo("#hk-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "immediateRender": false}, 2.85);
+tl.fromTo("#hk-ring", {scale: 1, opacity: 0.75}, {scale: 2.6, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 2.85);
+tl.to("#hk-finger", {"opacity": 0, "duration": 0.15}, 3.0);
+tl.fromTo("#hk-player", {"boxShadow": "0 0 0 0px rgba(48,210,124,0), 0 0 0px rgba(48,210,124,0)"}, {"boxShadow": "0 0 0 3px rgba(48,210,124,0.9), 0 0 40px rgba(48,210,124,0.35)", "duration": 0.2, "immediateRender": false}, 2.88);
+tl.to("#hk-academy", {"opacity": 0.35, "duration": 0.15}, 2.88);
+tl.to("#hk-title .ln > span", {yPercent: -105, duration: 0.22, ease: "power3.in", stagger: 0.03}, 3.05);
+tl.to("#hk-brand .ln > span", {yPercent: -105, duration: 0.22, ease: "power3.in", stagger: 0.03}, 3.05);
+tl.to("#hk-academy", {"y": 40, "opacity": 0, "duration": 0.24, "ease": "power3.in"}, 3.05);
+tl.to("#hk-player", {"x": -96, "y": -410, "scale": 0.78, "transformOrigin": "0% 0%", "duration": 0.45, "ease": "power3.inOut"}, 3.1);
+window.__timelines["hook"] = tl;
+</script>
+</template>

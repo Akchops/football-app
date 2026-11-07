@@ -1,0 +1,6 @@
+vo1|Matchday asks one question first. Who's this for?
+vo2|For a player: every match, rated for the position they actually play.
+vo3|For an academy: squads, staff and players, all in one place.
+vo4|Families see exactly what's shared, and say yes first.
+vo5|Then coaches pick teams from the players' own numbers, and the tables work themselves out.
+vo6|Matchday. For the player, and the academy.
