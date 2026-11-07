@@ -1,0 +1,67 @@
+<template>
+<style>
+
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('assets/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 500; src: url('assets/fonts/Inter-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 600; src: url('assets/fonts/Inter-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 700; src: url('assets/fonts/Inter-Bold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 800; src: url('assets/fonts/Inter-ExtraBold.otf') format('opentype'); }
+
+
+#root { position: absolute; inset: 0; color: #f2f2f7; font-family: 'Matchday Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+.display { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.005em; }
+.ln { display: block; overflow: hidden; padding: 0.04em 0.02em 0.02em; margin: -0.04em -0.02em -0.02em; }
+.ln > span { display: inline-block; }
+.green { color: #30d27c; }
+.muted { color: #a1a1a8; }
+.abs { position: absolute; }
+.col { position: absolute; left: 240px; width: 760px; }
+.phone { position: absolute; background: #0b0b0c; border-radius: 68px; padding: 14px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.16), inset 0 0 0 1.5px rgba(255,255,255,0.05), 0 40px 120px rgba(0,0,0,0.7); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 54px; overflow: hidden; background: #000; isolation: isolate; }
+.screen img { position: absolute; left: 0; width: 100%; display: block; opacity: 0; }
+.screen img.on { opacity: 1; }
+.sbar { position: absolute; left: 0; top: 0; right: 0; height: 42px; background: #000; z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 34px 0 44px; font-weight: 600; font-size: 17px; color: #fff; }
+.sbar .icons { display: flex; gap: 6px; align-items: center; }
+.lift { position: absolute; z-index: 10; opacity: 0; }
+.lift .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.lift .wrap img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+.lift .wrap img.on { opacity: 1; }
+.finger { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 12; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.8); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.ripple { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 11; opacity: 0;
+  border: 3px solid rgba(255,255,255,0.9); }
+
+
+#hk-zero { left: 100px; top: 70px; width: 700px; height: 940px; text-align: center; }
+#hk-lbl { display: block; font-family: 'Barlow Condensed'; font-weight: 700; font-size: 64px; letter-spacing: 0.32em; padding-left: 0.32em; color: #a1a1a8; text-transform: uppercase; }
+#hk-num { display: block; font-family: 'Barlow Condensed'; font-weight: 800; font-size: 860px; line-height: 0.86; color: #ffffff; }
+#hk-lines { left: 755px; top: 222px; font-size: 150px; line-height: 0.9; }
+
+</style>
+<div id="root" data-composition-id="hook" data-width="1920" data-height="1080" data-duration="3.35">
+<div id="hk-zero" class="abs"><span id="hk-lbl">Goals</span><span id="hk-num">0</span></div>
+<div id="hk-lines" class="abs display">
+<span data-layout-allow-overflow class="ln"><span>Most apps</span></span><span data-layout-allow-overflow class="ln"><span>count goals.</span></span>
+<span data-layout-allow-overflow class="ln green" id="hk-l2a"><span>Keepers</span></span><span data-layout-allow-overflow class="ln green" id="hk-l2b"><span>don't score.</span></span>
+</div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#hk-num", {"scale": 1.32, "opacity": 0}, {"scale": 1, "opacity": 1, "duration": 0.36, "ease": "back.out(1.2)"}, 0);
+tl.fromTo("#hk-lbl", {"y": 24, "opacity": 0}, {"y": 0, "opacity": 1, "duration": 0.3, "ease": "expo.out"}, 0.12);
+tl.fromTo("#hk-lines .ln:not(.green) > span", {yPercent: 105}, {yPercent: 0, duration: 0.42, ease: "expo.out", stagger: 0.09}, 0.15);
+tl.fromTo("#hk-lines .ln.green > span", {yPercent: 105}, {yPercent: 0, duration: 0.42, ease: "expo.out", stagger: 0.09}, 1.94);
+tl.fromTo("#hk-num", {"color": "#ffffff"}, {"color": "#ff6b61", "duration": 0.25, "ease": "power2.out", "immediateRender": false}, 1.94);
+tl.fromTo("#hk-zero", {"x": 0}, {"x": 11, "duration": 0.06, "ease": "sine.inOut"}, 1.94);
+tl.fromTo("#hk-zero", {"x": 11}, {"x": -9, "duration": 0.06, "ease": "sine.inOut", "immediateRender": false}, 2.0);
+tl.fromTo("#hk-zero", {"x": -9}, {"x": 7, "duration": 0.06, "ease": "sine.inOut", "immediateRender": false}, 2.06);
+tl.fromTo("#hk-zero", {"x": 7}, {"x": -4, "duration": 0.06, "ease": "sine.inOut", "immediateRender": false}, 2.12);
+tl.fromTo("#hk-zero", {"x": -4}, {"x": 0, "duration": 0.06, "ease": "sine.inOut", "immediateRender": false}, 2.18);
+tl.to("#hk-lines .ln > span", {yPercent: -105, duration: 0.22, ease: "power3.in", stagger: 0.03}, 3.06);
+tl.to("#hk-zero", {"x": -160, "opacity": 0, "duration": 0.26, "ease": "power3.in"}, 3.06);
+window.__timelines["hook"] = tl;
+</script>
+</template>

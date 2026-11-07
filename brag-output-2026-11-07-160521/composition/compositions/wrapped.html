@@ -1,0 +1,68 @@
+<template>
+<style>
+
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('assets/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 500; src: url('assets/fonts/Inter-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 600; src: url('assets/fonts/Inter-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 700; src: url('assets/fonts/Inter-Bold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 800; src: url('assets/fonts/Inter-ExtraBold.otf') format('opentype'); }
+
+
+#root { position: absolute; inset: 0; color: #f2f2f7; font-family: 'Matchday Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+.display { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.005em; }
+.ln { display: block; overflow: hidden; padding: 0.04em 0.02em 0.02em; margin: -0.04em -0.02em -0.02em; }
+.ln > span { display: inline-block; }
+.green { color: #30d27c; }
+.muted { color: #a1a1a8; }
+.abs { position: absolute; }
+.col { position: absolute; left: 240px; width: 760px; }
+.phone { position: absolute; background: #0b0b0c; border-radius: 68px; padding: 14px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.16), inset 0 0 0 1.5px rgba(255,255,255,0.05), 0 40px 120px rgba(0,0,0,0.7); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 54px; overflow: hidden; background: #000; isolation: isolate; }
+.screen img { position: absolute; left: 0; width: 100%; display: block; opacity: 0; }
+.screen img.on { opacity: 1; }
+.sbar { position: absolute; left: 0; top: 0; right: 0; height: 42px; background: #000; z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 34px 0 44px; font-weight: 600; font-size: 17px; color: #fff; }
+.sbar .icons { display: flex; gap: 6px; align-items: center; }
+.lift { position: absolute; z-index: 10; opacity: 0; }
+.lift .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.lift .wrap img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+.lift .wrap img.on { opacity: 1; }
+.finger { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 12; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.8); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.ripple { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 11; opacity: 0;
+  border: 3px solid rgba(255,255,255,0.9); }
+
+
+.brand { top: 236px; display: flex; align-items: center; gap: 22px; }
+.brand .word { font-size: 104px; line-height: 1; padding-top: 6px; }
+.h2 { top: 380px; font-size: 104px; line-height: 0.92; }
+.cap { top: 712px; font-size: 40px; font-weight: 600; color: #a1a1a8; letter-spacing: -0.01em; }
+.cap b { color: #ffffff; font-weight: 800; }
+.h3 { top: 300px; font-size: 156px; line-height: 0.9; }
+.sub { font-size: 40px; font-weight: 500; color: #a1a1a8; line-height: 1.3; }
+#wr-title { left: 0; width: 1920px; top: 66px; text-align: center; font-size: 110px; line-height: 1; }
+#wr-title .ln { display: inline-block; vertical-align: top; }
+</style>
+<div id="root" data-composition-id="wrapped" data-width="1920" data-height="1080" data-duration="2.3">
+<div id="wr-title" class="abs display"><span data-layout-allow-overflow class="ln" id="wr-t1"><span>Your year on the pitch,&nbsp;</span></span><span data-layout-allow-overflow class="ln green" id="wr-t2"><span>Wrapped.</span></span></div>
+<div id="wr-p0" class="phone" style="left:423.0px;top:306.4px;width:334.0px;height:697.2px;padding:11px;border-radius:54px;z-index:1"><div class="screen" style="border-radius:44px"><img src="assets/img/w-3.jpg" alt="" class="on" style="top:0"></div></div>
+<div id="wr-p1" class="phone" style="left:1163.0px;top:306.4px;width:334.0px;height:697.2px;padding:11px;border-radius:54px;z-index:1"><div class="screen" style="border-radius:44px"><img src="assets/img/w-7.jpg" alt="" class="on" style="top:0"></div></div>
+<div id="wr-p2" class="phone" style="left:793.0px;top:291.4px;width:334.0px;height:697.2px;padding:11px;border-radius:54px;z-index:3"><div class="screen" style="border-radius:44px"><img src="assets/img/w-4.jpg" alt="" class="on" style="top:0"></div></div>
+
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#wr-p0", {"y": 900, "rotation": -17.6, "scale": 1.0, "opacity": 0}, {"y": 0, "rotation": -8, "scale": 1.0, "opacity": 1, "duration": 0.6, "ease": "back.out(1.1)"}, 0.05);
+tl.to("#wr-p0", {"y": 1000, "duration": 0.32, "ease": "power3.in"}, 1.9);
+tl.fromTo("#wr-p1", {"y": 900, "rotation": 17.6, "scale": 1.0, "opacity": 0}, {"y": 0, "rotation": 8, "scale": 1.0, "opacity": 1, "duration": 0.6, "ease": "back.out(1.1)"}, 0.3);
+tl.to("#wr-p1", {"y": 1000, "duration": 0.32, "ease": "power3.in"}, 1.9);
+tl.fromTo("#wr-p2", {"y": 900, "rotation": 0.0, "scale": 1.06, "opacity": 0}, {"y": 0, "rotation": 0, "scale": 1.06, "opacity": 1, "duration": 0.6, "ease": "back.out(1.1)"}, 0.55);
+tl.to("#wr-p2", {"y": 1000, "duration": 0.32, "ease": "power3.in"}, 1.95);
+tl.fromTo("#wr-t1 > span", {"yPercent": 105}, {"yPercent": 0, "duration": 0.42, "ease": "expo.out"}, 0.07);
+tl.fromTo("#wr-t2 > span", {"yPercent": 105}, {"yPercent": 0, "duration": 0.42, "ease": "expo.out"}, 1.33);
+tl.to("#wr-title .ln > span", {yPercent: -105, duration: 0.15, ease: "power3.in", stagger: 0.03}, 2.1);
+window.__timelines["wrapped"] = tl;
+</script>
+</template>

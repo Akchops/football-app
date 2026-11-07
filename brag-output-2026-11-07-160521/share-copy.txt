@@ -1,0 +1,3 @@
+Most football apps count goals, which is bad news if you're a keeper. Matchday rates the position you actually play (the same 0–0 is 54 for a forward and 72 for a keeper), shows exactly how every point was earned, and fills in fixtures straight from the coach's message. It runs in your phone's browser and works with no signal at the pitch: https://akchops.github.io/football-app/
+
+Music: Sascha Ende, ende.app (CC BY 4.0)

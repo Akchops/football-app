@@ -1,0 +1,196 @@
+<template>
+<style>
+
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('assets/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 500; src: url('assets/fonts/Inter-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 600; src: url('assets/fonts/Inter-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 700; src: url('assets/fonts/Inter-Bold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 800; src: url('assets/fonts/Inter-ExtraBold.otf') format('opentype'); }
+
+
+#root { position: absolute; inset: 0; color: #f2f2f7; font-family: 'Matchday Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+.display { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.005em; }
+.ln { display: block; overflow: hidden; padding: 0.04em 0.02em 0.02em; margin: -0.04em -0.02em -0.02em; }
+.ln > span { display: inline-block; }
+.green { color: #30d27c; }
+.muted { color: #a1a1a8; }
+.abs { position: absolute; }
+.col { position: absolute; left: 240px; width: 760px; }
+.phone { position: absolute; background: #0b0b0c; border-radius: 68px; padding: 14px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.16), inset 0 0 0 1.5px rgba(255,255,255,0.05), 0 40px 120px rgba(0,0,0,0.7); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 54px; overflow: hidden; background: #000; isolation: isolate; }
+.screen img { position: absolute; left: 0; width: 100%; display: block; opacity: 0; }
+.screen img.on { opacity: 1; }
+.sbar { position: absolute; left: 0; top: 0; right: 0; height: 42px; background: #000; z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 34px 0 44px; font-weight: 600; font-size: 17px; color: #fff; }
+.sbar .icons { display: flex; gap: 6px; align-items: center; }
+.lift { position: absolute; z-index: 10; opacity: 0; }
+.lift .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.lift .wrap img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+.lift .wrap img.on { opacity: 1; }
+.finger { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 12; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.8); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.ripple { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 11; opacity: 0;
+  border: 3px solid rgba(255,255,255,0.9); }
+
+
+.brand { top: 236px; display: flex; align-items: center; gap: 22px; }
+.brand .word { font-size: 104px; line-height: 1; padding-top: 6px; }
+.h2 { top: 380px; font-size: 104px; line-height: 0.92; }
+.cap { top: 712px; font-size: 40px; font-weight: 600; color: #a1a1a8; letter-spacing: -0.01em; }
+.cap b { color: #ffffff; font-weight: 800; }
+.h3 { top: 300px; font-size: 156px; line-height: 0.9; }
+.sub { font-size: 40px; font-weight: 500; color: #a1a1a8; line-height: 1.3; }
+
+</style>
+<div id="root" data-composition-id="saves" data-width="1920" data-height="1080" data-duration="3.13">
+<div id="sv-h3" class="col h3 display"><span data-layout-allow-overflow class="ln"><span>Every save</span></span><span data-layout-allow-overflow class="ln green"><span>counts.</span></span></div>
+<div id="sv-sub" class="col sub" style="top:600px;width:640px"><span data-layout-allow-overflow class="ln"><span>Match rating out of 100,</span></span><span data-layout-allow-overflow class="ln"><span>updates as you type.</span></span></div>
+<div id="sv-wrap" class="abs" style="left:0;top:0;width:1920px;height:1080px;transform-origin:1410px 600px">
+<div class="phone" style="left:1190.47px;top:60.21px;width:439.06px;height:959.58px">
+<div class="screen"><div class="sbar" data-layout-ignore><span>9:41</span><span class="icons">
+<svg width="20" height="13" viewBox="0 0 20 13"><rect x="0" y="9" width="3.5" height="4" rx="1" fill="#fff"/><rect x="5.3" y="6" width="3.5" height="7" rx="1" fill="#fff"/><rect x="10.6" y="3" width="3.5" height="10" rx="1" fill="#fff"/><rect x="15.9" y="0" width="3.5" height="13" rx="1" fill="#fff"/></svg>
+<svg width="18" height="13" viewBox="0 0 18 13"><path d="M9 12.5l2.6-3.1a4 4 0 0 0-5.2 0z M9 4.6a8.2 8.2 0 0 1 5.4 2l1.6-1.9A10.7 10.7 0 0 0 9 2.1 10.7 10.7 0 0 0 2 4.7l1.6 1.9a8.2 8.2 0 0 1 5.4-2z" fill="#fff"/></svg>
+<svg width="28" height="13" viewBox="0 0 28 13"><rect x="0.5" y="0.5" width="24" height="12" rx="3.5" fill="none" stroke="rgba(255,255,255,0.45)"/><rect x="2.5" y="2.5" width="17" height="8" rx="2" fill="#fff"/><rect x="25.8" y="4.2" width="1.7" height="4.6" rx="0.8" fill="rgba(255,255,255,0.45)"/></svg>
+</span></div>
+<img id="sv-s-day6" src="assets/img/day6.jpg" alt="" style="top:42px;z-index:1" class=on>
+<img id="sv-s-r-keeper" src="assets/img/r-keeper.jpg" alt="" style="top:42px;z-index:2" class=on>
+<img id="sv-s-r-step1" src="assets/img/r-step1.jpg" alt="" style="top:42px;z-index:3">
+<img id="sv-s-r-step2" src="assets/img/r-step2.jpg" alt="" style="top:42px;z-index:4">
+<img id="sv-s-r-step3" src="assets/img/r-step3.jpg" alt="" style="top:42px;z-index:5">
+<img id="sv-s-r-step4" src="assets/img/r-step4.jpg" alt="" style="top:42px;z-index:6">
+<img id="sv-s-r-step5" src="assets/img/r-step5.jpg" alt="" style="top:42px;z-index:7">
+<img id="sv-s-r-step6" src="assets/img/r-step6.jpg" alt="" style="top:42px;z-index:8">
+<img id="sv-s-r-step7" src="assets/img/r-step7.jpg" alt="" style="top:42px;z-index:9">
+<img id="sv-s-r-step8" src="assets/img/r-step8.jpg" alt="" style="top:42px;z-index:10">
+</div></div>
+<div id="sv-card" class="lift" style="left:1221.33px;top:684.21px;width:377.33px;height:73.78px;transform-origin:50% 50%">
+<div id="sv-card-wrap" class="wrap" style="border-radius:16.86px;"><img id="sv-card-r-keeper" src="assets/img/card-r-keeper.png" alt="" class=on>
+<img id="sv-card-r-step1" src="assets/img/card-r-step1.png" alt="">
+<img id="sv-card-r-step2" src="assets/img/card-r-step2.png" alt="">
+<img id="sv-card-r-step3" src="assets/img/card-r-step3.png" alt="">
+<img id="sv-card-r-step4" src="assets/img/card-r-step4.png" alt="">
+<img id="sv-card-r-step5" src="assets/img/card-r-step5.png" alt="">
+<img id="sv-card-r-step6" src="assets/img/card-r-step6.png" alt="">
+<img id="sv-card-r-step7" src="assets/img/card-r-step7.png" alt="">
+<img id="sv-card-r-step8" src="assets/img/card-r-step8.png" alt=""></div></div>
+<div id="sv-rp0" class="ripple"></div>
+<div id="sv-rp1" class="ripple"></div>
+<div id="sv-rp2" class="ripple"></div>
+<div id="sv-rp3" class="ripple"></div>
+<div id="sv-rp4" class="ripple"></div>
+<div id="sv-rp5" class="ripple"></div>
+<div id="sv-rp6" class="ripple"></div>
+<div id="sv-rp7" class="ripple"></div>
+<div id="sv-rp8" class="ripple"></div>
+<div id="sv-finger" class="finger"></div>
+</div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.set("#sv-card", {"opacity": 1, "scale": 1.34, "x": -26, "y": -8}, 0);
+tl.set("#sv-card-wrap", {"boxShadow": "0 24px 60px rgba(0,0,0,0.65), 0 0 0 1.5px rgba(255,255,255,0.12), 0 0 0px rgba(48,210,124,0)"}, 0);
+tl.fromTo("#sv-h3 .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.42, ease: "expo.out", stagger: 0.08}, 0.08);
+tl.fromTo("#sv-sub .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.42, ease: "expo.out", stagger: 0.07}, 0.35);
+tl.fromTo("#sv-wrap", {"scale": 1, "y": 0}, {"scale": 1.08, "y": -30, "duration": 0.6, "ease": "power2.inOut"}, 0);
+tl.set("#sv-finger", {"x": 1360.46, "y": 321.53}, 0.05);
+tl.fromTo("#sv-finger", {"opacity": 0}, {"opacity": 1, "duration": 0.15}, 0.05);
+tl.set("#sv-rp0", {"x": 1360.46, "y": 321.53}, 0);
+tl.fromTo("#sv-rp0", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 0.25);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 0.18);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 0.25);
+tl.set("#sv-s-r-step1", {"opacity": 1}, 0.27);
+tl.set("#sv-card-r-keeper", {"opacity": 0}, 0.27);
+tl.set("#sv-card-r-step1", {"opacity": 1}, 0.27);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.39, "duration": 0.08, "ease": "power2.out"}, 0.27);
+tl.fromTo("#sv-card", {"scale": 1.39}, {"scale": 1.34, "duration": 0.1, "ease": "power2.inOut", "immediateRender": false}, 0.35);
+tl.set("#sv-rp1", {"x": 1360.46, "y": 321.53}, 0);
+tl.fromTo("#sv-rp1", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 0.45);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 0.38);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 0.45);
+tl.set("#sv-s-r-step2", {"opacity": 1}, 0.47);
+tl.set("#sv-card-r-step1", {"opacity": 0}, 0.47);
+tl.set("#sv-card-r-step2", {"opacity": 1}, 0.47);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.39, "duration": 0.08, "ease": "power2.out", "immediateRender": false}, 0.47);
+tl.fromTo("#sv-card", {"scale": 1.39}, {"scale": 1.34, "duration": 0.1, "ease": "power2.inOut", "immediateRender": false}, 0.55);
+tl.fromTo("#sv-finger", {"x": 1360.46, "y": 321.53}, {"x": 1374.16, "y": 545.51, "duration": 0.16, "ease": "power2.inOut", "immediateRender": false}, 0.5);
+tl.set("#sv-rp2", {"x": 1374.16, "y": 545.51}, 0);
+tl.fromTo("#sv-rp2", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 0.7);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 0.63);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 0.7);
+tl.set("#sv-s-r-step3", {"opacity": 1}, 0.72);
+tl.set("#sv-card-r-step2", {"opacity": 0}, 0.72);
+tl.set("#sv-card-r-step3", {"opacity": 1}, 0.72);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.39, "duration": 0.08, "ease": "power2.out", "immediateRender": false}, 0.72);
+tl.fromTo("#sv-card", {"scale": 1.39}, {"scale": 1.34, "duration": 0.1, "ease": "power2.inOut", "immediateRender": false}, 0.8);
+tl.set("#sv-rp3", {"x": 1374.16, "y": 545.51}, 0);
+tl.fromTo("#sv-rp3", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 0.95);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 0.88);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 0.95);
+tl.set("#sv-s-r-step4", {"opacity": 1}, 0.97);
+tl.set("#sv-card-r-step3", {"opacity": 0}, 0.97);
+tl.set("#sv-card-r-step4", {"opacity": 1}, 0.97);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.39, "duration": 0.08, "ease": "power2.out", "immediateRender": false}, 0.97);
+tl.fromTo("#sv-card", {"scale": 1.39}, {"scale": 1.34, "duration": 0.1, "ease": "power2.inOut", "immediateRender": false}, 1.05);
+tl.set("#sv-rp4", {"x": 1374.16, "y": 545.51}, 0);
+tl.fromTo("#sv-rp4", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 1.2);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 1.13);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 1.2);
+tl.set("#sv-s-r-step5", {"opacity": 1}, 1.22);
+tl.set("#sv-card-r-step4", {"opacity": 0}, 1.22);
+tl.set("#sv-card-r-step5", {"opacity": 1}, 1.22);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.39, "duration": 0.08, "ease": "power2.out", "immediateRender": false}, 1.22);
+tl.fromTo("#sv-card", {"scale": 1.39}, {"scale": 1.34, "duration": 0.1, "ease": "power2.inOut", "immediateRender": false}, 1.3);
+tl.set("#sv-rp5", {"x": 1374.16, "y": 545.51}, 0);
+tl.fromTo("#sv-rp5", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 1.45);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 1.38);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 1.45);
+tl.set("#sv-s-r-step6", {"opacity": 1}, 1.47);
+tl.set("#sv-card-r-step5", {"opacity": 0}, 1.47);
+tl.set("#sv-card-r-step6", {"opacity": 1}, 1.47);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.39, "duration": 0.08, "ease": "power2.out", "immediateRender": false}, 1.47);
+tl.fromTo("#sv-card", {"scale": 1.39}, {"scale": 1.34, "duration": 0.1, "ease": "power2.inOut", "immediateRender": false}, 1.55);
+tl.set("#sv-rp6", {"x": 1374.16, "y": 545.51}, 0);
+tl.fromTo("#sv-rp6", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 1.7);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 1.63);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 1.7);
+tl.set("#sv-s-r-step7", {"opacity": 1}, 1.72);
+tl.set("#sv-card-r-step6", {"opacity": 0}, 1.72);
+tl.set("#sv-card-r-step7", {"opacity": 1}, 1.72);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.39, "duration": 0.08, "ease": "power2.out", "immediateRender": false}, 1.72);
+tl.fromTo("#sv-card", {"scale": 1.39}, {"scale": 1.34, "duration": 0.1, "ease": "power2.inOut", "immediateRender": false}, 1.8);
+tl.set("#sv-rp7", {"x": 1374.16, "y": 545.51}, 0);
+tl.fromTo("#sv-rp7", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 1.95);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 1.88);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 1.95);
+tl.set("#sv-s-r-step8", {"opacity": 1}, 1.97);
+tl.set("#sv-card-r-step7", {"opacity": 0}, 1.97);
+tl.set("#sv-card-r-step8", {"opacity": 1}, 1.97);
+tl.fromTo("#sv-card", {"scale": 1.34}, {"scale": 1.44, "duration": 0.08, "ease": "power2.out", "immediateRender": false}, 1.97);
+tl.fromTo("#sv-card", {"scale": 1.44}, {"scale": 1.42, "duration": 0.3, "ease": "power2.inOut", "immediateRender": false}, 2.05);
+tl.fromTo("#sv-card-wrap", {"boxShadow": "0 24px 60px rgba(0,0,0,0.65), 0 0 0 1.5px rgba(255,255,255,0.12), 0 0 0px rgba(48,210,124,0)"}, {"boxShadow": "0 24px 60px rgba(0,0,0,0.65), 0 0 0 1.5px rgba(255,255,255,0.12), 0 0 46px rgba(48,210,124,0.55)", "duration": 0.22, "ease": "power2.out"}, 1.97);
+tl.fromTo("#sv-finger", {"x": 1374.16, "y": 545.51}, {"x": 1504.33, "y": 966.79, "duration": 0.38, "ease": "power2.inOut", "immediateRender": false}, 2.15);
+tl.to("#sv-card", {"scale": 1, "x": 0, "y": 0, "duration": 0.18, "ease": "power2.inOut"}, 2.56);
+tl.to("#sv-card-wrap", {"boxShadow": "0 0px 0px rgba(0,0,0,0), 0 0 0 0px rgba(255,255,255,0), 0 0 0px rgba(48,210,124,0)", "duration": 0.18}, 2.56);
+tl.set("#sv-card", {"opacity": 0}, 2.75);
+tl.set("#sv-rp8", {"x": 1504.33, "y": 966.79}, 0);
+tl.fromTo("#sv-rp8", {scale: 1, opacity: 0.75}, {scale: 2.4, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 2.8);
+tl.fromTo("#sv-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "ease": "power2.out", "immediateRender": false}, 2.73);
+tl.fromTo("#sv-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "ease": "power2.out", "immediateRender": false}, 2.8);
+tl.to("#sv-finger", {"opacity": 0, "duration": 0.12}, 2.9);
+tl.set("#sv-s-r-keeper", {"opacity": 0}, 2.84);
+tl.set("#sv-s-r-step1", {"opacity": 0}, 2.84);
+tl.set("#sv-s-r-step2", {"opacity": 0}, 2.84);
+tl.set("#sv-s-r-step3", {"opacity": 0}, 2.84);
+tl.set("#sv-s-r-step4", {"opacity": 0}, 2.84);
+tl.set("#sv-s-r-step5", {"opacity": 0}, 2.84);
+tl.set("#sv-s-r-step6", {"opacity": 0}, 2.84);
+tl.set("#sv-s-r-step7", {"opacity": 0}, 2.84);
+tl.fromTo("#sv-s-r-step8", {"yPercent": 0}, {"yPercent": 100, "duration": 0.26, "ease": "power2.in"}, 2.84);
+tl.to("#sv-wrap", {"scale": 1, "y": 0, "duration": 0.3, "ease": "power2.inOut"}, 2.8);
+tl.to("#sv-h3 .ln > span", {yPercent: -105, duration: 0.22, ease: "power3.in", stagger: 0.03}, 2.86);
+tl.to("#sv-sub .ln > span", {yPercent: -105, duration: 0.22, ease: "power3.in", stagger: 0.03}, 2.88);
+window.__timelines["saves"] = tl;
+</script>
+</template>

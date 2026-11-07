@@ -1,0 +1,6 @@
+# Regenerable: rerun work/capture-detail.cjs, work/build.py, `npx hyperframes render`.
+composition/.hyperframes/
+work/frames/
+work/cap/
+work/render.log
+work/tts-*.log

@@ -1,0 +1,7 @@
+vo1|Most football apps count goals. Keepers don't score.
+vo2|Matchday rates the position you actually play. Same nil-nil: forward, fifty-four. Keeper, seventy-two.
+vo3|Every save counts, and your rating updates as you type.
+vo4|Every point is explained. Never a black box.
+vo5|Paste the coach's message, and the fixture fills itself in.
+vo6|And your year on the pitch? Wrapped.
+vo7|Matchday. Built around your position, and it works with no signal.
