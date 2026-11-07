@@ -1,4 +1,4 @@
-import { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { LazyMotion, MotionConfig, domMax, m, useScroll, useTransform } from 'motion/react';
 import { springs } from './lib/motion';
 import { useAppearance } from './useAppearance';
@@ -31,6 +31,7 @@ import { TournamentSheet } from './components/TournamentSheet';
 import { ImportFixturesSheet } from './components/ImportFixturesSheet';
 import { TrainingFormSheet, type TrainingFormTarget } from './components/TrainingFormSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
+import { CheckingAccount, OpeningSplash, SignInScreen } from './components/SignInScreen';
 import { WhoIsThisFor } from './components/WhoIsThisFor';
 import { ACADEMY } from './lib/features';
 import { MediaScreen } from './components/MediaScreen';
@@ -162,6 +163,31 @@ function Shell() {
     return () => window.clearTimeout(timer);
   }, [imported]);
 
+  // Signed in on this phone just now, rather than opened already signed in:
+  // worth a moment to see what the account brings before showing anything.
+  const accountId = sync.account?.id ?? null;
+  const [seenAccount, setSeenAccount] = useState(accountId);
+  const [signedInHere, setSignedInHere] = useState<string | null>(null);
+  const [carryOn, setCarryOn] = useState(false);
+  if (accountId !== seenAccount) {
+    setSeenAccount(accountId);
+    setSignedInHere(accountId && !seenAccount ? accountId : null);
+    setCarryOn(false);
+  }
+
+  // Someone who works at an academy and has no player of their own goes
+  // straight to the academy on a new phone, rather than being asked. Once per
+  // sign-in, so leaving it for the first question doesn't bounce them back.
+  const pickedAcademyFor = useRef<string | null>(null);
+  const staffOnly =
+    ACADEMY && academy.enabled && academy.mode === null && !profile.onboardedAt && sync.checked && !sync.household &&
+    academy.loaded && academy.academies.length > 0 && pickedAcademyFor.current !== accountId;
+  useLayoutEffect(() => {
+    if (!staffOnly) return;
+    pickedAcademyFor.current = accountId;
+    academy.setMode('academy');
+  }, [staffOnly, accountId, academy]);
+
   const pending = useMemo(() => pendingResultMatches(matches, settings, now), [matches, settings, now]);
 
   // Sheets read from the store by id so they never show a stale copy of a match.
@@ -197,14 +223,34 @@ function Shell() {
   );
   const showInvite = inviteYear !== null && !showPrompt && !sheetOpen && !showAgeAsk && !wrappedView;
 
+  // With accounts in this build, nothing opens until someone signs in. A phone
+  // that has signed in before opens at once, signal or not.
+  if (sync.available && !sync.account) {
+    return sync.status === 'checking' ? <OpeningSplash /> : <SignInScreen />;
+  }
+
   // Academy staff: their half of the app, with no player's calendar unless this phone has one.
   // (ACADEMY first each time: with the release switched off, the build drops all of this.)
-  if (ACADEMY && academy.enabled && academy.mode === 'academy') {
+  if ((ACADEMY && academy.enabled && academy.mode === 'academy') || staffOnly) {
     return (
       <Suspense fallback={<AcademyShellSkeleton />}>
         <AcademyShell hasPlayer={Boolean(profile.onboardedAt)} />
       </Suspense>
     );
+  }
+
+  // Before setting anyone up, or straight after signing in: what the account
+  // already has. A player it has comes down with the first sync and this
+  // gives way to the app itself - no details typed in twice.
+  const academyUnknown =
+    ACADEMY && academy.enabled && academy.mode === null && !academy.loaded &&
+    (academy.status === 'idle' || academy.status === 'loading');
+  if (
+    sync.available && !carryOn &&
+    ((!sync.checked && (!profile.onboardedAt || signedInHere === accountId)) ||
+      (!profile.onboardedAt && sync.checked && academyUnknown))
+  ) {
+    return <CheckingAccount onCarryOn={() => setCarryOn(true)} />;
   }
 
   // First run: collect the player's details before showing the app proper -

@@ -30,10 +30,10 @@ function message(e: unknown): string {
   return describeAuthError(e instanceof Error ? e.message : String(e));
 }
 
-/** Email, then code. Used in Setup, on the first setup screen for joining, and to open the academy area. */
+/** Email, then code. The sign-in screen the app opens on, and the same form in Setup and the academy area. */
 export function SignInForm({
   intro = true,
-  footnote = 'Nothing leaves this phone until you sign in, and the app works exactly as it does now if you never do.',
+  footnote = 'Everything on this phone stays where it is when you sign in.',
 }: {
   intro?: boolean;
   footnote?: string;
@@ -81,8 +81,8 @@ export function SignInForm({
       {stage === 'email' ? (
         <>
           {intro && (<p className="muted small">
-            Optional. Sign in and everyone in the family sees the same calendar - add a training session on one phone
-            and it turns up on the others. A lost or wiped phone stops meaning a lost season.
+            Sign in and everyone in the family sees the same calendar - add a training session on one phone and it
+            turns up on the others. A lost or wiped phone stops meaning a lost season.
           </p>)}
           <Field label="Your email">
             <input
@@ -237,7 +237,7 @@ function SignedIn({ sync }: { sync: SyncValue }) {
       await sync.invite(address);
       setEmail('');
       setNote(
-        `Invited. On their phone, they open Matchday and sign in with ${address} - on a new phone, from "Joining your family?" on the first screen; otherwise from Setup.`,
+        `Invited. On their phone, they open Matchday and sign in with ${address}, and the family's matches come up.`,
       );
       await refresh();
     });
@@ -340,7 +340,8 @@ function SignedIn({ sync }: { sync: SyncValue }) {
         </button>
       </div>
       <p className="muted small">
-        Match photos and clips stay on each phone. Signing out keeps everything on this phone as it is.
+        Match photos and clips stay on each phone. Signing out goes back to the sign-in screen; everything on this phone
+        stays as it is.
       </p>
     </>
   );

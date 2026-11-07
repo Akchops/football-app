@@ -9,8 +9,8 @@ Matchday you agree to these terms.
 
 ## The app
 
-Matchday tracks a player's matches, training and stats, and optionally shares
-them with family and with academies. It is free. It is provided as it is: we
+Matchday tracks a player's matches, training and stats, and can share them
+with family and with academies. It is free. It is provided as it is: we
 work to keep it running and correct, but we cannot promise it will always be
 available or free of mistakes, and stats are only as accurate as what is
 entered.
@@ -21,8 +21,8 @@ checked figures.
 
 ## Accounts
 
-- Signing in is optional. Keep the email account you sign in with secure; a
-  sign-in code is the key to your account.
+- You sign in with your email to use Matchday. Keep that email account
+  secure; a sign-in code is the key to your account.
 - Under 13s should use Matchday with a parent or guardian, and only a parent or
   guardian, or a player of 13 or over, may agree to share with an academy.
 - Pick a username that isn't offensive and doesn't pretend to be someone else.

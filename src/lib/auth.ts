@@ -1,4 +1,4 @@
-import { authSettings, configured, returnAddress, supabase } from './supabase';
+import { authSettings, configured, returnAddress, sessionKey, supabase } from './supabase';
 
 /** Somebody signed in. Not the player - the person holding the phone. */
 export interface Account {
@@ -27,6 +27,47 @@ function toAccount(user: RawUser | null | undefined): Account | null {
 }
 
 /**
+ * The account a session saved on this phone belongs to - the raw value the
+ * sign-in library keeps in storage. Null for anything that isn't a whole
+ * session (the library throws those away too).
+ */
+export function accountFromStoredSession(raw: string | null): Account | null {
+  if (!raw) return null;
+  try {
+    const session = JSON.parse(raw) as {
+      access_token?: unknown;
+      refresh_token?: unknown;
+      expires_at?: unknown;
+      user?: RawUser | null;
+    } | null;
+    if (!session || typeof session !== 'object') return null;
+    if (typeof session.access_token !== 'string' || typeof session.refresh_token !== 'string') return null;
+    if (!session.user || typeof session.user.id !== 'string' || !session.user.id) return null;
+    return toAccount(session.user);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Who has signed in on this phone, read straight from storage: at once, before
+ * the sign-in library has loaded, and with no signal. The library keeps the
+ * session there until someone signs out or the server turns it down for good.
+ * An access token that has only run out - it lasts an hour - stays, because
+ * with no signal it can't be renewed; and the library then reports nobody
+ * signed in, after half a minute of trying. The app is mostly opened at a
+ * pitch, so that can't be what decides whether it opens.
+ */
+export function rememberedAccount(): Account | null {
+  if (!configured()) return null;
+  try {
+    return accountFromStoredSession(localStorage.getItem(sessionKey()));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Who is signed in, or null. Resolves from the session already in storage, so it
  * works with no signal - which matters, because the app is mostly opened
  * somewhere with none.
@@ -35,11 +76,13 @@ export async function currentAccount(): Promise<Account | null> {
   if (!configured()) return null;
   try {
     const { data } = await (await supabase()).auth.getSession();
-    return toAccount(data.session?.user);
+    // A session that has run out and can't be renewed right now comes back as
+    // none. It is still this person's phone.
+    return toAccount(data.session?.user) ?? rememberedAccount();
   } catch {
     // Offline, or the backend is unreachable. Not being able to check is not the
-    // same as being signed out, but there is nothing better to report.
-    return null;
+    // same as being signed out.
+    return rememberedAccount();
   }
 }
 
@@ -104,8 +147,10 @@ export function onAccountChange(listener: (account: Account | null) => void): ()
 
   void supabase()
     .then((client) => {
-      const { data } = client.auth.onAuthStateChange((_event, session) => {
-        listener(toAccount(session?.user));
+      const { data } = client.auth.onAuthStateChange((event, session) => {
+        // Only signing out signs anyone out. Opening with no signal and a
+        // run-out token reports no session too, and that's still them.
+        listener(toAccount(session?.user) ?? (event === 'SIGNED_OUT' ? null : rememberedAccount()));
       });
       // Unsubscribed before the client finished loading.
       if (dropped) data.subscription.unsubscribe();
