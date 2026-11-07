@@ -1,0 +1,10 @@
+# Large or regenerable intermediates: rerun work/capture.cjs, work/render.cjs and work/audio.py to rebuild.
+work/frames/
+work/seq/
+work/cap/
+work/shots/
+work/stills/
+work/final/
+work/*.wav
+work/*.log
+work/brag-raw.mp4

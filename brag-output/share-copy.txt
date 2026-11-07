@@ -1,0 +1,1 @@
+Most football apps count goals, which is bad news if you're a keeper. Matchday asks where you play first: the same 0–0 rates 54 for a forward and 72 for a keeper, every save moves your match rating, and the season ends in your own Wrapped. It runs in your phone's browser and works with no signal at the pitch: https://akchops.github.io/football-app/
