@@ -1,7 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-    <rect width="64" height="64" rx="14.08" fill="#0b1220"/>
-    
-    <circle cx="32" cy="32" r="23.04" fill="#f8fafc"/>
-    <polygon points="32.00,22.78 40.76,29.15 37.42,39.46 26.58,39.46 23.24,29.15" fill="#0b1220"/>
-    <path d="M32.00,22.78 L32.00,9.65 M40.76,29.15 L53.25,25.09 M37.42,39.46 L45.14,50.08 M26.58,39.46 L18.86,50.08 M23.24,29.15 L10.75,25.09" stroke="#0b1220" stroke-width="2.65" stroke-linecap="round" fill="none"/>
-  </svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs><radialGradient id="bgs" gradientUnits="userSpaceOnUse" cx="512.00" cy="300.00" r="760.00"><stop offset="0" stop-color="#0D121C"/><stop offset="0.55" stop-color="#06080D"/><stop offset="1" stop-color="#030406"/></radialGradient><linearGradient id="gb" gradientUnits="userSpaceOnUse" x1="0" y1="209.70" x2="0" y2="814.30"><stop offset="0" stop-color="#24272B"/><stop offset="1" stop-color="#17191D"/></linearGradient><filter id="gBlack" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="16.00"/></filter><filter id="gGreen" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="22.00"/></filter></defs>
+<rect width="1024" height="1024" fill="url(#bgs)"/>
+<polygon points="510.70,209.70 711.90,220.10 782.70,408.40 819.00,592.30 680.80,713.20 512.40,814.30 353.50,721.00 205.00,592.30 245.60,401.50 323.30,231.30" fill="#D5DCE4" opacity="0.35" filter="url(#gBlack)"/>
+<polygon points="512.40,337.60 666.10,444.60 782.70,408.40 711.90,220.10 510.70,209.70" fill="#55E898" opacity="1" filter="url(#gGreen)"/>
+<polygon points="512.40,337.60 666.10,444.60 782.70,408.40 711.90,220.10 510.70,209.70" fill="#55E898" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="666.10,444.60 782.70,408.40 819.00,592.30 680.80,713.20 603.10,621.70" fill="url(#gb)" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="603.10,621.70 680.80,713.20 512.40,814.30 353.50,721.00 420.00,621.70" fill="url(#gb)" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="420.00,621.70 353.50,721.00 205.00,592.30 245.60,401.50 359.60,444.60" fill="url(#gb)" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="359.60,444.60 245.60,401.50 323.30,231.30 510.70,209.70 512.40,337.60" fill="url(#gb)" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="512.40,337.60 666.10,444.60 603.10,621.70 420.00,621.70 359.60,444.60" fill="url(#gb)" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="510.70,209.70 711.90,220.10 782.70,408.40 819.00,592.30 680.80,713.20 512.40,814.30 353.50,721.00 205.00,592.30 245.60,401.50 323.30,231.30" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linejoin="round"/>
+</svg>
