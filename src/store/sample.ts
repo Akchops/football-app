@@ -52,7 +52,7 @@ export function buildSampleData(now: Date = new Date()): AppData {
   const result = (over: Partial<MatchResult>): MatchResult => ({
     goalsFor: 0, goalsAgainst: 0, penaltiesFor: null, penaltiesAgainst: null,
     didPlay: true, minutes: 80, position: 'GK', positionGroup: 'goalkeeper',
-    rating: null, motm: false, yellowCards: 0, redCards: 0, metrics: {}, ...over,
+    motm: false, yellowCards: 0, redCards: 0, metrics: {}, ...over,
   });
 
   const make = (over: Partial<Match>): Match => ({
@@ -67,33 +67,33 @@ export function buildSampleData(now: Date = new Date()): AppData {
 
   const matches: Match[] = [
     spring({ stage: 'group', stageDetail: 'B', opponent: 'Oakfield', time: '10:00',
-      result: result({ goalsFor: 2, goalsAgainst: 0, minutes: 30, rating: 8,
+      result: result({ goalsFor: 2, goalsAgainst: 0, minutes: 30,
         metrics: { saves: 4, conceded: 0, claims: 2 } }) }),
     spring({ stage: 'semi', opponent: 'Hillcrest', time: '12:30',
-      result: result({ goalsFor: 1, goalsAgainst: 1, penaltiesFor: 3, penaltiesAgainst: 2, minutes: 30, rating: 9,
+      result: result({ goalsFor: 1, goalsAgainst: 1, penaltiesFor: 3, penaltiesAgainst: 2, minutes: 30,
         motm: true, metrics: { saves: 5, conceded: 1, penaltiesSaved: 2 } }) }),
     spring({ stage: 'final', opponent: 'Vale FC', time: '15:00',
-      result: result({ goalsFor: 0, goalsAgainst: 1, minutes: 30, rating: 7,
+      result: result({ goalsFor: 0, goalsAgainst: 1, minutes: 30,
         metrics: { saves: 6, conceded: 1, claims: 1 } }) }),
     make({ opponent: 'Riverside FC', date: iso(-28), time: '14:00', venue: 'away', status: 'played',
-      result: result({ goalsFor: 2, goalsAgainst: 1, rating: 8, motm: true,
+      result: result({ goalsFor: 2, goalsAgainst: 1, motm: true,
         metrics: { saves: 5, conceded: 1, claims: 3 } }) }),
     make({ opponent: 'Kingsway United', date: iso(-21), time: '16:30', venue: 'home', status: 'played',
-      result: result({ goalsFor: 0, goalsAgainst: 3, rating: 5,
+      result: result({ goalsFor: 0, goalsAgainst: 3,
         metrics: { saves: 2, conceded: 3, claims: 1 } }) }),
     make({ opponent: 'Barton Athletic', date: iso(-14), time: '11:00', venue: 'home', competitionId: cup.id,
-      stage: 'round', stageDetail: '2', status: 'played', result: result({ goalsFor: 1, goalsAgainst: 1, penaltiesFor: 4, penaltiesAgainst: 3, rating: 7,
+      stage: 'round', stageDetail: '2', status: 'played', result: result({ goalsFor: 1, goalsAgainst: 1, penaltiesFor: 4, penaltiesAgainst: 3,
         metrics: { saves: 4, conceded: 1, penaltiesSaved: 2, claims: 2 } }) }),
     // A Sunday-league outing for the second club.
     make({ opponent: 'Dockside Rovers', date: iso(-10), time: '10:30', venue: 'away', teamId: sundaySide.id,
       competitionId: null, status: 'played', durationMinutes: 90,
-      result: result({ goalsFor: 3, goalsAgainst: 0, rating: 8, minutes: 90,
+      result: result({ goalsFor: 3, goalsAgainst: 0, minutes: 90,
         metrics: { saves: 6, conceded: 0, claims: 4, sweeperActions: 2 } }) }),
     make({ opponent: 'Old Boys', date: iso(-7), time: '16:30', venue: 'away', status: 'played',
-      result: result({ goalsFor: 3, goalsAgainst: 0, rating: 9, motm: true,
+      result: result({ goalsFor: 3, goalsAgainst: 0, motm: true,
         metrics: { saves: 3, conceded: 0, claims: 2, sweeperActions: 1 } }) }),
     make({ opponent: 'Northside Rangers', date: iso(-4), time: '16:30', venue: 'home', status: 'played',
-      result: result({ goalsFor: 2, goalsAgainst: 2, rating: 7, yellowCards: 1,
+      result: result({ goalsFor: 2, goalsAgainst: 2, yellowCards: 1,
         metrics: { saves: 4, conceded: 2, claims: 1 } }) }),
     // Kicked off yesterday and never logged - this is what triggers the result prompt.
     make({ opponent: 'Eastfield Town', date: iso(-1), time: '16:30', venue: 'away' }),

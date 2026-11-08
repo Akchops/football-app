@@ -7,13 +7,29 @@ things that actually matter for that position. A keeper gets saves, clean
 sheets, goals conceded and save percentage. A defender gets tackles,
 interceptions, clearances and blocks.
 
-It runs in the browser and keeps everything on the device. Signing in is
-optional: it shares a player's matches with their family, and links them to an
-academy. Without it, nothing is uploaded.
+It runs in the browser and keeps everything on the device, so it opens with no
+signal. You sign in first, with a code sent by email: someone new gets an
+account that way, and someone coming back - a new phone, the app put back on -
+gets their player, teams and matches back instead of setting them up again.
+The account also shares a player's matches with their family, and links them to
+an academy. (A build with no account backend set up skips signing in and keeps
+everything on the one phone.)
 
 ## What it does
 
-**Setup (first run)**
+**Signing in (first screen)**
+- The app opens on signing in and nothing else, whenever the build has an
+  account backend: an email, then the six-digit code sent to it (or Google,
+  once switched on). There's no password, and no separate "sign up"
+- An account that already has a player opens straight into the app, with
+  everything synced down - no setup screens. Only an account with no player yet
+  goes on to the setup below, and only once
+- A phone that has signed in before opens at once, even with no signal and an
+  hour-old session that can't be renewed until there is some
+- A phone that already has matches keeps them: signing in saves them to the
+  account, or, if the account has its own, asks whether to keep both
+
+**Setup (first run, for a new account)**
 - Name, date of birth (age worked out for you, so it goes up on your birthday),
   and the age group you play in — suggested from your date of birth using the
   31 August cutoff
@@ -27,10 +43,10 @@ academy. Without it, nothing is uploaded.
   stats the whole app tracks
 - Every team you play for — add as many as you like. Each gets its own colour,
   and you can play a different position at each one
-- It's a local profile, not a login, and everything can be changed later in
-  Setup. Signing in is a separate, optional step (see below)
-- Once academies are switched on, a new phone first asks who it's for: one
-  player (this setup), or an academy
+- Everything can be changed later in Setup
+- Once academies are switched on, a new account first asks who it's for: one
+  player (this setup), or an academy. Someone who already works at an academy,
+  with no player of their own, goes straight to it
 
 **Calendar (main screen)**
 - Month grid showing every match, with a count on any day holding more than one
@@ -204,7 +220,7 @@ academy. Without it, nothing is uploaded.
   keepers — it isn't their job)
 - **Your game**: average match score, plus your last five performances out of
   100 as a trend, then the six stats that matter for your position
-- Minutes, discipline, self-rating
+- Minutes and discipline
 - **Personal bests**: most saves in a match, longest clean sheet run, longest
   unbeaten run, best match score — each showing where it happened
 - **Tournaments**: every tournament you've played in, with how far you got, its
@@ -228,12 +244,12 @@ academy. Without it, nothing is uploaded.
 - Demo data (a keeper across two clubs) to try the app, and a clear-everything
   button
 
-## Family and academies (optional, with an account)
+## Family and academies (with an account)
 
 Both need the backend in [supabase/](supabase/README.md) to be set up; until it
-is, none of this shows.
+is, none of this shows, and the app doesn't ask anyone to sign in.
 
-**Family.** Sign in with a code sent by email, invite the rest of the family,
+**Family.** Everyone signs in with a code sent by email; invite the rest of the family,
 and everyone sees the same calendar - a change on one phone turns up on the
 others. Match photos and clips stay on the phone they're on.
 
@@ -280,7 +296,6 @@ played, so the same stat line scores differently for a keeper and a striker.
   defeat still rates well
 - Discipline: yellow −3, red −12. Man of the match +5
 - A short cameo swings the score less than a full 90
-- If you gave yourself a rating out of 10, it's blended in at 30%
 
 The breakdown is always visible on the match, so the number is never a black box.
 
@@ -355,9 +370,11 @@ Once that's set, the site is served from
 `https://<user>.github.io/football-app/`. The build uses relative asset paths,
 so it works from that subpath without extra configuration.
 
-Everything is stored in the browser, so each phone that opens the link keeps
-its own data. Signing in (see Family and academies) shares it between a
-family's phones; without that, Export/Import in Setup moves it across.
+Everything is stored in the browser too, so the app works with no signal. The
+account it signs in to keeps a copy, so a new phone gets everything back by
+signing in, and a family's phones stay in step. In a build with no account
+backend, each phone keeps its own data and Export/Import in Setup moves it
+across.
 
 ## Layout on a phone
 

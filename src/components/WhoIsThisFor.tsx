@@ -1,4 +1,5 @@
 import type { AppMode } from '../store/AcademyProvider';
+import { useSync } from '../store/SyncProvider';
 import { BallIcon, ShieldIcon } from './icons';
 import { Logo } from './Logo';
 
@@ -7,6 +8,7 @@ import { Logo } from './Logo';
  * matches, or an academy's whole set-up. Either can add the other later.
  */
 export function WhoIsThisFor({ onPick }: { onPick: (mode: AppMode) => void }) {
+  const sync = useSync();
   return (
     <div className="onboarding">
       <div className="onboard-top">
@@ -26,7 +28,7 @@ export function WhoIsThisFor({ onPick }: { onPick: (mode: AppMode) => void }) {
           <span className="who-text">
             <span className="who-name">Me or my child</span>
             <span className="who-blurb">
-              One player&apos;s matches, training and stats. Works on this phone with no account.
+              One player&apos;s matches, training and stats.
             </span>
           </span>
         </button>
@@ -38,11 +40,19 @@ export function WhoIsThisFor({ onPick }: { onPick: (mode: AppMode) => void }) {
           <span className="who-text">
             <span className="who-name">An academy</span>
             <span className="who-blurb">
-              Squads, league tables and players&apos; stats for picking teams, shared with your coaches. Needs an
-              account.
+              Squads, league tables and players&apos; stats for picking teams, shared with your coaches.
             </span>
           </span>
         </button>
+
+        {sync.account && (
+          <p className="muted small">
+            Signed in as {sync.account.email} ·{' '}
+            <button className="link-btn inline" onClick={() => void sync.signOut()}>
+              Use a different email
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );

@@ -21,6 +21,19 @@ export function configured(): boolean {
   return URL !== '' && KEY !== '';
 }
 
+/**
+ * Where the sign-in library keeps the session on the phone: its own default
+ * key, worked out the way it works it out. Kept as the default rather than set,
+ * so phones already signed in stay signed in.
+ */
+export function sessionKey(): string {
+  try {
+    return `sb-${new globalThis.URL(URL).hostname.split('.')[0]}-auth-token`;
+  } catch {
+    return '';
+  }
+}
+
 let client: Promise<SupabaseClient> | null = null;
 
 /**

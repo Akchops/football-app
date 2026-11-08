@@ -323,13 +323,6 @@ export function StatsScreen({
             </span>
             <span className="table-sub">{stats.motm} man of the match</span>
           </div>
-          {stats.averageRating !== null && (
-            <div className="table-row">
-              <span className="table-name">Your own rating</span>
-              <span className="table-value">{stats.averageRating.toFixed(1)}</span>
-              <span className="table-sub">out of 10, self-rated</span>
-            </div>
-          )}
         </div>
       </Section>
 

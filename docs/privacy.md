@@ -7,15 +7,16 @@
 > [square brackets], and publish it where the app can link to it.
 
 Matchday is a football tracker for one player's matches, training and stats,
-with optional family sharing and academies. It is run by [Aarav Chopra]
+with family sharing and academies. It is run by [Aarav Chopra]
 ("we"). Contact: [contact email].
 
-## Without an account: nothing leaves the phone
+## On the phone
 
-Used without signing in, everything you enter - the player's name, date of
-birth, age group, position, photo, teams, matches, results, stats, notes and
-training - is kept only in this browser on this device. We never see it.
-**Setup → Your data → Clear all data** removes it.
+Everything you enter - the player's name, date of birth, age group, position,
+photo, teams, matches, results, stats, notes and training - is kept in this
+browser on this device, so the app works with no signal. **Setup → Your data →
+Clear all data** removes it from the phone. (A version of Matchday run without
+accounts keeps it only there, and we never see it.)
 
 Match photos and videos are always kept only on the phone they were added on,
 signed in or not.
@@ -28,9 +29,10 @@ Gemini, through Matchday's own small server) to get an answer. Matchday does
 not keep them. Google's terms for its API apply to what it receives. You can
 use the rest of the app without these features.
 
-## With an account (optional)
+## Your account
 
-Signing in is optional. If you do:
+Matchday asks you to sign in before you use it, so that a new phone, or the app
+put back on, gets everything back. Signing in means:
 
 - **Your email address** is used only to send sign-in codes. Nobody else in the
   app sees it - family members you invite see the addresses in the household,

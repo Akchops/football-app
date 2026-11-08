@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { accountsAvailable, currentAccount, onAccountChange, signOut as endSession, type Account } from '../lib/auth';
+import {
+  accountsAvailable, currentAccount, onAccountChange, rememberedAccount, signOut as endSession, type Account,
+} from '../lib/auth';
 import { supabaseRemote } from '../lib/remote';
 import { supabase } from '../lib/supabase';
 import { syncOnce, type Household, type Invite, type Person, type Remote, type SentInvite, type SyncState } from '../lib/syncEngine';
@@ -31,6 +33,12 @@ export interface SyncValue {
   /** Whether this build has an account backend at all. */
   available: boolean;
   account: Account | null;
+  /**
+   * The first sync since this account opened on the phone has worked, so
+   * whether it already has a player - and a family - is known. Stays true
+   * through later syncs, so screens that wait on it don't flicker.
+   */
+  checked: boolean;
   status: SyncStatus;
   lastSynced: number | null;
   error: string;
@@ -72,6 +80,7 @@ function isOffline(error: unknown): boolean {
 const OFF: SyncValue = {
   available: false,
   account: null,
+  checked: false,
   status: 'off',
   lastSynced: null,
   error: '',
@@ -92,7 +101,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const store = useStore();
   const available = accountsAvailable();
 
-  const [account, setAccount] = useState<Account | null>(null);
+  // Whoever signed in on this phone before, from storage, so the app opens on
+  // the first frame - signal or not - rather than on a sign-in screen.
+  const [account, setAccount] = useState<Account | null>(() => (available ? rememberedAccount() : null));
+  const [checkedFor, setCheckedFor] = useState<string | null>(null);
   const [status, setStatus] = useState<SyncStatus>(available ? 'checking' : 'off');
   const [lastSynced, setLastSynced] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -103,7 +115,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   // through these rather than through whatever it closed over.
   const storeRef = useRef(store);
   storeRef.current = store;
-  const accountRef = useRef<Account | null>(null);
+  const accountRef = useRef<Account | null>(account);
   const remoteRef = useRef<Remote | null>(null);
   const running = useRef(false);
   const again = useRef(false);
@@ -146,6 +158,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       });
       if (accountRef.current?.id !== signedIn.id) return;
       setHousehold(result.household);
+      setCheckedFor(signedIn.id);
       setLastSynced(Date.now());
       setError('');
       setStatus('synced');
@@ -171,10 +184,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const settle = async (found: Account | null) => {
       if (!live) return;
       accountRef.current = found;
-      setAccount(found);
+      // The same person as the copy from storage keeps the same object, so
+      // nothing that depends on it starts over.
+      setAccount((before) => (before && found && before.id === found.id && before.email === found.email ? before : found));
       if (!found) {
         remoteRef.current = null;
         setHousehold(null);
+        setCheckedFor(null);
         setStatus('signed-out');
         return;
       }
@@ -273,6 +289,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     () => ({
       available,
       account,
+      checked: account !== null && checkedFor === account.id,
       status,
       lastSynced,
       error,
@@ -286,7 +303,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       joinInvite,
       signOut,
     }),
-    [available, account, status, lastSynced, error, household, joinQuestion, answerJoin, run, family, invite, cancelInvite, joinInvite, signOut],
+    [available, account, checkedFor, status, lastSynced, error, household, joinQuestion, answerJoin, run, family, invite, cancelInvite, joinInvite, signOut],
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

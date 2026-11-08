@@ -407,7 +407,9 @@ export function SetupScreen({
           appears. On iPhone, open it in Safari and tap Share → Add to Home Screen.
         </p>
         <p className="muted small">
-          It stores everything on this device, so each phone that opens it keeps its own separate data.
+          {signedIn
+            ? 'It keeps everything on this phone too, so it opens with no signal, and catches up with your account when it has one.'
+            : 'It stores everything on this device, so each phone that opens it keeps its own separate data.'}
         </p>
       </Section>
 

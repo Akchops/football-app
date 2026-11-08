@@ -143,12 +143,6 @@ export function MatchDetailSheet({
                 <span className="perf-stat-label">Clean sheet</span>
               </div>
             )}
-            {result.rating !== null && (
-              <div className="perf-stat">
-                <span className="perf-stat-value">{result.rating}</span>
-                <span className="perf-stat-label">Your rating</span>
-              </div>
-            )}
           </div>
 
           <details className="perf-breakdown">

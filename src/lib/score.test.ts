@@ -97,13 +97,6 @@ describe('matchScore', () => {
     expect(benched.breakdown).toEqual([]);
   });
 
-  it('blends in a self rating when one was given', () => {
-    const base = keeper({ goalsAgainst: 0, metrics: { saves: 4 } });
-    const harsh = matchScore({ ...base, rating: 4 });
-    const generous = matchScore({ ...base, rating: 10 });
-    expect(generous.score).toBeGreaterThan(harsh.score);
-  });
-
   it('bands and describes scores', () => {
     expect(scoreBand(85)).toBe('great');
     expect(scoreBand(70)).toBe('good');
