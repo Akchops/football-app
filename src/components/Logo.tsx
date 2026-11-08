@@ -1,54 +1,35 @@
-import { useId } from 'react';
+// Matchday's mark: a faceted ball with one panel lit green. The six panels a
+// regular dodecahedron shows face-on, lit from the top left, flat colours with
+// real gaps for seams - the same artwork as docs/brand/logo/symbol.svg, with
+// the seams a little wider since it's drawn at around 24px.
+const GREEN = '#30D27C';
+const LIGHT = '#3B3F45';
+const MID = '#35393E';
+const DARK = '#2A2E32';
 
-const PANELS = [
-  '666.1,444.6 782.7,408.4 819.0,592.3 680.8,713.2 603.1,621.7',
-  '603.1,621.7 680.8,713.2 512.4,814.3 353.5,721.0 420.0,621.7',
-  '420.0,621.7 353.5,721.0 205.0,592.3 245.6,401.5 359.6,444.6',
-  '359.6,444.6 245.6,401.5 323.3,231.3 510.7,209.7 512.4,337.6',
-  '512.4,337.6 666.1,444.6 603.1,621.7 420.0,621.7 359.6,444.6',
+const PANELS: [string, string][] = [
+  ['M230.52,87.38L193.65,36.64L134,17.26L134,51.01L198.41,97.81Z', GREEN],
+  ['M21.78,161.51L58.64,212.26L78.48,184.95L53.88,109.23L21.78,98.79Z', MID],
+  ['M177.52,184.95L197.36,212.26L234.22,161.51L234.22,98.79L202.12,109.23Z', DARK],
+  ['M187.65,219.31L167.81,192L88.19,192L68.35,219.31L128,238.69Z', DARK],
+  ['M128,61.49L65.69,106.76L89.49,180L166.51,180L190.31,106.76Z', MID],
+  ['M57.59,97.81L122,51.01L122,17.26L62.35,36.64L25.48,87.38Z', LIGHT],
 ];
-const LIT = '512.4,337.6 666.1,444.6 782.7,408.4 711.9,220.1 510.7,209.7';
 
-/**
- * Matchday's mark: a faceted ball with one panel lit green. The same artwork as
- * the app icon (docs/brand/matchday-logo.svg), drawn inline and cropped to the
- * ball, without the black tile - so it's sharp at any size, on either theme.
- */
+/** The ball on its own, without the black tile, so it sits on either theme. */
 export function Logo({ size = '1em', className }: { size?: number | string; className?: string }) {
-  // Gradient ids are page-wide, so each copy of the mark needs its own.
-  const id = useId().replace(/[^a-zA-Z0-9_-]/g, '');
-  const body = `logo-body-${id}`;
-  const lit = `logo-lit-${id}`;
-  const halo = `logo-halo-${id}`;
   return (
     <svg
       className={className ? `logo ${className}` : 'logo'}
-      viewBox="176 176 672 672"
+      viewBox="16.5 16 223 223"
       width={size}
       height={size}
       aria-hidden="true"
       focusable="false"
     >
-      <defs>
-        <linearGradient id={body} gradientUnits="userSpaceOnUse" x1="0" y1="209.7" x2="0" y2="814.3">
-          <stop offset="0" stopColor="#23272c" />
-          <stop offset="1" stopColor="#16191d" />
-        </linearGradient>
-        <linearGradient id={lit} gradientUnits="userSpaceOnUse" x1="0" y1="209.7" x2="0" y2="814.3">
-          <stop offset="0" stopColor="#48E597" />
-          <stop offset="1" stopColor="#30D27C" />
-        </linearGradient>
-        <filter id={halo} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="16" />
-        </filter>
-      </defs>
-      <polygon points={LIT} fill="#30D27C" opacity="0.55" filter={`url(#${halo})`} />
-      <g stroke="#000000" strokeWidth="15" strokeLinejoin="round">
-        <polygon points={LIT} fill={`url(#${lit})`} />
-        {PANELS.map((points) => (
-          <polygon key={points} points={points} fill={`url(#${body})`} />
-        ))}
-      </g>
+      {PANELS.map(([d, fill]) => (
+        <path key={d} d={d} fill={fill} />
+      ))}
     </svg>
   );
 }
