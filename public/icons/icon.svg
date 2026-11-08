@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Matchday">
+  <!-- The app icon on its rounded tile (docs/brand/icons/app-icon-rounded.svg), for the opening splash in index.html. -->
+<defs><radialGradient id="glow"><stop offset="0" stop-color="#30D27C" stop-opacity="0.38"/><stop offset="1" stop-color="#30D27C" stop-opacity="0"/></radialGradient></defs><rect width="256" height="256" rx="57" fill="#000000"/><circle cx="163.7" cy="80.8" r="72" fill="url(#glow)"/><path d="M202.23,102.20L175.21,65.02L131.50,50.82L131.50,76.30L177.99,110.08Z" fill="#30D27C"/>
+<path d="M51.61,154.82L78.63,192.00L93.61,171.39L75.85,116.74L51.61,108.86Z" fill="#35393E"/>
+<path d="M162.39,171.39L177.37,192.00L204.39,154.82L204.39,108.86L180.15,116.74Z" fill="#2A2E32"/>
+<path d="M171.71,196.12L156.73,175.50L99.27,175.50L84.29,196.12L128.00,210.32Z" fill="#2A2E32"/>
+<path d="M128.00,82.41L82.74,115.29L100.03,168.50L155.97,168.50L173.26,115.29Z" fill="#35393E"/>
+<path d="M78.01,110.08L124.50,76.30L124.50,50.82L80.79,65.02L53.77,102.20Z" fill="#3B3F45"/>
+</svg>
