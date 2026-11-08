@@ -309,7 +309,8 @@ async function workload(id) {
     } catch {
       // counted as no rating
     }
-    report('google', `${id} ${label}`, result.status === 200 && rating > 0, `${describe(result)} · rating ${rating}`);
+    const said = rating > 0 ? '' : ` · said ${JSON.stringify(result.text.slice(0, 160))}`;
+    report('google', `${id} ${label}`, result.status === 200 && rating > 0, `${describe(result)} · rating ${rating}${said}`);
   }
 }
 
@@ -346,7 +347,8 @@ async function checkWorker() {
 
   if (!IMPORT_ONLY) {
     const drills = await callWorker('/drills', { player, ask: 'one short warm-up for handling crosses' });
-    report('worker', 'Coach (/drills)', drills.status === 200 && Boolean(drills.body.result), workerDetail(drills));
+    const shape = missing(drills.body.result, ['title', 'focus', 'progression'], ['warmup', 'drills', 'kit']);
+    report('worker', 'Coach (/drills)', drills.status === 200 && !shape, workerDetail(drills, shape));
   }
 
   const fixturesPrompt = [
@@ -398,13 +400,31 @@ async function checkWorker() {
       label: `Frame at 0:0${i}`,
     })),
   });
-  report('worker', 'Clip as frames (/clip)', frames.status === 200 && Boolean(frames.body.result), workerDetail(frames));
+  const clipShape = (result) => missing(result, ['headline', 'whatHappened', 'confidence'], ['didWell', 'improve'], ['rating']);
+  report('worker', 'Clip as frames (/clip)', frames.status === 200 && !clipShape(frames.body.result), workerDetail(frames, clipShape(frames.body.result)));
 
-  const video = await callWorker('/clip', {
-    prompt: clipPrompt('This is one short clip. Judge only this passage of play.'),
-    media: [{ mimeType: 'video/webm', data: sample('clip.webm') }],
-  });
-  report('worker', 'Clip as video (/clip)', video.status === 200 && Boolean(video.body.result), workerDetail(video));
+  // webm is what Android records; an iPhone's clip arrives as a .mov, typed video/quicktime.
+  for (const [label, file, mimeType] of [
+    ['Clip as video (/clip)', 'clip.webm', 'video/webm'],
+    ['Clip as iPhone .mov (/clip)', 'clip.mov', 'video/quicktime'],
+  ]) {
+    const video = await callWorker('/clip', {
+      prompt: clipPrompt('This is one short clip. Judge only this passage of play.'),
+      media: [{ mimeType, data: sample(file) }],
+    });
+    report('worker', label, video.status === 200 && !clipShape(video.body.result), workerDetail(video, clipShape(video.body.result)));
+  }
+}
+
+/** What the app's screen reads off a reply but is not there, or '' when it all is. */
+function missing(result, strings, arrays, numbers = []) {
+  if (!result || typeof result !== 'object') return 'no result';
+  const gaps = [
+    ...strings.filter((k) => typeof result[k] !== 'string'),
+    ...arrays.filter((k) => !Array.isArray(result[k])),
+    ...numbers.filter((k) => typeof result[k] !== 'number'),
+  ];
+  return gaps.length ? `missing ${gaps.join(', ')} · keys: ${Object.keys(result).join(', ')}` : '';
 }
 
 // ---------------------------------------------------------------------------
