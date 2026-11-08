@@ -326,7 +326,14 @@ async function callWorker(path, payload) {
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(130_000),
     });
-    const body = await response.json().catch(() => ({}));
+    const text = await response.text();
+    let body;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // Not the worker's own JSON - a Cloudflare error page, say. Keep a little of it.
+      body = { raw: text.replace(/\s+/g, ' ').slice(0, 160) };
+    }
     return { status: response.status, ms: performance.now() - started, body };
   } catch (error) {
     return { status: 0, ms: performance.now() - started, body: { error: `${error.name}: ${error.message}` } };
@@ -413,6 +420,16 @@ async function checkWorker() {
       media: [{ mimeType, data: sample(file) }],
     });
     report('worker', label, video.status === 200 && !clipShape(video.body.result), workerDetail(video, clipShape(video.body.result)));
+  }
+
+  // The samples above are tiny; a phone's clip is megabytes. These are noise, so
+  // Google turning them down is expected - the check is that the worker itself
+  // lives long enough to say so, in its own words, rather than dying on the size.
+  for (const mb of [1, 6, 14]) {
+    const noise = Buffer.alloc(mb * 1024 * 1024, 7).toString('base64');
+    const big = await callWorker('/clip', { prompt: clipPrompt('One short clip.'), media: [{ mimeType: 'video/mp4', data: noise }] });
+    const own = typeof big.body.error === 'string' || Boolean(big.body.result);
+    report('worker', `Clip-sized body, ${mb} MB (/clip)`, own, workerDetail(big, own ? '' : `not the worker's reply: ${big.body.raw ?? ''}`));
   }
 }
 
