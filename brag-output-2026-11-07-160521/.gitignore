@@ -4,3 +4,5 @@ work/frames/
 work/cap/
 work/render.log
 work/tts-*.log
+composition-vertical/.hyperframes/
+work/render-vertical.log

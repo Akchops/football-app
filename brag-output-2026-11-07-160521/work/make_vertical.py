@@ -26,6 +26,26 @@ s = s.replace('data-width="1920" data-height="1080"', 'data-width="1080" data-he
 s = s.replace('width: 1920px; height: 1080px', 'width: 1080px; height: 1920px')
 s = s.replace('content="width=1920, height=1080"', 'content="width=1080, height=1920"')
 
+# ---------------------------------------------------------------- the new Matchday logo (docs/brand/logo/symbol.svg)
+NEW_LOGO = """
+# The new mark, from docs/brand/logo/symbol.svg on claude/bold-bell-mv7bmj: flat greys, the lit panel top right.
+LOGO_PATHS = [
+    ('M227.24,90.02L191.05,40.22L132.50,21.19L132.50,55.49L194.62,100.62Z', '#30D27C'),
+    ('M25.98,160.15L62.17,209.95L82.33,182.21L58.60,109.18L25.98,98.58Z', '#35393E'),
+    ('M173.67,182.21L193.83,209.95L230.02,160.15L230.02,98.58L197.40,109.18Z', '#2A2E32'),
+    ('M186.55,215.24L166.39,187.50L89.61,187.50L69.45,215.24L128.00,234.27Z', '#2A2E32'),
+    ('M128.00,63.34L67.46,107.33L90.58,178.50L165.42,178.50L188.54,107.33Z', '#35393E'),
+    ('M61.38,100.62L123.50,55.49L123.50,21.19L64.95,40.22L28.76,90.02Z', '#3B3F45'),
+]
+
+
+def logo_svg(uid, size):
+    paths = ''.join(f'<path d="{d}" fill="{f}"/>' for d, f in LOGO_PATHS)
+    return f'<svg viewBox="22 21.7 212 212" width="{size}" height="{size}" style="display:block">{paths}</svg>'
+"""
+s = sub(s, "\n# ---------------------------------------------------------------- phone geometry", NEW_LOGO + "\n# ---------------------------------------------------------------- phone geometry", 1)
+s = sub(s, "letter-spacing: -0.005em; }", "letter-spacing: -0.005em; }\n.wordmark { letter-spacing: 0.02em; }")
+
 blocks = re.split(r'\n(?=# ================================================================ )', s)
 by = {b.split('\n', 1)[0].replace('# ================================================================ ', ''): i for i, b in enumerate(blocks)}
 
@@ -33,6 +53,8 @@ by = {b.split('\n', 1)[0].replace('# ===========================================
 def edit(key, fn):
     i = next(i for k, i in by.items() if k.startswith(key))
     blocks[i] = fn(blocks[i])
+
+
 
 
 # ---------------------------------------------------------------- 1. hook: the 0 on top, the lines under it
@@ -65,6 +87,7 @@ edit('shared left-column css', col)
 
 def reveal(b):
     b = sub(b, "logo_svg('rvlogo', 96)", "logo_svg('rvlogo', 64)")
+    b = sub(b, '<span data-layout-allow-overflow class="ln word display">', '<span data-layout-allow-overflow class="ln word display wordmark">')
     b = sub(b, "tl.fromto('#rv-wrap', {'y': 1100}", "tl.fromto('#rv-wrap', {'y': 1350}")
     return b
 
@@ -123,7 +146,6 @@ edit('6. wrapped', wrapped)
 
 
 def outro(b):
-    b = sub(b, "#ou-pitch { left: 0; top: 0; width: 1920px; height: 1080px; }", "#ou-pitch { left: 0; top: 0; width: 1080px; height: 1920px; }")
     b = sub(b, "#ou-logo { left: 840px; top: 250px; width: 240px; height: 240px; }", "#ou-logo { left: 410px; top: 630px; width: 260px; height: 260px; }")
     b = sub(b, "#ou-word { left: 0; width: 1920px; top: 590px; text-align: center; font-size: 190px; line-height: 0.9; }",
             "#ou-word { left: 0; width: 1080px; top: 1010px; text-align: center; font-size: 180px; line-height: 0.9; }")
@@ -136,6 +158,10 @@ def outro(b):
     b = sub(b, 'cx="960" cy="370" r="205"', 'cx="540" cy="760" r="225"')
     b = sub(b, 'transform="rotate(-90 960 370)"', 'transform="rotate(-90 540 760)"')
     b = sub(b, "logo_svg('oulogo', 240)", "logo_svg('oulogo', 260)")
+    b = sub(b, "tl.fromto('#oulogo-halo', {'opacity': 1}, {'opacity': 0.55, 'duration': 1.2, 'ease': 'power2.out'}, 0.3)\n", "")
+    b = sub(b, "{'scale': 0.4, 'rotation': -40, 'opacity': 0}, {'scale': 1, 'rotation': 0, 'opacity': 1, 'duration': 0.5, 'ease': 'back.out(1.8)'}",
+            "{'scale': 0.5, 'opacity': 0}, {'scale': 1, 'opacity': 1, 'duration': 0.55, 'ease': 'back.out(1.6)'}")
+    b = sub(b, 'id="ou-word" class="abs display"', 'id="ou-word" class="abs display wordmark"')
     return b
 
 
@@ -143,13 +169,14 @@ edit('7. outro', outro)
 
 
 def background(b):
-    b = sub(b, "#bg-ground { left: 0; top: 0; width: 1920px; height: 1080px; background: #000; }", "#bg-ground { left: 0; top: 0; width: 1080px; height: 1920px; background: #000; }")
     b = sub(b, "#bg-glow { left: 510px; top: -340px;", "#bg-glow { left: -360px; top: 150px;")
     b = sub(b, "#bg-circle { left: 940px; top: 70px; width: 940px; height: 940px;", "#bg-circle { left: 110px; top: 622px; width: 860px; height: 860px;")
     b = sub(b, "{'x': -450, 'y': 60, 'scale': 1.15, 'duration': 0.8, 'ease': 'power2.inOut'}, 18.85)", "{'x': 0, 'y': -70, 'scale': 1.15, 'duration': 0.8, 'ease': 'power2.inOut'}, 18.85)")
     b = sub(b, "{'x': -450, 'y': 100, 'scale': 1.19, 'duration': 0.8, 'ease': 'power2.inOut'}, 18.85)", "{'x': 0, 'y': -60, 'scale': 1.1, 'duration': 0.8, 'ease': 'power2.inOut'}, 18.85)")
     b = sub(b, "tl.fromto('#bg-glow', {'x': -450, 'y': 60, 'scale': 1.15}, {'x': -450, 'y': -190, 'scale': 0.75,",
             "tl.fromto('#bg-glow', {'x': 0, 'y': -70, 'scale': 1.15}, {'x': 0, 'y': -292, 'scale': 0.75,")
+    # brand rule: no glow on the logo, so the glow goes before the logo lands
+    b = sub(b, "scene_file('bg', 25, css, body, tl)", "tl.to('#bg-glow', {'opacity': 0, 'duration': 0.5, 'ease': 'power2.out'}, 20.6)\nscene_file('bg', 25, css, body, tl)")
     return b
 
 

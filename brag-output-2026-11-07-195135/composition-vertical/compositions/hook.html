@@ -1,0 +1,84 @@
+<template>
+<style>
+
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('assets/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 500; src: url('assets/fonts/Inter-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 600; src: url('assets/fonts/Inter-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 700; src: url('assets/fonts/Inter-Bold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 800; src: url('assets/fonts/Inter-ExtraBold.otf') format('opentype'); }
+
+
+#root { position: absolute; inset: 0; color: #f2f2f7; font-family: 'Matchday Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+.display { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.005em; }
+.wordmark { letter-spacing: 0.02em; }
+.ln { display: block; overflow: hidden; padding: 0.04em 0.02em 0.02em; margin: -0.04em -0.02em -0.02em; }
+.ln > span { display: inline-block; }
+.green { color: #30d27c; }
+.muted { color: #a1a1a8; }
+.abs { position: absolute; }
+.col { position: absolute; left: 60px; width: 960px; text-align: center; }
+.phone { position: absolute; background: #0b0b0c; border-radius: 68px; padding: 14px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.16), inset 0 0 0 1.5px rgba(255,255,255,0.05), 0 40px 120px rgba(0,0,0,0.7); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 54px; overflow: hidden; background: #000; isolation: isolate; }
+.screen img { position: absolute; left: 0; width: 100%; display: block; opacity: 0; }
+.screen img.on { opacity: 1; }
+.sbar { position: absolute; left: 0; top: 0; right: 0; height: 42px; background: #000; z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 34px 0 44px; font-weight: 600; font-size: 17px; color: #fff; }
+.sbar .icons { display: flex; gap: 6px; align-items: center; }
+.lift { position: absolute; z-index: 10; opacity: 0; }
+.lift .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.lift .wrap img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+.lift .wrap img.on { opacity: 1; }
+.finger { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 12; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.8); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.ripple { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 11; opacity: 0;
+  border: 3px solid rgba(255,255,255,0.9); }
+
+
+.kicker { position: absolute; left: 280px; top: 214px; width: 520px; border-radius: 22px; overflow: hidden; }
+.kicker img { display: block; width: 100%; }
+.h { font-size: 80px; line-height: 0.92; }
+.sub { font-size: 36px; font-weight: 500; color: #a1a1a8; line-height: 1.3; }
+
+#hk-brand { left: 0; width: 1080px; top: 215px; display: flex; justify-content: center; align-items: center; gap: 16px; }
+#hk-brand .word { font-family: 'Barlow Condensed'; font-weight: 700; font-size: 50px; letter-spacing: 0.08em; color: #a1a1a8; text-transform: uppercase; }
+#hk-title { left: 0; width: 1080px; top: 300px; text-align: center; font-size: 176px; line-height: 0.95; }
+.who { position: absolute; width: 900px; border-radius: 28px; overflow: hidden; opacity: 0; }
+.who img { display: block; width: 100%; }
+#hk-player { left: 90px; top: 740px; }
+#hk-academy { left: 90px; top: 1030px; }
+#hk-ring { position: absolute; left: 0; top: 0; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.9); opacity: 0; }
+#hk-finger { position: absolute; left: 0; top: 0; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.85); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+
+</style>
+<div id="root" data-composition-id="hook" data-width="1080" data-height="1920" data-duration="3.6">
+<div id="hk-brand" class="abs"><span data-layout-allow-overflow class="ln" style="padding:6px;margin:-6px"><span><svg viewBox="22 21.7 212 212" width="60" height="60" style="display:block"><path d="M227.24,90.02L191.05,40.22L132.50,21.19L132.50,55.49L194.62,100.62Z" fill="#30D27C"/><path d="M25.98,160.15L62.17,209.95L82.33,182.21L58.60,109.18L25.98,98.58Z" fill="#35393E"/><path d="M173.67,182.21L193.83,209.95L230.02,160.15L230.02,98.58L197.40,109.18Z" fill="#2A2E32"/><path d="M186.55,215.24L166.39,187.50L89.61,187.50L69.45,215.24L128.00,234.27Z" fill="#2A2E32"/><path d="M128.00,63.34L67.46,107.33L90.58,178.50L165.42,178.50L188.54,107.33Z" fill="#35393E"/><path d="M61.38,100.62L123.50,55.49L123.50,21.19L64.95,40.22L28.76,90.02Z" fill="#3B3F45"/></svg></span></span><span data-layout-allow-overflow class="ln word wordmark"><span>Matchday</span></span></div>
+<div id="hk-title" class="abs display"><span data-layout-allow-overflow class="ln"><span>Who's this</span></span><span data-layout-allow-overflow class="ln green"><span>for?</span></span></div>
+<div id="hk-player" class="who"><img src="assets/img/who-player.png" alt=""></div>
+<div id="hk-academy" class="who"><img src="assets/img/who-academy.png" alt=""></div>
+<div id="hk-ring"></div><div id="hk-finger"></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#hk-brand .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.42, ease: "expo.out", stagger: 0.06}, 0.05);
+tl.fromTo("#hk-title .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.5, ease: "expo.out", stagger: 0.07}, 0.3);
+tl.fromTo("#hk-player", {"y": 60, "opacity": 0}, {"y": 0, "opacity": 1, "duration": 0.5, "ease": "back.out(1.4)"}, 0.95);
+tl.fromTo("#hk-academy", {"y": 60, "opacity": 0}, {"y": 0, "opacity": 1, "duration": 0.5, "ease": "back.out(1.4)"}, 1.15);
+tl.set("#hk-finger", {"x": 540.0, "y": 864.42}, 0);
+tl.set("#hk-ring", {"x": 540.0, "y": 864.42}, 0);
+tl.fromTo("#hk-finger", {"opacity": 0}, {"opacity": 1, "duration": 0.15}, 2.55);
+tl.fromTo("#hk-finger", {"scale": 1}, {"scale": 0.82, "duration": 0.07, "immediateRender": false}, 2.78);
+tl.fromTo("#hk-finger", {"scale": 0.82}, {"scale": 1, "duration": 0.1, "immediateRender": false}, 2.85);
+tl.fromTo("#hk-ring", {scale: 1, opacity: 0.75}, {scale: 2.6, opacity: 0, duration: 0.45, ease: "power2.out", immediateRender: false}, 2.85);
+tl.to("#hk-finger", {"opacity": 0, "duration": 0.15}, 3.0);
+tl.fromTo("#hk-player", {"boxShadow": "0 0 0 0px rgba(48,210,124,0), 0 0 0px rgba(48,210,124,0)"}, {"boxShadow": "0 0 0 3px rgba(48,210,124,0.9), 0 0 40px rgba(48,210,124,0.35)", "duration": 0.2, "immediateRender": false}, 2.88);
+tl.to("#hk-academy", {"opacity": 0.35, "duration": 0.15}, 2.88);
+tl.to("#hk-title .ln > span", {yPercent: -105, duration: 0.22, ease: "power3.in", stagger: 0.03}, 3.05);
+tl.to("#hk-brand .ln > span", {yPercent: -105, duration: 0.22, ease: "power3.in", stagger: 0.03}, 3.05);
+tl.to("#hk-academy", {"y": 60, "opacity": 0, "duration": 0.24, "ease": "power3.in"}, 3.05);
+tl.to("#hk-player", {"x": 190, "y": -526, "scale": 0.58, "transformOrigin": "0% 0%", "duration": 0.45, "ease": "power3.inOut"}, 3.1);
+window.__timelines["hook"] = tl;
+</script>
+</template>

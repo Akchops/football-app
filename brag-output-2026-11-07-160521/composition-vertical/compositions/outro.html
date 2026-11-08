@@ -1,0 +1,67 @@
+<template>
+<style>
+
+@font-face { font-family: 'Barlow Condensed'; font-weight: 700; src: url('assets/fonts/barlow-condensed-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Barlow Condensed'; font-weight: 800; src: url('assets/fonts/barlow-condensed-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 500; src: url('assets/fonts/Inter-Medium.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 600; src: url('assets/fonts/Inter-SemiBold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 700; src: url('assets/fonts/Inter-Bold.otf') format('opentype'); }
+@font-face { font-family: 'Matchday Inter'; font-weight: 800; src: url('assets/fonts/Inter-ExtraBold.otf') format('opentype'); }
+
+
+#root { position: absolute; inset: 0; color: #f2f2f7; font-family: 'Matchday Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+.display { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; text-transform: uppercase; letter-spacing: -0.005em; }
+.wordmark { letter-spacing: 0.02em; }
+.ln { display: block; overflow: hidden; padding: 0.04em 0.02em 0.02em; margin: -0.04em -0.02em -0.02em; }
+.ln > span { display: inline-block; }
+.green { color: #30d27c; }
+.muted { color: #a1a1a8; }
+.abs { position: absolute; }
+.col { position: absolute; left: 60px; width: 960px; text-align: center; }
+.phone { position: absolute; background: #0b0b0c; border-radius: 68px; padding: 14px;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,0.16), inset 0 0 0 1.5px rgba(255,255,255,0.05), 0 40px 120px rgba(0,0,0,0.7); }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 54px; overflow: hidden; background: #000; isolation: isolate; }
+.screen img { position: absolute; left: 0; width: 100%; display: block; opacity: 0; }
+.screen img.on { opacity: 1; }
+.sbar { position: absolute; left: 0; top: 0; right: 0; height: 42px; background: #000; z-index: 20; display: flex; align-items: center;
+  justify-content: space-between; padding: 6px 34px 0 44px; font-weight: 600; font-size: 17px; color: #fff; }
+.sbar .icons { display: flex; gap: 6px; align-items: center; }
+.lift { position: absolute; z-index: 10; opacity: 0; }
+.lift .wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.lift .wrap img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; opacity: 0; }
+.lift .wrap img.on { opacity: 1; }
+.finger { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 12; opacity: 0;
+  background: rgba(255,255,255,0.32); border: 2.5px solid rgba(255,255,255,0.8); box-shadow: 0 6px 18px rgba(0,0,0,0.45); }
+.ripple { position: absolute; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%; z-index: 11; opacity: 0;
+  border: 3px solid rgba(255,255,255,0.9); }
+
+
+#ou-pitch { left: 0; top: 0; width: 1080px; height: 1920px; }
+#ou-logo { left: 410px; top: 630px; width: 260px; height: 260px; }
+#ou-word { left: 0; width: 1080px; top: 1010px; text-align: center; font-size: 180px; line-height: 0.9; }
+#ou-tag { left: 0; width: 1080px; top: 1200px; text-align: center; font-size: 52px; font-weight: 600; letter-spacing: -0.015em; }
+#ou-cta { left: 0; width: 1080px; top: 1285px; text-align: center; font-size: 31px; font-weight: 500; color: #a1a1a8; }
+#ou-cta .dot { color: #30d27c; padding: 0 14px; }
+
+</style>
+<div id="root" data-composition-id="outro" data-width="1080" data-height="1920" data-duration="4.05">
+<svg id="ou-pitch" class="abs" viewBox="0 0 1080 1920">
+<line id="ou-line" x1="0" y1="760" x2="1080" y2="760" stroke="rgba(255,255,255,0.18)" stroke-width="4"/>
+<circle id="ou-circle" cx="540" cy="760" r="225" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="4" stroke-dasharray="1413.72" stroke-dashoffset="1413.72" transform="rotate(-90 540 760)"/>
+</svg>
+<div id="ou-logo" class="abs"><svg viewBox="22 21.7 212 212" width="260" height="260" style="display:block"><path d="M227.24,90.02L191.05,40.22L132.50,21.19L132.50,55.49L194.62,100.62Z" fill="#30D27C"/><path d="M25.98,160.15L62.17,209.95L82.33,182.21L58.60,109.18L25.98,98.58Z" fill="#35393E"/><path d="M173.67,182.21L193.83,209.95L230.02,160.15L230.02,98.58L197.40,109.18Z" fill="#2A2E32"/><path d="M186.55,215.24L166.39,187.50L89.61,187.50L69.45,215.24L128.00,234.27Z" fill="#2A2E32"/><path d="M128.00,63.34L67.46,107.33L90.58,178.50L165.42,178.50L188.54,107.33Z" fill="#35393E"/><path d="M61.38,100.62L123.50,55.49L123.50,21.19L64.95,40.22L28.76,90.02Z" fill="#3B3F45"/></svg></div>
+<div id="ou-word" class="abs display wordmark"><span data-layout-allow-overflow class="ln"><span>Matchday</span></span></div>
+<div id="ou-tag" class="abs"><span data-layout-allow-overflow class="ln"><span>Built around <span class="green">your position.</span></span></span></div>
+<div id="ou-cta" class="abs"><span data-layout-allow-overflow class="ln"><span>Runs in your phone's browser<span class="dot">·</span>Works with no signal</span></span></div>
+</div>
+<script>
+const tl = gsap.timeline({ paused: true });
+tl.fromTo("#ou-logo", {"scale": 0.5, "opacity": 0}, {"scale": 1, "opacity": 1, "duration": 0.55, "ease": "back.out(1.6)"}, 0.06);
+tl.fromTo("#ou-circle", {"strokeDashoffset": 1413.72}, {"strokeDashoffset": 0, "duration": 0.8, "ease": "power2.inOut"}, 0.1);
+tl.fromTo("#ou-line", {"scaleX": 0, "transformOrigin": "50% 50%"}, {"scaleX": 1, "transformOrigin": "50% 50%", "duration": 0.7, "ease": "power2.inOut"}, 0.1);
+tl.fromTo("#ou-word .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.5, ease: "expo.out", stagger: 0.07}, 0.2);
+tl.fromTo("#ou-tag .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.45, ease: "expo.out", stagger: 0.07}, 0.98);
+tl.fromTo("#ou-cta .ln > span", {yPercent: 105}, {yPercent: 0, duration: 0.45, ease: "expo.out", stagger: 0.07}, 1.15);
+window.__timelines["outro"] = tl;
+</script>
+</template>
