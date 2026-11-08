@@ -85,8 +85,25 @@ deliberately quiet on black; the green panel is what you spot first.
 | `public/icons/icon-maskable-512.png`, `apple-touch-icon.png` | `icons/app-icon.svg`: square and opaque, since phones round these themselves. The ball sits inside Android's safe circle |
 | `public/icons/badge-96.png` | `icons/badge.svg`: one colour, wide seams, for Android's status bar |
 
-Ready-made PNGs are in `png/`: the symbol and the app icon at 1024 px (app
-stores, profile pictures), and the horizontal lockup at 1200 px wide.
+## PNGs
+
+Every version is also in `png/` as a ready-made PNG with a transparent
+background (except the app icon and the Instagram picture, which are on black):
+
+| Folder | What's in it |
+|---|---|
+| `png/symbol/` | The ball at 1024 px: colour, one colour (black, white, lit panel open), and the small cut at 256 px |
+| `png/lockup/` | Horizontal (2400 px wide) and stacked (1200 px wide), each in dark, light, black and white |
+| `png/wordmark/` | MATCHDAY on its own, 2000 px wide, in ink, paper, black and white |
+| `png/app-icon/` | The app icon at 1024 px, square (app stores) and with rounded corners |
+| `png/social/` | `matchday-instagram-profile-1080.png`: the profile picture for Instagram and other round crops |
+
+`dark` and `white` versions are light-coloured, for dark backgrounds, so they
+look empty on a white preview. That's expected.
+
+The Instagram picture (`icons/instagram-profile.svg`) is the app icon's ball a
+little bigger on a full black square, so Instagram's circle crop never touches
+it. The glow stays, since a profile picture is never printed.
 
 The logo isn't trademark-checked. Before printing it on kit or merchandise, do
 a trademark search and a reverse image search.

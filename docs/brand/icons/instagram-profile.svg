@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Matchday">
+<defs><radialGradient id="glow"><stop offset="0" stop-color="#30D27C" stop-opacity="0.38"/><stop offset="1" stop-color="#30D27C" stop-opacity="0"/></radialGradient></defs><rect width="256" height="256" fill="#000000"/><circle cx="168.0" cy="74.0" r="80" fill="url(#glow)"/><path d="M210.93,97.85L180.78,56.36L132.00,40.51L132.00,68.87L183.95,106.61Z" fill="#30D27C"/>
+<path d="M42.60,156.75L72.75,198.24L89.42,175.30L69.57,114.22L42.60,105.46Z" fill="#35393E"/>
+<path d="M166.58,175.30L183.25,198.24L213.40,156.75L213.40,105.46L186.43,114.22Z" fill="#2A2E32"/>
+<path d="M176.78,202.94L160.11,180.00L95.89,180.00L79.22,202.94L128.00,218.79Z" fill="#2A2E32"/>
+<path d="M128.00,75.85L77.45,112.58L96.76,172.00L159.24,172.00L178.55,112.58Z" fill="#35393E"/>
+<path d="M72.05,106.61L124.00,68.87L124.00,40.51L75.22,56.36L45.07,97.85Z" fill="#3B3F45"/>
+</svg>
