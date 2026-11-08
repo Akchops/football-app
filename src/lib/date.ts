@@ -162,6 +162,19 @@ export function currentAge(dob: string, now: Date = new Date()): number | null {
 }
 
 /**
+ * The youngest anyone can be to have an account of their own: the UK's age of
+ * digital consent, and the line COPPA draws in the US. Younger players use
+ * Matchday through a parent's or guardian's account.
+ */
+export const ACCOUNT_MIN_AGE = 13;
+
+/** Whether a date of birth is old enough for an account: null when it isn't a real date of birth. */
+export function oldEnoughForAccount(dob: string, now: Date = new Date()): boolean | null {
+  const age = ageOn(dob, now);
+  return age === null ? null : age >= ACCOUNT_MIN_AGE;
+}
+
+/**
  * Youth football bands by age on 31 August of the current season, which is how
  * English grassroots leagues set them.
  */

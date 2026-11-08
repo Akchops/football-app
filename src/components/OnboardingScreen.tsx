@@ -4,7 +4,7 @@ import {
   AGE_GROUPS, POSITIONS_BY_GROUP, POSITION_GROUP_BLURB, POSITION_GROUP_LABEL, TEAM_COLORS,
   type PositionGroup,
 } from '../types';
-import { currentAge, suggestAgeGroup } from '../lib/date';
+import { ACCOUNT_MIN_AGE, currentAge, suggestAgeGroup } from '../lib/date';
 import { BusyLabel, Field } from './ui';
 import { accountsAvailable } from '../lib/auth';
 import { useSync } from '../store/SyncProvider';
@@ -139,6 +139,12 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
             <Field label="Date of birth" hint={age !== null ? `You're ${age}` : 'Used to suggest your age group'}>
               <input className="input" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
             </Field>
+            {accountsAvailable() && age !== null && age < ACCOUNT_MIN_AGE && (
+              <p className="muted small">
+                Under {ACCOUNT_MIN_AGE}, so this account should be a parent&apos;s or guardian&apos;s - signed in with
+                their email, not the player&apos;s.
+              </p>
+            )}
 
             <Field
               label="Age group you play in"

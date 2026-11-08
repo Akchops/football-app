@@ -23,8 +23,10 @@ checked figures.
 
 - You sign in with your email to use Matchday. Keep that email account
   secure; a sign-in code is the key to your account.
-- Under 13s should use Matchday with a parent or guardian, and only a parent or
-  guardian, or a player of 13 or over, may agree to share with an academy.
+- You must be 13 or over to have an account. A player under 13 uses Matchday
+  through a parent's or guardian's account, signed in with the grown-up's
+  email - and only a parent or guardian, or a player of 13 or over, may agree
+  to share with an academy.
 - Pick a username that isn't offensive and doesn't pretend to be someone else.
 
 ## Academies
@@ -50,6 +52,13 @@ checked figures.
 - Try to see data you haven't been given access to, or to get round the app's
   rules.
 - Upload anything you don't have the right to share.
+
+## Reporting something
+
+If something in Matchday - a photo, an academy's details, a username - is
+yours and was used without your permission, or shouldn't be there for any
+other reason, email [contact email] with what it is and where you saw it.
+We will look at it promptly and take it down if it shouldn't be there.
 
 ## Ending
 

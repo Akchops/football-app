@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { describeAuthError, googleAvailable, sendCode, signInWithGoogle, verifyCode } from '../lib/auth';
+import { ACCOUNT_MIN_AGE, oldEnoughForAccount, todayISO } from '../lib/date';
 import type { Invite, Person, SentInvite } from '../lib/syncEngine';
 import { useSync, type SyncValue } from '../store/SyncProvider';
 import { BusyLabel, Field, LoadingLine, Section } from './ui';
@@ -30,7 +31,33 @@ function message(e: unknown): string {
   return describeAuthError(e instanceof Error ? e.message : String(e));
 }
 
-/** Email, then code. The sign-in screen the app opens on, and the same form in Setup and the academy area. */
+/**
+ * Asked before anyone gives an email, so nobody under 13 makes an account of
+ * their own. Remembered for this visit only - so a sign-out and back in doesn't
+ * ask twice - and only that the answer was 13 or over: never the date itself.
+ */
+const AGE_CHECKED_KEY = 'matchday.signInAge.v1';
+
+function ageCheckedThisVisit(): boolean {
+  try {
+    return sessionStorage.getItem(AGE_CHECKED_KEY) === 'ok';
+  } catch {
+    return false;
+  }
+}
+
+function rememberAgeChecked() {
+  try {
+    sessionStorage.setItem(AGE_CHECKED_KEY, 'ok');
+  } catch {
+    // Private mode and the like: it's asked again next time, which is fine.
+  }
+}
+
+/**
+ * Date of birth, then email, then code. The sign-in screen the app opens on,
+ * and the same form in Setup and the academy area.
+ */
 export function SignInForm({
   intro = true,
   footnote = 'Everything on this phone stays where it is when you sign in.',
@@ -40,7 +67,11 @@ export function SignInForm({
 }) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
-  const [stage, setStage] = useState<'email' | 'code'>('email');
+  const [stage, setStage] = useState<'age' | 'under13' | 'email' | 'code'>(() =>
+    ageCheckedThisVisit() ? 'email' : 'age',
+  );
+  const [dob, setDob] = useState('');
+  const [grownUp, setGrownUp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [google, setGoogle] = useState(false);
@@ -74,11 +105,64 @@ export function SignInForm({
 
   const verify = () => run(() => verifyCode(email, code));
 
+  const checkAge = () => {
+    const ok = oldEnoughForAccount(dob);
+    if (ok === null) return setError("That date of birth doesn't look right - check the year.");
+    setError('');
+    setDob('');
+    if (!ok) return setStage('under13');
+    rememberAgeChecked();
+    setStage('email');
+  };
+
   return (
     <>
       {error && <p className="notice warn">{error}</p>}
 
-      {stage === 'email' ? (
+      {stage === 'age' ? (
+        <>
+          <Field
+            label={grownUp ? "Parent or guardian's date of birth" : 'Your date of birth'}
+            hint={
+              grownUp
+                ? "Yours, not the player's - theirs comes after signing in. It isn't saved."
+                : "Whoever is signing in. Setting this up for your child? Put yours - theirs comes next. It isn't saved."
+            }
+          >
+            <input
+              className="input"
+              type="date"
+              max={todayISO()}
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && dob && checkAge()}
+            />
+          </Field>
+          <div className="button-row">
+            <button className="primary-btn" disabled={!dob} onClick={checkAge}>
+              Continue
+            </button>
+          </div>
+        </>
+      ) : stage === 'under13' ? (
+        <>
+          <p className="notice">
+            Players under {ACCOUNT_MIN_AGE} use Matchday with a parent or guardian. Ask yours to sign in here with their
+            own email - they set you up as the player, and you use it together.
+          </p>
+          <div className="button-row">
+            <button
+              className="ghost-btn"
+              onClick={() => {
+                setGrownUp(true);
+                setStage('age');
+              }}
+            >
+              A parent or guardian is here
+            </button>
+          </div>
+        </>
+      ) : stage === 'email' ? (
         <>
           {intro && (<p className="muted small">
             Sign in and everyone in the family sees the same calendar - add a training session on one phone and it

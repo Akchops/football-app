@@ -34,6 +34,10 @@ use the rest of the app without these features.
 Matchday asks you to sign in before you use it, so that a new phone, or the app
 put back on, gets everything back. Signing in means:
 
+- **Your date of birth** is asked first, before your email, only to check that
+  whoever is signing in is 13 or over. It is not saved or sent anywhere. Under
+  13s are asked to get a parent or guardian to sign in with their own email.
+
 - **Your email address** is used only to send sign-in codes. Nobody else in the
   app sees it - family members you invite see the addresses in the household,
   and that is all. Academies and other players only ever see a **username**
@@ -92,9 +96,12 @@ squads, competitions and team picks from the app at any time.
 
 ## Children
 
-Matchday is used by and for young players. A player under 13 needs a parent or
-guardian to set up any sharing, and only a parent or guardian, or a player of
-13 or over, can agree to an academy seeing their records. [Review against the
+Matchday is used by and for young players. Accounts are for parents and
+guardians, and for players of 13 or over: sign-in asks for a date of birth
+before anything else, and a player under 13 is asked to have a parent or
+guardian sign in with their own email and set them up. So a player under 13
+is always on a grown-up's account, and only a parent or guardian, or a player
+of 13 or over, can agree to an academy seeing their records. [Review against the
 ICO Children's code: high privacy by default, no nudges to share more, clear
 explanations for children.]
 

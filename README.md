@@ -19,8 +19,13 @@ everything on the one phone.)
 
 **Signing in (first screen)**
 - The app opens on signing in and nothing else, whenever the build has an
-  account backend: an email, then the six-digit code sent to it (or Google,
-  once switched on). There's no password, and no separate "sign up"
+  account backend: a date of birth, then an email, then the six-digit code sent
+  to it (or Google, once switched on). There's no password, and no separate
+  "sign up"
+- The date of birth is whoever is signing in, and only checks they're 13 or
+  over: it isn't saved, and isn't asked again in the same visit. Under 13 is
+  asked to get a parent or guardian, who signs in with their own email and sets
+  the player up; setup says so again if the player's date of birth is under 13
 - An account that already has a player opens straight into the app, with
   everything synced down - no setup screens. Only an account with no player yet
   goes on to the setup below, and only once

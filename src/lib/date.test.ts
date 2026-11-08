@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ageGroupCheck, ageOn, countdown, daysBetween, formatDateShort, formatTime, fromISODate, kickoffAt, monthGrid,
-  calendarSeason, nextSeasonAgeGroup, relativeDayLabel, seasonLabel, suggestAgeGroup, toISODate, weekdayLabels,
+  calendarSeason, nextSeasonAgeGroup, oldEnoughForAccount, relativeDayLabel, seasonLabel, suggestAgeGroup, toISODate, weekdayLabels,
 } from './date';
 
 describe('date helpers', () => {
@@ -84,6 +84,18 @@ describe('age helpers', () => {
     expect(ageOn('2010-04-12', new Date(2026, 7, 23))).toBe(16);
     expect(ageOn('2010-12-12', new Date(2026, 7, 23))).toBe(15);
     expect(ageOn('', new Date(2026, 7, 23))).toBeNull();
+  });
+
+  it('lets 13 and over have an account, from the 13th birthday itself', () => {
+    const on = new Date(2026, 10, 8);
+    expect(oldEnoughForAccount('2013-11-08', on)).toBe(true);
+    expect(oldEnoughForAccount('2013-11-09', on)).toBe(false);
+    expect(oldEnoughForAccount('2018-05-01', on)).toBe(false);
+    expect(oldEnoughForAccount('1985-02-14', on)).toBe(true);
+    // Not a date of birth at all: in the future, blank, or not a date.
+    expect(oldEnoughForAccount('2027-01-01', on)).toBeNull();
+    expect(oldEnoughForAccount('', on)).toBeNull();
+    expect(oldEnoughForAccount('not a date', on)).toBeNull();
   });
 
   it('suggests a youth age group from age on 31 August', () => {
