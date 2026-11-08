@@ -71,8 +71,11 @@ required to run or build Matchday.
 
    and make the subject `Your Matchday code`. The `{{ .Token }}` is what makes
    the email carry a code rather than a link.
-5. **Authentication → URL Configuration → Site URL**:
-   `https://<your-github-username>.github.io/football-app/`
+5. **Authentication → URL Configuration → Site URL**: the app's address -
+   `https://<project>.pages.dev/` on Cloudflare Pages, or
+   `https://<your-github-username>.github.io/football-app/` on GitHub Pages.
+   Add the same address with `**` on the end under **Redirect URLs**, so
+   Google sign-in can come back to it.
 6. **Project Settings → API** (or *API Keys*): copy the **Project URL** and the
    **anon** / **publishable** key — never the *service_role* / *secret* one.
 7. GitHub → the repository → **Settings → Secrets and variables → Actions →

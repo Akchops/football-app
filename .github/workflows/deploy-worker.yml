@@ -30,3 +30,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           WORKERS_SUBDOMAIN: ${{ inputs.workers_subdomain }}
+          # The app's address on Cloudflare Pages (or a domain of your own), so
+          # it may call the worker as well as the GitHub Pages address.
+          APP_ORIGIN: ${{ vars.APP_ORIGIN }}

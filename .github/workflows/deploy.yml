@@ -18,6 +18,10 @@ concurrency:
 
 jobs:
   build:
+    # GitHub Pages on the free plan only serves public repositories. Once the
+    # repository is private, the app lives on Cloudflare Pages
+    # (deploy-cloudflare.yml) and this deploy skips itself instead of failing.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

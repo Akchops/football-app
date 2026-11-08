@@ -1,0 +1,9 @@
+# Cloudflare Pages reads this file and adds these headers to every page
+# (GitHub Pages ignores it). They stop other sites showing Matchday inside a
+# frame to trick someone into tapping things, stop browsers guessing file
+# types, and keep the app's addresses out of other sites' logs.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'
+  Referrer-Policy: strict-origin-when-cross-origin

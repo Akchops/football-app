@@ -1,0 +1,54 @@
+name: Deploy to Cloudflare Pages
+
+# Hosts the app on Cloudflare Pages, which works with a private repository
+# (GitHub Pages needs a paid plan for that). It uses the CLOUDFLARE_API_TOKEN
+# secret the AI proxy already has, with "Cloudflare Pages: Edit" added to it.
+# See "Hosting it" in README.md.
+on:
+  push:
+    branches: [claude/football-match-tracker-n5cq0n, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Let a running deploy finish rather than cancelling it half way.
+concurrency:
+  group: cloudflare-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - run: npm run build
+        env:
+          # Served from the root of <name>.pages.dev, not a /football-app/ sub-path.
+          VITE_BASE: /
+          # The same build variables as the GitHub Pages deploy.
+          VITE_AI_PROXY_URL: ${{ vars.AI_PROXY_URL }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_ACADEMY: ${{ vars.VITE_ACADEMY || 'true' }}
+
+      # Brings in wrangler, Cloudflare's command-line tool.
+      - run: npm install
+        working-directory: worker
+
+      # No 404.html is added: with none, Cloudflare Pages serves the app for any
+      # address, which is what a single-page app wants.
+      - run: ./.github/deploy-pages.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PAGES_PROJECT: ${{ vars.PAGES_PROJECT || 'matchday' }}

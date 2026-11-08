@@ -137,6 +137,26 @@ echo "Using rate-limit store $id"
 # Patch the id in for this run only; it is never committed.
 sed -i.bak "s/REPLACE_WITH_KV_ID/$id/" wrangler.toml && rm -f wrangler.toml.bak
 
+# Wherever else the app is hosted (Cloudflare Pages, a domain of your own): the
+# APP_ORIGIN repository variable - one address, or several separated by commas -
+# is added to the origins allowed to call the worker, for this run only.
+if [ -n "${APP_ORIGIN:-}" ]; then
+  extra=$(node -e '
+    try {
+      const out = process.argv[1].split(",").map((s) => s.trim()).filter(Boolean)
+        .map((s) => new URL(s).origin);
+      console.log(out.join(","));
+    } catch {
+      process.exit(1);
+    }
+  ' "$APP_ORIGIN") || {
+    echo "APP_ORIGIN should be the app's address, like https://matchday.pages.dev - got '$APP_ORIGIN'." >&2
+    exit 1
+  }
+  sed -i.bak -E "s#^(ALLOWED_ORIGINS = \"[^\"]*)\"#\1,$extra\"#" wrangler.toml && rm -f wrangler.toml.bak
+  echo "Also allowing: $extra"
+fi
+
 echo "Storing the Gemini key as a secret..."
 printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
 
@@ -168,7 +188,8 @@ if [ -n "$url" ]; then
   echo "    Settings -> Secrets and variables -> Actions -> Variables tab"
   echo "    New repository variable, name: AI_PROXY_URL"
   echo "    Value: $url"
-  echo "  Then run the 'Deploy to GitHub Pages' workflow again."
+  echo "  Then run the app's deploy workflow again ('Deploy to Cloudflare Pages',"
+  echo "  or 'Deploy to GitHub Pages')."
 else
   echo "  Deployed. Copy the workers.dev URL from the log above and set it as"
   echo "  the AI_PROXY_URL repository variable."

@@ -358,17 +358,39 @@ aren't set up on the server.
 
 ## Hosting it
 
-`.github/workflows/deploy.yml` builds the app, runs the tests, and publishes it
-to GitHub Pages on every push to the working branch (or on demand from the
-Actions tab). It needs Pages enabled once, by hand:
+Two deploy workflows build the app, run the tests and publish it on every push
+to the working branch (or on demand from the Actions tab).
 
-1. **Settings → Pages → Source: GitHub Actions**
-2. GitHub Pages needs the repository to be public, or a GitHub Pro plan for a
-   private one.
+**Cloudflare Pages** (`.github/workflows/deploy-cloudflare.yml`) works with a
+private repository on the free plan, and serves the app from
+`https://<project>.pages.dev/`. It uses the AI proxy's `CLOUDFLARE_API_TOKEN`
+secret, which needs one more permission: dash.cloudflare.com/profile/api-tokens
+→ the token → **Edit** → add **Account · Cloudflare Pages · Edit** → Update
+token (its value stays the same). The first run creates the Pages project,
+named `matchday` unless the `PAGES_PROJECT` repository variable says otherwise,
+and prints the address. Cloudflare also adds the safety headers in
+`public/_headers`.
 
-Once that's set, the site is served from
-`https://<user>.github.io/football-app/`. The build uses relative asset paths,
-so it works from that subpath without extra configuration.
+**GitHub Pages** (`.github/workflows/deploy.yml`) serves
+`https://<user>.github.io/football-app/`. It needs **Settings → Pages → Source:
+GitHub Actions** set once, and a public repository (or GitHub Pro). Once the
+repository is private it skips itself.
+
+**Moving from GitHub Pages to Cloudflare Pages.** Both run side by side until
+the last step, so nothing goes down:
+
+1. Add the Pages permission to the Cloudflare token (above), then run **Deploy
+   to Cloudflare Pages**. It prints the new address.
+2. Repository variable `APP_ORIGIN` = that address, then run **Deploy AI
+   proxy**, so the Coach, imports and reminders answer the new address.
+3. Supabase → **Authentication → URL Configuration**: Site URL = the new
+   address, and add it with `**` on the end under Redirect URLs.
+4. On each phone, open the new address and sign in: matches, teams and stats
+   come back from the account. Add it to the Home Screen and switch match
+   reminders on again. **Photos and clips don't move** - the browser keeps them
+   per address - so they stay in the old app.
+5. **Settings → General → Change visibility → Private.** The GitHub Pages site
+   goes offline, and its workflow skips itself from then on.
 
 Everything is stored in the browser too, so the app works with no signal. The
 account it signs in to keeps a copy, so a new phone gets everything back by
