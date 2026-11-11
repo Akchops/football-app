@@ -4,6 +4,8 @@ import { AnimatePresence, m, useScroll, useTransform } from 'motion/react';
 import { ROLE_LABEL, VERIFICATION_LABEL, can, type StaffRole } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
+import { useStatus } from '../../store/StatusProvider';
+import { StatusBanner } from '../StatusBanner';
 import { SignInForm } from '../AccountSettings';
 import { ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon } from '../icons';
 import { BusyLabel, Section, Sheet, Waiting } from '../ui';
@@ -75,6 +77,8 @@ const TAB_FOR: Record<AddWhat, AcademyTab> = {
 export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   const academy = useAcademy();
   const sync = useSync();
+  // Signal, but no server: the banner says so, rather than blaming the signal.
+  const serverDown = useStatus().health === 'outage';
   const [tab, setTab] = useState<AcademyTab>('home');
   const [switching, setSwitching] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
@@ -133,7 +137,9 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
       );
   } else if (!academy.loaded) {
     gate =
-      academy.status === 'offline' ? (
+      serverDown ? (
+        <Problem text="Matchday's server isn't answering, and the academy needs it the first time it opens on a phone. It opens by itself once the server is back." />
+      ) : academy.status === 'offline' ? (
         <Problem text="No signal. The academy needs a connection the first time it opens on a phone." />
       ) : academy.status === 'error' ? (
         <Problem text={academy.error} />
@@ -218,7 +224,8 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
       </header>
 
       <main className="content" ref={contentRef}>
-        {academy.loaded && academy.status === 'offline' && (
+        <StatusBanner />
+        {academy.loaded && academy.status === 'offline' && !serverDown && (
           <p className="notice offline-note">No signal - this is what the phone last saw.</p>
         )}
         {gate ??

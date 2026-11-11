@@ -282,6 +282,38 @@ Before real families and academies use accounts, the drafts in
 reviewing - it is children's data - and publishing where the app can link to
 them.
 
+## When the server is down
+
+Matchday never waits on its server: everything is saved on the phone first and
+syncs afterwards, so if the account server (Supabase) goes down the app still
+opens, and everything logged meanwhile syncs once it's back. What changes is
+that it says so, so nobody is left refreshing, reinstalling or emailing to ask:
+
+- **A banner at the top** - "Some things aren't working right now". It shows
+  when the phone has signal but the account server isn't answering. No signal
+  at all is normal at a pitch and gets no banner
+- **Tap it** for what still works (calendar, matches, results, stats, clips,
+  the coach, reminders), what's paused (syncing, signing in, inviting family,
+  academy changes), how many changes are waiting to sync, and a countdown to
+  the next check. It looks again every 30 seconds by itself, and when the
+  server is back the banner goes and everything catches up
+- **A message from Matchday**, set remotely: the **Status message** workflow
+  in the Actions tab (it works from the GitHub app on a phone) puts a title and
+  a message on every phone within a minute or so - "check back after 3pm". It's
+  kept on Cloudflare with the worker, not on Supabase, so it can be read while
+  Supabase is down. A message posted when nothing is down shows as a note, put
+  away with "Got it". See [worker/README.md](worker/README.md#the-status-message)
+- **An outage drill**: Setup → If Matchday's server goes down → Practise it on
+  this phone. That phone then acts exactly as if the server were down - the
+  banner, the details, changes waiting and then syncing when it's switched off -
+  so it can be tried out before it happens for real. Other phones aren't
+  affected
+
+How it tells an outage from no signal: the worker is on Cloudflare, nowhere
+near Supabase, so it answering while Supabase doesn't points at Supabase; neither
+answering points at the phone's own connection. That's in `src/lib/status.ts`,
+with tests.
+
 ## The match score
 
 Each performance is rated out of 100 from the stats that matter in the position

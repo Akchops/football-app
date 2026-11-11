@@ -1447,6 +1447,85 @@ select.input {
 .duration-custom .input { width: 96px; }
 .duration-unit { font-size: 13px; color: var(--muted); font-weight: 600; }
 
+/* ---------- status banner ----------
+   Something's down, or a message from Matchday. Amber for down - it's a
+   heads-up, not an error: nothing the player did, and nothing lost. */
+.status-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 32px);
+  margin: 0 16px 10px;
+  padding: 11px 12px 11px 14px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.15s ease;
+}
+.status-banner:active { transform: scale(0.985); }
+.status-banner.down {
+  border-color: color-mix(in srgb, var(--draw) 42%, transparent);
+  background: color-mix(in srgb, var(--draw) 13%, var(--surface));
+}
+.status-banner-icon { display: flex; flex: none; font-size: 21px; color: var(--accent); }
+.status-banner.down .status-banner-icon { color: var(--draw); }
+.status-banner-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.status-banner-text strong { font-size: 14.5px; line-height: 1.3; }
+.status-banner-text > span { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+.status-banner-chevron { display: flex; flex: none; font-size: 15px; color: var(--faint); }
+.status-drill-tag {
+  flex: none;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--draw);
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+/* The sign-in screen has its own side padding. */
+.onboard-body .status-banner { width: 100%; margin: 0; }
+
+.status-notice,
+.status-safe,
+.status-check {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--sheet-surface);
+}
+.status-notice p,
+.status-safe p,
+.status-check p { margin: 0; font-size: 14.5px; line-height: 1.45; }
+.status-notice p { white-space: pre-line; font-size: 15.5px; }
+.status-safe { background: color-mix(in srgb, var(--accent) 12%, var(--sheet-surface)); }
+.status-safe strong { color: var(--accent); font-size: 15px; }
+.status-lists { display: flex; flex-direction: column; gap: 14px; }
+.status-lists h3 {
+  margin: 0 0 6px 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.status-list { list-style: none; margin: 0; padding: 0; border-radius: var(--radius); background: var(--sheet-surface); }
+.status-list li { display: flex; align-items: center; gap: 11px; padding: 11px 14px; font-size: 15px; line-height: 1.35; }
+.status-list li + li { border-top: 1px solid var(--line-soft); }
+.status-list svg { flex: none; font-size: 15px; }
+.status-list.ok svg { color: var(--win); }
+.status-list.paused svg { color: var(--draw); }
+.status-check strong { font-variant-numeric: tabular-nums; }
+
 /* ---------- install / update ---------- */
 .install-banner {
   background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 14%, transparent), var(--surface));

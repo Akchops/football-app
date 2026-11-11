@@ -9,6 +9,7 @@
 
 import { describeFailure, generate } from './gemini';
 import { handlePush, type PushEnv } from './push';
+import { handleStatus } from './status';
 
 export { PushStore } from './push';
 
@@ -18,6 +19,7 @@ export interface Env extends PushEnv {
   ALLOWED_ORIGINS: string;
   /** Requests allowed per IP per day. */
   DAILY_LIMIT?: string;
+  /** Per-IP daily counters, the cached model id, and the status message (src/status.ts). */
   RATE_LIMIT: KVNamespace;
   /** Coach and clip models to try first, best first, comma-separated. */
   GEMINI_MODEL?: string;
@@ -168,7 +170,7 @@ function corsHeaders(origin: string | null, env: Env): Record<string, string> {
   const ok = origin && (allowed.includes('*') || allowed.includes(origin));
   return {
     'Access-Control-Allow-Origin': ok ? (origin as string) : allowed[0] ?? '',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'content-type',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
@@ -203,6 +205,13 @@ export default {
     const headers = corsHeaders(origin, env);
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
+
+    // The status message: read by the app on opening, and every 30 seconds
+    // while something is down. Public and read-only, so no origin check.
+    if (request.method === 'GET' && new URL(request.url).pathname.endsWith('/status')) {
+      return handleStatus(env.RATE_LIMIT, headers);
+    }
+
     if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405, headers);
 
     const allowed = env.ALLOWED_ORIGINS.split(',').map((o) => o.trim());

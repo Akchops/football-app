@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { drillOn } from './drill';
 
 /**
  * The connection to the account backend, if this build has one.
@@ -54,9 +55,45 @@ export function supabase(): Promise<SupabaseClient> {
         detectSessionInUrl: true,
         flowType: 'pkce',
       },
+      global: { fetch: drillFetch },
     }),
   );
   return client;
+}
+
+/**
+ * Every request to the account server goes through here. With the outage
+ * drill on (src/lib/drill.ts) it fails exactly the way a request does when the
+ * server can't be reached - so signing in, syncing and the academy all behave
+ * as they would in a real outage, and the sign-in library treats it as a
+ * blip to retry, never as a reason to sign anyone out.
+ */
+function drillFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (drillOn()) return Promise.reject(new TypeError('Failed to fetch'));
+  return fetch(input, init);
+}
+
+/**
+ * Whether the account server is answering at all: its sign-in service and,
+ * behind the database's API, the database itself. Any reply short of a server
+ * error counts - "you're not allowed to read that" still means it's up. True
+ * in a build with no account server, since there is nothing to be down.
+ */
+export async function pingAccountServer(timeoutMs = 8_000): Promise<boolean> {
+  if (!configured()) return true;
+  if (drillOn()) return false;
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), timeoutMs);
+  const ask = (path: string) =>
+    fetch(`${URL}${path}`, { headers: { apikey: KEY }, cache: 'no-store', signal: stop.signal }).then((r) => r.status < 500);
+  try {
+    const [auth, data] = await Promise.all([ask('/auth/v1/health'), ask('/rest/v1/households?select=id&limit=1')]);
+    return auth && data;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 let settings: Promise<{ external?: Record<string, boolean> }> | null = null;

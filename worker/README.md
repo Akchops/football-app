@@ -99,6 +99,25 @@ phone turns them on in Setup → Match reminders.
   proxy** after this change is all it takes to switch reminders on; until then
   the app says reminders aren't set up on the server.
 
+## The status message
+
+The worker also serves the message the app shows when something is wrong
+(`src/status.ts`) - "Syncing is down while our provider fixes an outage, check
+back after 3pm". It lives in the worker's own KV store on Cloudflare, not in
+Supabase, so it can still be read while Supabase is down.
+
+- **Posting one:** Actions tab → **Status message** → Run workflow, type the
+  message (and, if you like, a few words for the banner). It works from the
+  GitHub app on a phone. Phones with Matchday open show it within a minute or
+  so. It takes itself down after the number of hours given (6 by default), or
+  run the workflow again with **clear** ticked.
+- It needs nothing new: the `CLOUDFLARE_API_TOKEN` secret the proxy was
+  deployed with, and the proxy deployed at least once (the message goes in the
+  same KV store).
+- `GET /status` is public and read-only, and doesn't count towards
+  `DAILY_LIMIT`. The app reads it on opening, every few minutes while open,
+  and every 30 seconds while something is down.
+
 ## Costs and limits
 
 The Gemini free tier is shared across everyone using your proxy, and it is rate

@@ -246,6 +246,11 @@ export function isEmpty(out: Outgoing): boolean {
   return !out.profile && !out.settings && TABLES.every((t) => out.rows[t].length === 0);
 }
 
+/** How many records a push would send - "3 changes waiting to sync". */
+export function countOutgoing(out: Outgoing): number {
+  return TABLES.reduce((n, t) => n + out.rows[t].length, 0) + (out.profile ? 1 : 0) + (out.settings ? 1 : 0);
+}
+
 /**
  * A record as the server hands it back, made safe to hold: anything added to
  * the app since that phone last updated is filled in, exactly as an old backup

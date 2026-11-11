@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { describeAuthError, googleAvailable, sendCode, signInWithGoogle, verifyCode } from '../lib/auth';
 import type { Invite, Person, SentInvite } from '../lib/syncEngine';
+import { useStatus } from '../store/StatusProvider';
 import { useSync, type SyncValue } from '../store/SyncProvider';
 import { BusyLabel, Field, LoadingLine, Section } from './ui';
 
@@ -30,6 +31,11 @@ function message(e: unknown): string {
   return describeAuthError(e instanceof Error ? e.message : String(e));
 }
 
+/** Never got an answer at all - the error as the browser gives it, or as describeAuthError words it. */
+function unreachable(e: unknown): boolean {
+  return /failed to fetch|load failed|fetch failed|network|could not reach/i.test(e instanceof Error ? e.message : String(e));
+}
+
 /** Email, then code. The sign-in screen the app opens on, and the same form in Setup and the academy area. */
 export function SignInForm({
   intro = true,
@@ -44,6 +50,7 @@ export function SignInForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [google, setGoogle] = useState(false);
+  const status = useStatus();
 
   useEffect(() => {
     let live = true;
@@ -60,6 +67,8 @@ export function SignInForm({
       await work();
     } catch (e) {
       setError(message(e));
+      // Couldn't reach the server at all: find out whether it's the server, so the banner can say so.
+      if (unreachable(e)) status.checkNow();
     } finally {
       setBusy(false);
     }
@@ -153,7 +162,10 @@ export function SignInForm({
   );
 }
 
-function statusLine(sync: SyncValue): string {
+function statusLine(sync: SyncValue, serverDown: boolean): string {
+  if (serverDown && (sync.status === 'offline' || sync.status === 'error')) {
+    return "Matchday's server isn't answering - everything is saved on this phone and will sync once it's back.";
+  }
   switch (sync.status) {
     case 'syncing':
       return 'Syncing…';
@@ -242,7 +254,8 @@ function SignedIn({ sync }: { sync: SyncValue }) {
       await refresh();
     });
 
-  const line = statusLine(sync);
+  const serverDown = useStatus().health === 'outage';
+  const line = statusLine(sync, serverDown);
 
   return (
     <>
@@ -270,7 +283,7 @@ function SignedIn({ sync }: { sync: SyncValue }) {
 
       {error && <p className="notice warn">{error}</p>}
       {note && <p className="notice">{note}</p>}
-      {line && <p className={sync.status === 'error' ? 'notice warn' : 'muted small'}>{line}</p>}
+      {line && <p className={sync.status === 'error' && !serverDown ? 'notice warn' : 'muted small'}>{line}</p>}
 
       <p className="small">
         Signed in as <strong>{sync.account?.email}</strong>

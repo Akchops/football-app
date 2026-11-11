@@ -274,3 +274,34 @@ export function StarIcon({ on }: IconProps = {}) {
     </svg>
   );
 }
+
+/** exclamationmark.triangle - something isn't working. */
+export function AlertIcon() {
+  return (
+    <svg {...base}>
+      <path d="M10.3 4.2a2 2 0 013.4 0l7.4 12.9a2 2 0 01-1.7 3H4.6a2 2 0 01-1.7-3z" />
+      <path d="M12 9.5v4" />
+      <circle cx="12" cy="16.9" r="0.6" {...solid} />
+    </svg>
+  );
+}
+
+/** info.circle - a note from Matchday. */
+export function InfoIcon() {
+  return (
+    <svg {...base}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5.5" />
+      <circle cx="12" cy="7.8" r="0.6" {...solid} />
+    </svg>
+  );
+}
+
+/** pause - waiting for the server. */
+export function PauseIcon() {
+  return (
+    <svg {...base} strokeWidth={2.6}>
+      <path d="M9 6.5v11M15 6.5v11" />
+    </svg>
+  );
+}

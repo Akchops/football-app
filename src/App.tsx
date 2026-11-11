@@ -5,6 +5,7 @@ import { useAppearance } from './useAppearance';
 import { AppStoreProvider, useStore } from './store/AppStore';
 import { SyncProvider, useSync } from './store/SyncProvider';
 import { AcademyProvider, useAcademy } from './store/AcademyProvider';
+import { StatusProvider } from './store/StatusProvider';
 import { useNow } from './useNow';
 import type { Match } from './types';
 import { ageGroupCheck, kickoffAt, todayISO } from './lib/date';
@@ -44,6 +45,7 @@ const AIScreen = lazy(() => import('./components/AIScreen'));
 // build with the academy release switched off drops it altogether.
 const AcademyShell = /* @__PURE__ */ lazy(() => import('./components/academy/AcademyShell'));
 import { InstallBanner } from './components/InstallBanner';
+import { StatusBanner } from './components/StatusBanner';
 import { AddButton } from './components/AddButton';
 import { PullToRefresh } from './components/PullToRefresh';
 import { UndoProvider } from './components/UndoToast';
@@ -304,6 +306,7 @@ function Shell() {
       </header>
 
       <main className="content" ref={contentRef}>
+        <StatusBanner />
         <InstallBanner />
         <PullToRefresh scroller={contentRef} enabled={Boolean(sync.account)} onRefresh={sync.syncNow}>
         {/* Screens cross-fade and rise a touch; nothing slides sideways, as on iOS's tab bar. */}
@@ -527,9 +530,12 @@ export default function App() {
           <UpdatePrompt />
           <SyncProvider>
             <AcademyProvider>
-              <UndoProvider>
-                <Shell />
-              </UndoProvider>
+              {/* Whether the servers are answering - for the banner, wherever it shows. */}
+              <StatusProvider>
+                <UndoProvider>
+                  <Shell />
+                </UndoProvider>
+              </StatusProvider>
             </AcademyProvider>
           </SyncProvider>
         </AppStoreProvider>

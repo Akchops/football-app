@@ -1,7 +1,7 @@
 import { live } from '../store/storage';
 import type { AppData, Profile, Settings } from '../types';
 import {
-  TABLES, fingerprint, fromServer, hasContent, isEmpty, keyOf, mergeRemote, outgoing,
+  TABLES, countOutgoing, fingerprint, fromServer, hasContent, isEmpty, keyOf, mergeRemote, outgoing,
   profileFromServer, settingsFromServer, type Outgoing, type RemoteChanges, type Table,
 } from './sync';
 
@@ -132,10 +132,6 @@ function later(a: string, b: string): string {
   return Date.parse(b) > Date.parse(a) ? b : a;
 }
 
-function countOf(out: Outgoing): number {
-  return TABLES.reduce((n, t) => n + out.rows[t].length, 0) + (out.profile ? 1 : 0) + (out.settings ? 1 : 0);
-}
-
 export async function syncOnce(h: SyncHooks): Promise<SyncResult> {
   let state = h.loadState();
   if (state && state.userId !== h.userId) state = null;
@@ -260,7 +256,7 @@ export async function syncOnce(h: SyncHooks): Promise<SyncResult> {
     }
     if (out.profile) confirmed.profile = fingerprint(out.profile);
     if (out.settings) confirmed.settings = fingerprint(out.settings);
-    pushedCount = countOf(out);
+    pushedCount = countOutgoing(out);
     state = { ...state, confirmed };
     h.saveState(state);
   }

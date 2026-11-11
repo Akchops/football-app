@@ -19,6 +19,7 @@ import { AvatarPicker } from './Avatar';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
 import type { TeamFormTarget } from './TeamFormSheet';
 import { ReminderSettings } from './ReminderSettings';
+import { OutageSettings } from './OutageSettings';
 
 const PROMPT_DELAYS = [
   { value: 0, label: 'At kickoff' },
@@ -342,6 +343,7 @@ export function SetupScreen({
 
       <AccountSection />
       {ACADEMY && <AcademySection />}
+      <OutageSettings />
 
       <Section grouped title="Your data">
         <p className="muted small">

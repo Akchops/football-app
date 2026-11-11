@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 import { hasContent } from '../lib/sync';
 import { useStore } from '../store/AppStore';
+import { useStatus } from '../store/StatusProvider';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard, SignInForm } from './AccountSettings';
 import { Logo } from './Logo';
+import { StatusBanner } from './StatusBanner';
 import { Spinner } from './ui';
 
 /**
@@ -40,6 +42,7 @@ export function SignInScreen() {
  */
 export function CheckingAccount({ onCarryOn }: { onCarryOn: () => void }) {
   const sync = useSync();
+  const serverDown = useStatus().health === 'outage';
   const { profile } = useStore();
   const email = sync.account?.email ?? '';
   const different = (
@@ -62,12 +65,15 @@ export function CheckingAccount({ onCarryOn }: { onCarryOn: () => void }) {
       <Frame>
         <h1>Couldn&apos;t reach your account</h1>
         <p className="onboard-lead">
-          {sync.status === 'offline'
+          {serverDown
+            ? `Matchday's server isn't answering, so it can't check what's saved for ${email} yet.`
+            : sync.status === 'offline'
             ? `There's no signal, so Matchday can't check what's saved for ${email} yet.`
             : `Matchday couldn't check what's saved for ${email}: ${sync.error}`}
         </p>
         <p className="muted small">
-          Used Matchday before? Try again once you have signal, and your player and matches come back.
+          Used Matchday before? Try again once {serverDown ? "it's back" : 'you have signal'}, and your player and
+          matches come back.
         </p>
         <div className="button-row">
           <button className="primary-btn" onClick={() => sync.syncNow()}>
@@ -113,7 +119,11 @@ function Frame({ children }: { children: ReactNode }) {
           Matchday
         </div>
       </div>
-      <div className="onboard-body">{children}</div>
+      <div className="onboard-body">
+        {/* Signing in is the one thing here that needs the server, so say so when it's down. */}
+        <StatusBanner />
+        {children}
+      </div>
     </div>
   );
 }

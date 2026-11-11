@@ -4,6 +4,7 @@ import {
 } from '../lib/auth';
 import { supabaseRemote } from '../lib/remote';
 import { supabase } from '../lib/supabase';
+import { countOutgoing, outgoing } from '../lib/sync';
 import { syncOnce, type Household, type Invite, type Person, type Remote, type SentInvite, type SyncState } from '../lib/syncEngine';
 import { useStore } from './AppStore';
 
@@ -46,6 +47,8 @@ export interface SyncValue {
   joinQuestion: JoinQuestion | null;
   answerJoin(choice: 'merge' | 'replace'): void;
   syncNow(): void;
+  /** Changes made on this phone that the server hasn't got yet. */
+  waiting(): number;
   /** Who is in the household, who has been invited to it, and invites addressed to me. */
   family(): Promise<{ people: Person[]; invites: SentInvite[]; mine: Invite[] }>;
   invite(email: string): Promise<void>;
@@ -88,6 +91,7 @@ const OFF: SyncValue = {
   joinQuestion: null,
   answerJoin: () => {},
   syncNow: () => {},
+  waiting: () => 0,
   family: async () => ({ people: [], invites: [], mine: [] }),
   invite: async () => {},
   cancelInvite: async () => {},
@@ -285,6 +289,15 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     await endSession();
   }, []);
 
+  const waiting = useCallback(() => {
+    const signedIn = accountRef.current;
+    if (!signedIn) return 0;
+    const state = loadState();
+    // Never synced as this person: everything here is still to go up.
+    const confirmed = state && state.userId === signedIn.id ? state.confirmed : {};
+    return countOutgoing(outgoing(storeRef.current.data, confirmed));
+  }, []);
+
   const value = useMemo<SyncValue>(
     () => ({
       available,
@@ -297,13 +310,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       joinQuestion,
       answerJoin,
       syncNow: () => void run(),
+      waiting,
       family,
       invite,
       cancelInvite,
       joinInvite,
       signOut,
     }),
-    [available, account, checkedFor, status, lastSynced, error, household, joinQuestion, answerJoin, run, family, invite, cancelInvite, joinInvite, signOut],
+    [available, account, checkedFor, status, lastSynced, error, household, joinQuestion, answerJoin, run, waiting, family, invite, cancelInvite, joinInvite, signOut],
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

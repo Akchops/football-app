@@ -1,0 +1,47 @@
+name: Status message
+
+# The message the app shows when something's wrong. Run it from the Actions tab -
+# the GitHub app on a phone works - and every phone with Matchday open shows it
+# within a minute or so. It's kept on Cloudflare with the AI proxy, not on
+# Supabase, so it still shows while Supabase is down. Needs the
+# CLOUDFLARE_API_TOKEN secret the proxy was deployed with, and the proxy itself.
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "What to tell everyone, e.g. \"Signing in and syncing are down while our server provider fixes an outage. Everything you log is saved - check back after 3pm.\""
+        required: false
+        default: ''
+      title:
+        description: 'A few words for the banner (optional), e.g. "Syncing is down"'
+        required: false
+        default: ''
+      hours:
+        description: 'Take it down by itself after this many hours'
+        required: false
+        default: '6'
+      clear:
+        description: 'Take the current message down instead'
+        type: boolean
+        default: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The inputs go in as environment variables, never pasted into the
+      # script, so nothing typed in the message can run as a command.
+      - run: ./status-message.sh
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          MESSAGE: ${{ inputs.message }}
+          TITLE: ${{ inputs.title }}
+          HOURS: ${{ inputs.hours }}
+          CLEAR: ${{ inputs.clear }}
