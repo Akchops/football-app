@@ -140,6 +140,15 @@ everything on the one phone.)
   keeper; tackles, interceptions and clearances for a defender; chances created
   for a midfielder; shots and conversion for a forward
 - Your match score out of 100 updates live as you type
+- **More detail** holds minutes, cards and **effort (RPE)**: how hard the game
+  felt on Borg's 6-20 scale. Effort × minutes is the **match load**, in
+  arbitrary units (AU) - 15 for 60 minutes is 900 AU. It shows as you pick it,
+  on the match, and added up on Stats (Minutes and discipline). It's the
+  session-RPE method; most published figures use the 0-10 scale instead, so
+  these numbers run higher than those
+- If a coach has checked the result, the match says so - ✓ checked, or denied
+  with the coach's figures and their note - and changing it sends it back to
+  the coach
 - You can switch position for a single match (a keeper filling in outfield) and
   the form follows
 
@@ -248,6 +257,9 @@ everything on the one phone.)
 
 Both need the backend in [supabase/](supabase/README.md) to be set up; until it
 is, none of this shows, and the app doesn't ask anyone to sign in.
+Checking results needs version 5 of `supabase/schema.sql`: run the whole file
+again in the SQL Editor (it is safe to run again), then the *Check accounts
+setup* workflow says whether it took.
 
 **Family.** Everyone signs in with a code sent by email; invite the rest of the family,
 and everyone sees the same calendar - a change on one phone turns up on the
@@ -266,10 +278,28 @@ phone or a laptop:
   it at once. Players without the app go on the list by name
 - **Tables** - the academy's own leagues and tournaments, with every team's
   results; the table works itself out, and linked families can read it
-- **Stats for picking teams** - leaderboards from players' own logs (marked as
-  self-logged), by season, competition, group stage or knockouts, position and
-  squad; a page per player; two or three side by side; and team picks to save,
-  share or print
+- **Matches** - a coach enters the squad's result (+ → Result, or Matches →
+  Add a result): the date, the opponent, the score. Below it, every player in
+  the squad appears with the figures they logged for that game in their own
+  Matchday - goals, assists, saves, minutes, cards, effort - and two big
+  buttons, **Approve** and **Deny**. Approving marks their figures as checked.
+  Denying opens their figures with the coach's score for the coach to put
+  right; saving replaces the player's figures in their own Matchday and
+  **flags** them. A flag stays until a coach at that academy takes it off
+  (the player's page → Take the flag off), and while it's on their match score
+  counts 15 points lower in leaderboards, comparisons and team picks. Games
+  players have logged with no result from a coach yet show at the top of
+  Matches as waiting, and open with the result filled in. A player who changes
+  a checked result shows as changed, to be checked again. Tables are the
+  other half of Matches
+- **Each player's games** - Players → tap a player: every game they've
+  logged, newest first, with the score, their rating out of 100 and whether a
+  coach checked it; tap a game for the whole stat line. Also from Stats → tap
+  a name
+- **Stats for picking teams** - leaderboards from players' own logs, by
+  season, competition, group stage or knockouts, position and squad (the
+  filters fold away under Filters); a page per player; two or three side by
+  side; and team picks to save, share or print
 - **Verification** - an academy sends its registration and certificates, and
   Matchday's admin checks them; verified academies carry a tick wherever their
   name shows. A switch can require verification before an academy adds players

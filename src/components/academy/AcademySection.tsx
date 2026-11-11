@@ -174,8 +174,10 @@ export function AcademySection() {
 function WhatTheySee({ name }: { name: string }) {
   return (
     <p className="muted small">
-      They&apos;ll see everything {name} logs in Matchday - profile, matches and their notes, training and stats. Match
-      photos and videos stay on this phone. You can leave at any time, and they stop seeing it straight away.
+      They&apos;ll see everything {name} logs in Matchday - profile, matches and their notes, training and stats. Their
+      coaches can check {name}&apos;s results: approve them, or deny them and put in the right figures, which flags{' '}
+      {name} until a coach takes it off. Match photos and videos stay on this phone. You can leave at any time, and they
+      stop seeing it straight away.
     </p>
   );
 }

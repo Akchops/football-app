@@ -17,7 +17,11 @@ entered.
 
 **Stats are self-logged.** Players and their families enter their own matches
 and numbers. Academies should treat them as the player's own record, not as
-checked figures.
+checked figures - unless a coach has checked them. A coach can approve a
+player's figures for a game, or deny them and put in the right ones; a player
+whose figures are denied is flagged until a coach at that academy takes the
+flag off, and while flagged their match score counts lower in that and other
+academies' rankings. Log every game as it really went.
 
 ## Accounts
 

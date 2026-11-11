@@ -52,12 +52,23 @@ yes**, by accepting an invite or asking to join with the academy's code. Saying
 yes needs someone to confirm "I'm 13 or over, or I'm this player's parent or
 guardian", and we record who confirmed and when.
 
-Once linked, the academy's staff can **read** - never change - the player's
-profile, matches with their notes, training and stats, as far as their role
-allows: the owner and managers see every linked player; a coach only the
-players in squads they coach; the office admin role sees no stats at all. The
-academy also keeps its own records: its squads (by name), its competitions and
-results, team selections, and the player's name on its list.
+Once linked, the academy's staff can **read** the player's profile, matches
+with their notes, training and stats, as far as their role allows: the owner
+and managers see every linked player; a coach only the players in squads they
+coach; the office admin role sees no stats at all. The academy also keeps its
+own records: its squads (by name), its competitions and results, team
+selections, and the player's name on its list.
+
+**Checking results.** A coach can check the figures a player logged for a game
+against the result the coach entered. Approving marks the result as checked.
+Denying marks it as denied, **flags** the player until a coach at that academy
+takes the flag off, and can replace the player's figures for that one game
+with the coach's - the only change an academy can make to a player's records,
+and only to a game it checked. We keep what the player had entered, who
+checked it, when, and any note the coach added. The family sees every
+verdict, the note and the flag in their app. These verdicts are part of the
+player's match records, so any academy the family later shares the player
+with sees them too.
 
 **Leaving** an academy (Setup → Academies → Leave) stops it seeing anything
 straight away. The academy keeps the player's name on its list, marked as left.
@@ -72,7 +83,7 @@ the academy's owner and Matchday's admins can see them.
 | Who | Sees |
 |---|---|
 | Your household | Everything about the player that is synced |
-| A linked academy's owner and managers | The player's records, read-only |
+| A linked academy's owner and managers | The player's records, and every coach's verdict on them; can check results |
 | A linked academy's coaches | The same, for players in squads they coach |
 | An academy's office admin | Names, positions and age groups on the list - no stats |
 | Squad mates | Names only |

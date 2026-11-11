@@ -24,7 +24,12 @@ required to run or build Matchday.
 - **Academies** live here too: their staff and roles, squads, the players linked
   to them, their competitions and tables, team picks and verification
   documents. An academy reads a player's records only once the player's family
-  has said yes, only as far as each staff role allows, and never changes them.
+  has said yes, only as far as each staff role allows. The one change it can
+  make is a coach correcting a game they denied (below).
+- **Checking results**: a coach enters a squad's result, and approves or denies
+  each player's own figures for it. Denying flags the player at that academy
+  until a coach there clears it, and can write the coach's figures into that
+  one match - as a newer edit, so the family's phones pull it like any other.
   Everyone is found by a username they pick; nobody sees anyone else's email.
 
 ## Files
@@ -158,10 +163,17 @@ cannot promote itself or touch a manager; a coach brings new players into
 the squads they coach but cannot pull in a player already linked elsewhere,
 and someone moved off coaching loses those squads at once; saying no or
 leaving takes a player out of every squad; nobody at an academy can write a
-player's records; usernames are unique ignoring case; an old join code stops
-working once a new one is made; an owner cannot verify their own academy; a
-verified academy that changes its name, place or logo goes back for review;
+player's records directly; usernames are unique ignoring case; an old join code
+stops working once a new one is made; an owner cannot verify their own academy;
+a verified academy that changes its name, place or logo goes back for review;
 and with approval required, an unverified academy cannot take on any player.
+For checking results: only the owner, a manager or the player's own squad
+coach can approve or deny their figures - not another squad's coach, the office
+admin, a stranger or the player; a denial puts the coach's figures into that
+one match and nothing else of it, and keeps what the player claimed; the family
+sees every verdict and the flag, other families and other squads' coaches see
+none; only the academy's own coaching staff take a flag off; and once a player
+leaves, the academy sees none of the verdicts.
 
 The two files can be run in either order, and again, on the same database.
 
