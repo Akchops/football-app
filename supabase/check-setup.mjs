@@ -14,7 +14,7 @@ const TABLES = [
   'matches', 'training_sessions', 'teams', 'competitions', 'results',
   'profiles', 'academies', 'academy_members', 'academy_staff_invites', 'academy_squads', 'squad_coaches',
   'academy_players', 'squad_players', 'academy_competitions', 'academy_results', 'academy_selections',
-  'academy_documents', 'app_admins', 'app_settings',
+  'academy_documents', 'app_admins', 'app_settings', 'squad_matches', 'match_reviews',
 ];
 
 const url = (process.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
