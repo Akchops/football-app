@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { FLAG_PENALTY } from '../../lib/academyStats';
 import { ROLE_LABEL, cleanJoinCode, describeAcademyError, type Membership, type PlayerInvite } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useStore } from '../../store/AppStore';
@@ -56,9 +57,27 @@ export function AcademySection() {
   }
 
   const inOne = academy.memberships.length > 0 || academy.joinRequests.length > 0;
+  const flags = academy.checks.filter((c) => c.flagActive);
+  const flaggedAt = [...new Set(flags.map((c) => c.academyName))];
+  const approved = academy.checks.filter((c) => c.verdict === 'approved').length;
 
   return (
     <Section title="Academies">
+      {flags.length > 0 && (
+        <div className="flag-notice" role="status">
+          <strong>🚩 Flagged at {flaggedAt.join(' and ')}</strong>
+          <p className="small">
+            A coach denied {flags.length === 1 ? 'one of your results' : `${flags.length} of your results`} and put in the right
+            figures - they show on the match. You stay flagged until a coach there takes it off; until then academies see your
+            match score {FLAG_PENALTY} points lower. Log every game as it really went.
+          </p>
+        </div>
+      )}
+      {approved > 0 && flags.length === 0 && (
+        <p className="muted small">
+          ✓ {approved} of {name}&apos;s results {approved === 1 ? 'has' : 'have'} been checked by a coach.
+        </p>
+      )}
       {academy.playerInvites.map((invite) => (
         <PlayerInviteCard key={invite.id} invite={invite} name={name} />
       ))}

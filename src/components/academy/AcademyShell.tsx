@@ -5,7 +5,9 @@ import { ROLE_LABEL, VERIFICATION_LABEL, can, type StaffRole } from '../../lib/a
 import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { SignInForm } from '../AccountSettings';
-import { ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon } from '../icons';
+import {
+  BallIcon, ChartIcon, ChevronIcon, GearIcon, HomeIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon, TrophyIcon, WhistleResultIcon,
+} from '../icons';
 import { BusyLabel, Section, Sheet, Waiting } from '../ui';
 import { AcademyHomeSkeleton } from '../Skeletons';
 import { AddButton, type AddItem } from '../AddButton';
@@ -15,6 +17,7 @@ import { AcademyHome, type AcademyTab } from './AcademyHome';
 import { AcademySettings } from './AcademySettings';
 import { AdminScreen } from './AdminScreen';
 import { AcademyLogo, StaffInviteCard, VerificationBadge, type AddRequest, type AddWhat } from './parts';
+import { MatchesScreen } from './MatchesScreen';
 import { PlayersScreen } from './PlayersScreen';
 import { StatsScreen } from './StatsScreen';
 import { TablesScreen } from './TablesScreen';
@@ -24,22 +27,25 @@ import { UsernameForm } from './UsernameForm';
 type TabDef = { id: AcademyTab; label: string; Icon: (p: { on?: boolean }) => JSX.Element };
 const HOME: TabDef = { id: 'home', label: 'Home', Icon: HomeIcon };
 const PLAYERS: TabDef = { id: 'players', label: 'Players', Icon: ShirtIcon };
+const MATCHES: TabDef = { id: 'matches', label: 'Matches', Icon: BallIcon };
 const TABLES: TabDef = { id: 'tables', label: 'Tables', Icon: TableIcon };
 const STATS: TabDef = { id: 'stats', label: 'Stats', Icon: ChartIcon };
 const STAFF: TabDef = { id: 'staff', label: 'Staff', Icon: PeopleIcon };
 
 /**
- * Four tabs round the big +, as in the player's app. Staff is a row on Home
- * for those who pick teams; the admin role works on the office side and never
- * sees players' stats, so Staff takes the Stats tab's place for them.
+ * Four tabs round the big +, as in the player's app. Matches holds the
+ * results and, a tap across, the tables. Staff is a row on Home for those who
+ * pick teams; the admin role works on the office side and never sees players'
+ * stats or their results, so they get Tables and Staff instead.
  */
 function tabsFor(role: StaffRole): TabDef[] {
-  return [HOME, PLAYERS, TABLES, can(role, 'coach') ? STATS : STAFF];
+  return can(role, 'coach') ? [HOME, PLAYERS, MATCHES, STATS] : [HOME, PLAYERS, TABLES, STAFF];
 }
 
 const TITLES: Record<AcademyTab, string> = {
   home: 'Home',
   players: 'Players',
+  matches: 'Matches',
   tables: 'Tables',
   stats: 'Stats',
   staff: 'Staff',
@@ -49,6 +55,9 @@ const TITLES: Record<AcademyTab, string> = {
 /** What the + offers, by what this person may do. */
 function addItems(role: StaffRole, ask: (what: AddWhat) => void): AddItem[] {
   const items: AddItem[] = [];
+  if (can(role, 'coach')) {
+    items.push({ label: 'Result', hint: 'The score, then check each player', Icon: WhistleResultIcon, run: () => ask('result') });
+  }
   if (can(role, 'add-players')) items.push({ label: 'Player', hint: 'By username, or just a name', Icon: ShirtIcon, run: () => ask('player') });
   if (can(role, 'run-squads')) items.push({ label: 'Squad', hint: 'U14 Elite, a cup squad…', Icon: PeopleIcon, run: () => ask('squad') });
   if (can(role, 'coach')) {
@@ -60,9 +69,10 @@ function addItems(role: StaffRole, ask: (what: AddWhat) => void): AddItem[] {
 }
 
 const TAB_FOR: Record<AddWhat, AcademyTab> = {
+  result: 'matches',
   player: 'players',
   squad: 'players',
-  competition: 'tables',
+  competition: 'matches',
   pick: 'stats',
   staff: 'staff',
 };
@@ -81,7 +91,8 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
   const current = academy.current;
   const [request, setRequest] = useState<AddRequest | null>(null);
   const ask = (what: AddWhat) => {
-    setTab(TAB_FOR[what]);
+    // The admin role has Tables as a tab of its own, not inside Matches.
+    setTab(what === 'competition' && current && !can(current.role, 'coach') ? 'tables' : TAB_FOR[what]);
     setRequest((r) => ({ what, n: (r?.n ?? 0) + 1 }));
   };
 
@@ -226,6 +237,7 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
             <m.div key={tab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={springs.smooth}>
               {tab === 'home' && <AcademyHome academy={current} onGo={setTab} />}
               {tab === 'players' && <PlayersScreen academy={current} request={request} />}
+              {tab === 'matches' && can(current.role, 'coach') && <MatchesScreen academy={current} request={request} />}
               {tab === 'tables' && <TablesScreen academy={current} request={request} />}
               {tab === 'stats' && can(current.role, 'coach') && <StatsScreen academy={current} request={request} />}
               {tab === 'staff' && (
@@ -245,7 +257,10 @@ export default function AcademyShell({ hasPlayer }: { hasPlayer: boolean }) {
           {tabsFor(current.role).map((t, i) => {
             // Staff belongs to Home when it isn't a tab of its own, so Home stays lit.
             const tabs = tabsFor(current.role);
-            const on = tab === t.id || (t.id === 'home' && tab === 'staff' && !tabs.some((x) => x.id === 'staff'));
+            const on =
+              tab === t.id ||
+              (t.id === 'home' && tab === 'staff' && !tabs.some((x) => x.id === 'staff')) ||
+              (t.id === 'matches' && tab === 'tables');
             const items = addItems(current.role, ask);
             return (
               <Fragment key={t.id}>

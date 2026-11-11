@@ -6,7 +6,7 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { useSync } from '../../store/SyncProvider';
 import { AGE_GROUPS, ALL_POSITIONS } from '../../types';
 import { BusyLabel, Field, Section, Segmented, Sheet } from '../ui';
-import { Initials, StatusChip, useAddRequest, type AddRequest } from './parts';
+import { Initials, StatusChip, useAddRequest, useLoad, type AddRequest } from './parts';
 import { m } from 'motion/react';
 import { rememberOrigin, stagger } from '../../lib/motion';
 import { ChevronIcon, PeopleIcon, PlusIcon } from '../icons';
@@ -20,7 +20,7 @@ function squadColour(id: string): string {
 }
 
 /** One player as an Apple list row: their initials, name, facts, where they stand. */
-function PlayerRow({ player, facts, onOpen }: { player: AcademyPlayer; facts: string; onOpen: () => void }) {
+function PlayerRow({ player, facts, flagged = false, onOpen }: { player: AcademyPlayer; facts: string; flagged?: boolean; onOpen: () => void }) {
   return (
     <button
       className="nav-row"
@@ -34,6 +34,11 @@ function PlayerRow({ player, facts, onOpen }: { player: AcademyPlayer; facts: st
         <span className="nav-row-label">{player.name}</span>
         <span className="nav-row-sub">{facts}</span>
       </span>
+      {flagged && (
+        <span className="flag-chip" title="Flagged for false results">
+          🚩 Flagged
+        </span>
+      )}
       <StatusChip status={player.status} />
       <span className="row-chevron" aria-hidden="true">
         <ChevronIcon />
@@ -76,9 +81,16 @@ export function SquadSelect({
 /** Everyone on the academy's books, its squads, and anyone asking to join. */
 export function PlayersScreen({ academy, request }: { academy: StaffAcademy; request?: AddRequest | null }) {
   const sync = useSync();
-  const { requireVerification } = useAcademy();
+  const { api, requireVerification } = useAcademy();
   const me = sync.account?.id ?? '';
   const roster = useRoster(academy);
+  // Who is flagged, for a mark on their row: verdicts only, not their whole records.
+  const linkedIds = (roster.players ?? []).filter((p) => p.status === 'linked' && p.playerId).map((p) => p.playerId as string).sort();
+  const checks = useLoad(
+    api && roster.players && can(academy.role, 'coach') ? () => api.matchChecks(linkedIds) : null,
+    `${academy.id}:${linkedIds.join(',')}`,
+  );
+  const flagged = new Set((checks.data ?? []).filter((c) => c.flagActive).map((c) => c.playerId));
   const [adding, setAdding] = useState(false);
   const [newSquad, setNewSquad] = useState(false);
   const [squadId, setSquadId] = useState<string | null>(null);
@@ -227,7 +239,12 @@ export function PlayersScreen({ academy, request }: { academy: StaffAcademy; req
             <ul className="list-group person-group">
               {shown.map((p, i) => (
                 <m.li key={p.id} layout="position" {...stagger(i)}>
-                  <PlayerRow player={p} facts={playerFacts(p, squadNames(p.id))} onOpen={() => setPlayerId(p.id)} />
+                  <PlayerRow
+                    player={p}
+                    facts={playerFacts(p, squadNames(p.id))}
+                    flagged={Boolean(p.playerId && flagged.has(p.playerId))}
+                    onOpen={() => setPlayerId(p.id)}
+                  />
                 </m.li>
               ))}
               {shown.length === 0 && <li className="list-empty">Nobody called that.</li>}
@@ -288,7 +305,10 @@ export function PlayersScreen({ academy, request }: { academy: StaffAcademy; req
         squads={squads}
         me={me}
         onClose={() => setPlayerId(null)}
-        onChanged={roster.reload}
+        onChanged={async () => {
+          await roster.reload();
+          await checks.reload();
+        }}
       />
     </div>
   );

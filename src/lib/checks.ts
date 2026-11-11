@@ -1,9 +1,10 @@
-import type { Match, MatchResult } from '../types';
+import { METRIC_BY_ID, type Match, type MatchResult, type MetricId } from '../types';
 import type { MatchCheck, SquadMatch } from './academy';
 import type { SquadPlayer } from './academyStats';
 import { addDays, todayISO, fromISODate, toISODate } from './date';
+import { formatLoad, matchLoad } from './load';
 import { pruneMetrics } from './metrics';
-import { playedMatches } from './stats';
+import { isWalkover, playedMatches } from './stats';
 import { canonical } from './sync';
 
 /**
@@ -153,11 +154,15 @@ export function waitingForResult(
         (r) => r.date === match.date && r.squadId && squads.includes(r.squadId) && sameOpponent(r.opponent, match.opponent),
       );
       if (covered) continue;
-      const key = `${match.date}|${opponentKey(match.opponent)}`;
-      let group = groups.get(key);
+      // "Vale" and "Vale Juniors" on the same day are one game, however each player typed it.
+      let group = [...groups.values()].find((g) => g.date === match.date && sameOpponent(g.opponent, match.opponent));
       if (!group) {
+        const key = `${match.date}|${opponentKey(match.opponent)}`;
         group = { key, date: match.date, opponent: match.opponent.trim(), squadId: null, claims: [] };
         groups.set(key, group);
+      } else if (match.opponent.trim().length > group.opponent.length) {
+        // The fullest name is the one to start the coach's result with.
+        group.opponent = match.opponent.trim();
       }
       group.claims.push({ player, match });
     }
@@ -203,4 +208,24 @@ export function finishCorrection(result: MatchResult): MatchResult {
   return result.didPlay
     ? { ...result, metrics: pruneMetrics(result.metrics) }
     : { ...result, minutes: 0, motm: false, yellowCards: 0, redCards: 0, metrics: {}, rpe: null };
+}
+
+/** "Goals 2 · Assists 1 · 60 min · MOTM" - a result's line, for a row. */
+export function statLine(result: MatchResult): string {
+  if (isWalkover(result)) return 'Walkover';
+  if (!result.didPlay) return 'Did not play';
+  const metrics = (Object.keys(result.metrics) as MetricId[])
+    .filter((id) => (result.metrics[id] ?? 0) !== 0)
+    .map((id) => `${METRIC_BY_ID[id]?.short ?? id} ${result.metrics[id]}`);
+  const load = matchLoad(result);
+  return [
+    ...metrics,
+    `${result.minutes} min`,
+    result.motm ? 'MOTM' : '',
+    result.yellowCards ? `${result.yellowCards} yellow` : '',
+    result.redCards ? 'Red card' : '',
+    load !== null ? `RPE ${result.rpe} · ${formatLoad(load)}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }

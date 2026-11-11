@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  academyApi, describeAcademyError, type AcademyApi, type JoinRequest, type Membership, type PlayerInvite, type StaffAcademy,
-  type StaffInvite,
+  academyApi, describeAcademyError, type AcademyApi, type JoinRequest, type MatchCheck, type Membership, type PlayerInvite,
+  type StaffAcademy, type StaffInvite,
 } from '../lib/academy';
 import { ACADEMY } from '../lib/features';
 import { supabase } from '../lib/supabase';
@@ -32,6 +32,8 @@ interface Snapshot {
   playerInvites: PlayerInvite[];
   joinRequests: JoinRequest[];
   memberships: Membership[];
+  /** Coaches' verdicts on the family's player's matches. */
+  checks: MatchCheck[];
   isAppAdmin: boolean;
   requireVerification: boolean;
 }
@@ -58,6 +60,8 @@ export interface AcademyValue {
   joinRequests: JoinRequest[];
   /** Academies the family's player is linked to. */
   memberships: Membership[];
+  /** Coaches' verdicts on the family's player's matches: approved, or denied and corrected. */
+  checks: MatchCheck[];
   /** One of Matchday's own admins, who review academies. */
   isAppAdmin: boolean;
   /** Whether an academy must be verified before it can add players - the switch on Matchday's admin screen. */
@@ -112,6 +116,7 @@ function readCache(userId: string): (Snapshot & { currentId: string | null }) | 
       playerInvites: list(parsed.playerInvites),
       joinRequests: list(parsed.joinRequests),
       memberships: list(parsed.memberships),
+      checks: list(parsed.checks),
       isAppAdmin: parsed.isAppAdmin === true,
       requireVerification: parsed.requireVerification === true,
       currentId: parsed.currentId ?? null,
@@ -164,6 +169,7 @@ const OFF: AcademyValue = {
   playerInvites: [],
   joinRequests: [],
   memberships: [],
+  checks: [],
   isAppAdmin: false,
   requireVerification: false,
   current: null,
@@ -183,6 +189,7 @@ const NO_INVITES: StaffInvite[] = [];
 const NO_PLAYER_INVITES: PlayerInvite[] = [];
 const NO_REQUESTS: JoinRequest[] = [];
 const NO_MEMBERSHIPS: Membership[] = [];
+const NO_CHECKS: MatchCheck[] = [];
 
 export function AcademyProvider({ children }: { children: ReactNode }) {
   const sync = useSync();
@@ -213,7 +220,7 @@ function AcademyOn({ children }: { children: ReactNode }) {
     if (!client || !who) return;
     setStatus('loading');
     try {
-      const [username, academies, invites, playerInvites, joinRequests, memberships, isAppAdmin, requireVerification] =
+      const [username, academies, invites, playerInvites, joinRequests, memberships, checks, isAppAdmin, requireVerification] =
         await Promise.all([
           client.username(),
           client.staffAcademies(),
@@ -221,12 +228,15 @@ function AcademyOn({ children }: { children: ReactNode }) {
           client.playerInvitesForMe(),
           client.joinRequests(),
           client.memberships(),
+          // A server not yet updated for checks has none to give; that mustn't stop the rest.
+          client.myMatchChecks().catch(() => NO_CHECKS),
           client.isAppAdmin(),
           client.requireVerification(),
         ]);
       if (accountRef.current !== who) return;
       setSnapshot({
-        userId: who, username, academies, invites, playerInvites, joinRequests, memberships, isAppAdmin, requireVerification,
+        userId: who, username, academies, invites, playerInvites, joinRequests, memberships, checks, isAppAdmin,
+        requireVerification,
       });
       setError('');
       setStatus('ready');
@@ -316,6 +326,7 @@ function AcademyOn({ children }: { children: ReactNode }) {
   const playerInvites = loaded ? snapshot.playerInvites : NO_PLAYER_INVITES;
   const joinRequests = loaded ? snapshot.joinRequests : NO_REQUESTS;
   const memberships = loaded ? snapshot.memberships : NO_MEMBERSHIPS;
+  const checks = loaded ? snapshot.checks : NO_CHECKS;
   const username = loaded ? snapshot.username : null;
   const isAppAdmin = loaded ? snapshot.isAppAdmin : false;
   const requireVerification = loaded ? snapshot.requireVerification : false;
@@ -336,6 +347,7 @@ function AcademyOn({ children }: { children: ReactNode }) {
       playerInvites,
       joinRequests,
       memberships,
+      checks,
       isAppAdmin,
       requireVerification,
       current,
@@ -348,7 +360,7 @@ function AcademyOn({ children }: { children: ReactNode }) {
       setReviewing,
     }),
     [
-      mode, setMode, api, status, error, loaded, username, academies, invites, playerInvites, joinRequests, memberships,
+      mode, setMode, api, status, error, loaded, username, academies, invites, playerInvites, joinRequests, memberships, checks,
       isAppAdmin, requireVerification, current, refresh, setUsername, creating, reviewing,
     ],
   );

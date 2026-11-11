@@ -11,6 +11,7 @@ import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
 import { RPE_VALUES, formatLoad, matchLoad, rpeLabel } from '../lib/load';
 import { Disclosure, Field, Segmented, Sheet, Stepper } from './ui';
 import { NoEntryIcon } from './icons';
+import { MatchCheckNote } from './MatchCheckNote';
 
 const SHORT_GROUP: Record<PositionGroup, string> = {
   goalkeeper: 'Keeper',
@@ -167,6 +168,8 @@ export function ResultSheet({
         </>
       }
     >
+      {match.result && <MatchCheckNote match={match} editing />}
+
       {walkover ? (
         <div className={`walkover-note outcome-${walkover === 'us' ? 'w' : 'l'}`}>
           <strong>{walkover === 'us' ? `Walkover to ${us}` : `Walkover to ${them}`}</strong>

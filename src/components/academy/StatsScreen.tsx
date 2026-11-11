@@ -1,20 +1,22 @@
 import { useMemo, useState } from 'react';
-import type { Squad, StaffAcademy } from '../../lib/academy';
+import type { StaffAcademy } from '../../lib/academy';
 import {
-  NO_FILTER, boardsFor, compareRows, competitionsIn, groupOfPosition, leaderboard, matchesFor, seasonOf,
+  FLAG_PENALTY, NO_FILTER, boardsFor, compareRows, competitionsIn, leaderboard, matchesFor, ratingOf, seasonOf,
   seasonsIn, statsFor, type BoardId, type SquadPlayer, type StageFilter, type StatsFilter,
 } from '../../lib/academyStats';
 import { seasonLabel } from '../../lib/date';
 import { positionStatCards } from '../../lib/metrics';
-import { matchScore } from '../../lib/score';
-import { STAGE_SHORT } from '../../lib/stage';
-import { placingLabel, recordSummary, scoreline, statsByStage, statsByTournament } from '../../lib/stats';
-import { useAcademy } from '../../store/AcademyProvider';
+import { placingLabel, recordSummary, statsByStage, statsByTournament } from '../../lib/stats';
+import type { MatchCheck } from '../../lib/academy';
+import { can } from '../../lib/academy';
+import { useSync } from '../../store/SyncProvider';
 import type { PositionGroup } from '../../types';
-import { Section, Segmented, Sheet, StatTile } from '../ui';
-import { useLoad, type AddRequest } from './parts';
+import { Disclosure, Section, Segmented, Sheet, StatTile } from '../ui';
+import { FlagNotice, PlayerGames } from './PlayerGames';
+import { type AddRequest } from './parts';
+import { useSquadData } from './useSquadData';
 import { TeamPicks } from './TeamPicks';
-import { isActive, playerFacts, useRoster } from './useRoster';
+import { playerFacts } from './useRoster';
 import { LeaderboardSkeleton } from './skeletons';
 
 const POSITIONS: { value: PositionGroup | ''; label: string }[] = [
@@ -27,65 +29,12 @@ const POSITIONS: { value: PositionGroup | ''; label: string }[] = [
 
 const MAX_COMPARE = 3;
 
-export interface SquadData {
-  players: SquadPlayer[];
-  squads: Squad[];
-  loading: boolean;
-  error: string;
-  reload: () => Promise<void>;
-}
-
-/**
- * Everyone on the academy's books, each with whatever of their own records the
- * viewer may read - all linked players for the owner and managers, the
- * players in their squads for a coach - shaped for the stats.
- */
-export function useSquadData(academy: StaffAcademy): SquadData {
-  const { api } = useAcademy();
-  const roster = useRoster(academy);
-  const active = (roster.players ?? []).filter(isActive);
-  const linked = active
-    .filter((p) => p.status === 'linked' && p.playerId)
-    .map((p) => p.playerId as string)
-    .sort();
-  const key = `${academy.id}:${linked.join(',')}`;
-  const records = useLoad(api && roster.players ? () => api.playerRecords(linked) : null, key);
-  const squads = roster.squads ?? [];
-
-  const players = useMemo(
-    () =>
-      active.map((ap): SquadPlayer => {
-        const rec = ap.playerId && ap.status === 'linked' ? records.data?.find((r) => r.playerId === ap.playerId) : undefined;
-        const position = rec?.profile?.position || ap.position;
-        return {
-          id: ap.id,
-          name: ap.name,
-          position,
-          positionGroup: rec?.profile?.positionGroup ?? groupOfPosition(position),
-          ageGroup: rec?.profile?.ageGroup || ap.ageGroup,
-          squadIds: squads.filter((s) => s.memberIds.includes(ap.id)).map((s) => s.id),
-          matches: rec?.matches ?? [],
-          competitions: rec?.competitions ?? [],
-        };
-      }),
-    // The roster and records arrays are new on each load, which is when this should change.
-    [roster.players, roster.squads, records.data],
-  );
-
-  return {
-    players,
-    squads,
-    loading: !roster.players || !roster.squads || (linked.length > 0 && !records.data && !records.error),
-    error: roster.error || records.error,
-    reload: async () => {
-      await roster.reload();
-      await records.reload();
-    },
-  };
-}
+export { useSquadData, type SquadData } from './useSquadData';
 
 /** Leaderboards across the academy's players, a page per player, side-by-side comparison, and team picks. */
 export function StatsScreen({ academy, request }: { academy: StaffAcademy; request?: AddRequest | null }) {
+  const sync = useSync();
+  const me = sync.account?.id ?? '';
   const data = useSquadData(academy);
   const seasons = useMemo(() => seasonsIn(data.players), [data.players]);
   const competitions = useMemo(() => competitionsIn(data.players), [data.players]);
@@ -95,6 +44,7 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
   const [comparing, setComparing] = useState<string[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   // Start at this season if anything has been played in it; all time otherwise.
   const f: StatsFilter = filter ?? { ...NO_FILTER, season: seasons.includes(thisSeason) ? thisSeason : '' };
@@ -117,7 +67,8 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
         <h1>Stats</h1>
       </div>
       <p className="muted small">
-        From each linked player&apos;s own Matchday - logged by them and their family, not checked by the academy.
+        From each linked player&apos;s own Matchday. ✓ marks a result a coach has checked; 🚩 a player flagged for false
+        results, whose match score counts lower.
       </p>
 
       {data.error && <p className="notice warn">{data.error}</p>}
@@ -125,41 +76,50 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
 
       {!data.loading && (
         <>
-          <div className="stats-filters">
-            <select className="input" aria-label="Season" value={f.season} onChange={(e) => set({ season: e.target.value })}>
-              <option value="">All time</option>
-              {seasons.map((s) => (
-                <option key={s} value={s}>
-                  {s} season
-                </option>
-              ))}
-            </select>
-            <select className="input" aria-label="Competition" value={f.competition} onChange={(e) => set({ competition: e.target.value })}>
-              <option value="">All competitions</option>
-              {competitions.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <select className="input" aria-label="Squad" value={f.squadId} onChange={(e) => set({ squadId: e.target.value })}>
-              <option value="">All squads</option>
-              {data.squads.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Segmented<StageFilter>
-            options={[
-              { value: 'all', label: 'All games' },
-              { value: 'group', label: 'Group stage' },
-              { value: 'knockout', label: 'Knockouts' },
-            ]}
-            value={f.stage}
-            onChange={(stage) => set({ stage })}
-          />
+          <Disclosure
+            label="Filters"
+            detail={filterSummary(f, competitions, data.squads)}
+            open={showFilters}
+            onToggle={() => setShowFilters((x) => !x)}
+          >
+            <div className="detail-block">
+              <div className="stats-filters">
+                <select className="input" aria-label="Season" value={f.season} onChange={(e) => set({ season: e.target.value })}>
+                  <option value="">All time</option>
+                  {seasons.map((s) => (
+                    <option key={s} value={s}>
+                      {s} season
+                    </option>
+                  ))}
+                </select>
+                <select className="input" aria-label="Competition" value={f.competition} onChange={(e) => set({ competition: e.target.value })}>
+                  <option value="">All competitions</option>
+                  {competitions.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <select className="input" aria-label="Squad" value={f.squadId} onChange={(e) => set({ squadId: e.target.value })}>
+                  <option value="">All squads</option>
+                  {data.squads.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Segmented<StageFilter>
+                options={[
+                  { value: 'all', label: 'All games' },
+                  { value: 'group', label: 'Group stage' },
+                  { value: 'knockout', label: 'Knockouts' },
+                ]}
+                value={f.stage}
+                onChange={(stage) => set({ stage })}
+              />
+            </div>
+          </Disclosure>
           <div className="chip-scroll" role="group" aria-label="Position">
             {POSITIONS.map((p) => (
               <button
@@ -208,7 +168,10 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
                     />
                     <span className="board-rank">{i + 1}</span>
                     <button className="board-name" onClick={() => setOpenId(row.player.id)}>
-                      <strong>{row.player.name}</strong>
+                      <strong>
+                        {row.player.name}
+                        {row.player.flagged && <span className="flag-mark" title="Flagged for false results"> 🚩</span>}
+                      </strong>
                       <span className="muted small">{playerFacts(row.player, row.player.squadIds.map(squadName))}</span>
                     </button>
                     <span className="board-value">
@@ -244,7 +207,20 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
         </>
       )}
 
-      <PlayerStatsSheet player={open} filter={f} squadName={squadName} onClose={() => setOpenId(null)} />
+      <PlayerStatsSheet
+        academy={academy}
+        player={open}
+        filter={f}
+        squadName={squadName}
+        checks={data.checks}
+        checkMap={data.checkMap}
+        mayClear={
+          Boolean(open) &&
+          (can(academy.role, 'run-squads') || data.squads.some((s) => s.coachIds.includes(me) && open!.squadIds.includes(s.id)))
+        }
+        onChanged={() => data.reloadChecks()}
+        onClose={() => setOpenId(null)}
+      />
       <CompareSheet
         open={compareOpen}
         players={comparing.map((id) => data.players.find((p) => p.id === id)).filter((p): p is SquadPlayer => Boolean(p))}
@@ -253,6 +229,22 @@ export function StatsScreen({ academy, request }: { academy: StaffAcademy; reque
       />
     </div>
   );
+}
+
+/** "2026/27 season · All competitions · All squads" - what the filters are set to, while they're shut. */
+function filterSummary(
+  f: StatsFilter,
+  competitions: { key: string; name: string }[],
+  squads: { id: string; name: string }[],
+): string {
+  return [
+    f.season ? `${f.season} season` : 'All time',
+    f.competition ? competitions.find((c) => c.key === f.competition)?.name ?? '' : 'All competitions',
+    f.squadId ? squads.find((s) => s.id === f.squadId)?.name ?? '' : 'All squads',
+    f.stage === 'group' ? 'Group stage' : f.stage === 'knockout' ? 'Knockouts' : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** "This season · Group stage · Yorkshire U16 League" - what a number covers. */
@@ -266,14 +258,25 @@ function filterWords(filter: StatsFilter): string {
 }
 
 function PlayerStatsSheet({
+  academy,
   player,
   filter,
   squadName,
+  checks,
+  checkMap,
+  mayClear,
+  onChanged,
   onClose,
 }: {
+  academy: StaffAcademy;
   player: SquadPlayer | null;
   filter: StatsFilter;
   squadName: (id: string) => string;
+  checks: MatchCheck[];
+  checkMap: Map<string, MatchCheck>;
+  /** Whether this person may take a flag off: the owner, a manager, or the player's coach. */
+  mayClear: boolean;
+  onChanged: () => Promise<void>;
   onClose: () => void;
 }) {
   if (!player) return null;
@@ -291,10 +294,11 @@ function PlayerStatsSheet({
   const tournaments = statsByTournament(player.matches, player.competitions).filter((t) =>
     !filter.season || seasonOf(t.to || t.from || '1970-01-01') === filter.season,
   );
-  const recent = matches.slice(0, 5);
+  const rating = ratingOf(stats.averageScore, player.flagged);
 
   return (
     <Sheet open title={player.name} subtitle={playerFacts(player, player.squadIds.map(squadName))} onClose={onClose}>
+      <FlagNotice academyId={academy.id} player={player} checks={checks} canClear={mayClear} onCleared={onChanged} />
       <p className="muted small">
         From {player.name}&apos;s own Matchday · {filterWords(filter)}
         {stats.played > 0 ? ` · their team ${recordSummary(stats)}` : ''}
@@ -305,7 +309,11 @@ function PlayerStatsSheet({
         <>
           <div className="tile-grid">
             <StatTile label="Appearances" value={stats.appearances} sub={`${stats.minutes} min`} />
-            <StatTile label="Match score" value={stats.averageScore === null ? '–' : Math.round(stats.averageScore)} sub="average" />
+            <StatTile
+              label="Match score"
+              value={rating === null ? '–' : Math.round(rating)}
+              sub={player.flagged ? `average · −${FLAG_PENALTY} flag` : 'average'}
+            />
             <StatTile label="Man of the Match" value={stats.motm} />
           </div>
           <div className="tile-grid">
@@ -347,25 +355,9 @@ function PlayerStatsSheet({
         </Section>
       )}
 
-      {recent.length > 0 && (
-        <Section title="Recent games">
-          <ul className="plain-list">
-            {recent.map((m) => (
-              <li key={m.id}>
-                <span>
-                  {m.date.slice(5).split('-').reverse().join('/')} · {m.venue === 'away' ? '@ ' : 'v '}
-                  {m.opponent || 'TBC'}
-                  {m.stage && m.stage !== 'group' ? ` · ${STAGE_SHORT[m.stage]}` : ''}
-                </span>
-                <span className="muted small">
-                  {m.result ? scoreline(m.result) : ''}
-                  {m.result?.didPlay ? ` · score ${matchScore(m.result, m.durationMinutes).score}` : ' · did not play'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
+      <Section title="Games">
+        <PlayerGames player={{ ...player, matches }} checks={checkMap} />
+      </Section>
     </Sheet>
   );
 }

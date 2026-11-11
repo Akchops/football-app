@@ -3,16 +3,18 @@ import { m } from 'motion/react';
 import { ROLE_LABEL, can, describeAcademyError, type StaffAcademy } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { springs, stagger } from '../../lib/motion';
-import { CheckIcon, ChevronIcon, PeopleIcon, ShieldIcon, ShirtIcon, TableIcon } from '../icons';
+import { BallIcon, ChartIcon, CheckIcon, ChevronIcon, GearIcon, PeopleIcon, ShirtIcon, TableIcon } from '../icons';
 import { Bone, RollingNumber, Section } from '../ui';
 import { AcademyLogo, VerificationBadge, useLoad } from './parts';
 import { ChecklistSkeleton } from './skeletons';
+import { useCheckWork } from './useCheckWork';
 
 /** A Settings-style row: a coloured symbol, what it is, what's there, a chevron. */
 function NavRow({
   icon,
   color,
   label,
+  sub,
   detail,
   alert,
   onClick,
@@ -20,6 +22,8 @@ function NavRow({
   icon: ReactNode;
   color: string;
   label: string;
+  /** What it's for, in a line. */
+  sub?: string;
   detail: ReactNode;
   alert?: string;
   onClick: () => void;
@@ -31,6 +35,7 @@ function NavRow({
       </span>
       <span className="nav-row-text">
         <span className="nav-row-label">{label}</span>
+        {sub && <span className="nav-row-sub">{sub}</span>}
         {alert && <span className="nav-row-alert">{alert}</span>}
       </span>
       <span className="nav-row-detail">{detail}</span>
@@ -41,7 +46,7 @@ function NavRow({
   );
 }
 
-export type AcademyTab = 'home' | 'players' | 'tables' | 'stats' | 'staff' | 'settings';
+export type AcademyTab = 'home' | 'players' | 'matches' | 'tables' | 'stats' | 'staff' | 'settings';
 
 /** The academy at a glance: who it is, its join code, and what to do next. */
 export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (tab: AcademyTab) => void }) {
@@ -50,6 +55,10 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
   const pending = useLoad(api ? () => api.pendingStaff(academy.id) : null, academy.id);
   const squads = useLoad(api ? () => api.squads(academy.id) : null, academy.id);
   const players = useLoad(api ? () => api.players(academy.id) : null, academy.id);
+  const coaches = can(academy.role, 'coach');
+  const work = useCheckWork(academy, coaches);
+  const toCheck = coaches ? work.toCheck : 0;
+  const resultCount = work.results;
 
   const where = [academy.town, academy.country].filter(Boolean).join(', ');
   const staffCount = staff.data?.length ?? null;
@@ -68,11 +77,14 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
   if (can(academy.role, 'add-players')) {
     steps.push({ label: 'Add your players', done: (onBooks?.length ?? 0) > 0, go: 'players' });
   }
+  if (coaches) {
+    steps.push({ label: 'Enter your first result, and check what players logged', done: (resultCount ?? 0) > 0, go: 'matches' });
+  }
   const allDone = steps.every((s) => s.done);
   // Which steps are done is only known once everything has loaded - until then
   // the list is outlined, rather than shown with every step looking undone.
   const lists = [staff, pending, squads, players];
-  const known = lists.every((l) => l.data !== null);
+  const known = lists.every((l) => l.data !== null) && (!coaches || resultCount !== null);
   const failed = lists.some((l) => l.error);
 
   const stat = (value: number | null, label: string, error: string) => (
@@ -122,6 +134,33 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
         </p>
       )}
 
+      {(toCheck ?? 0) + asking > 0 && (
+        <Section title="Needs you">
+          <div className="list-group nav-group described">
+            {(toCheck ?? 0) > 0 && (
+              <NavRow
+                icon={<CheckIcon />}
+                color="#ff375f"
+                label={`${toCheck} result${toCheck === 1 ? '' : 's'} to check`}
+                sub="Players have logged games - approve or deny their figures"
+                detail=""
+                onClick={() => onGo('matches')}
+              />
+            )}
+            {asking > 0 && (
+              <NavRow
+                icon={<ShirtIcon on />}
+                color="#0a84ff"
+                label={`${asking} asking to join`}
+                sub="Say yes into a squad, or no"
+                detail=""
+                onClick={() => onGo('players')}
+              />
+            )}
+          </div>
+        </Section>
+      )}
+
       {!known && !failed && <ChecklistSkeleton />}
       {known && !allDone && (
         <Section title="Getting started">
@@ -144,37 +183,73 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
         </Section>
       )}
 
-      <div className="list-group nav-group">
-        <NavRow
-          icon={<ShirtIcon on />}
-          color="#0a84ff"
-          label="Players"
-          detail={
-            onBooks === null || squadCount === null
-              ? players.error || squads.error || <Bone />
-              : `${onBooks.length} · ${squadCount} squad${squadCount === 1 ? '' : 's'}`
-          }
-          alert={asking > 0 ? `${asking} asking to join` : undefined}
-          onClick={() => onGo('players')}
-        />
-        <NavRow
-          icon={<PeopleIcon on />}
-          color="#bf5af2"
-          label="Staff"
-          detail={staffCount === null ? staff.error || <Bone /> : `${staffCount}${invited ? ` · ${invited} invited` : ''}`}
-          onClick={() => onGo('staff')}
-        />
-        <NavRow icon={<TableIcon on />} color="#30d158" label="Tables" detail="" onClick={() => onGo('tables')} />
-        {academy.role === 'owner' && (academy.verification === 'unverified' || academy.verification === 'rejected') && (
+      <Section title="Everything in your academy">
+        <div className="list-group nav-group described">
+          {coaches && (
+            <NavRow
+              icon={<BallIcon on />}
+              color="#ff375f"
+              label="Matches"
+              sub="Enter results; approve or deny what players logged"
+              detail={toCheck === null ? <Bone /> : toCheck > 0 ? '' : `${resultCount ?? 0}`}
+              alert={toCheck ? `${toCheck} to check` : undefined}
+              onClick={() => onGo('matches')}
+            />
+          )}
           <NavRow
-            icon={<ShieldIcon />}
-            color="#ff9f0a"
-            label="Get verified"
-            detail="Badge"
+            icon={<ShirtIcon on />}
+            color="#0a84ff"
+            label="Players and squads"
+            sub={coaches ? 'Everyone on your books - tap a player for their games' : 'Everyone on your books, and their squads'}
+            detail={
+              onBooks === null || squadCount === null
+                ? players.error || squads.error || <Bone />
+                : `${onBooks.length} · ${squadCount} squad${squadCount === 1 ? '' : 's'}`
+            }
+            alert={asking > 0 ? `${asking} asking to join` : undefined}
+            onClick={() => onGo('players')}
+          />
+          {coaches && (
+            <NavRow
+              icon={<ChartIcon on />}
+              color="#ff9f0a"
+              label="Stats and team picks"
+              sub="Leaderboards, players side by side, picking a team"
+              detail=""
+              onClick={() => onGo('stats')}
+            />
+          )}
+          <NavRow
+            icon={<TableIcon on />}
+            color="#30d158"
+            label="Tables"
+            sub="Your leagues and tournaments, worked out from the results"
+            detail=""
+            onClick={() => onGo('tables')}
+          />
+          <NavRow
+            icon={<PeopleIcon on />}
+            color="#bf5af2"
+            label="Staff"
+            sub="Coaches, managers and the office, and what each can do"
+            detail={staffCount === null ? staff.error || <Bone /> : `${staffCount}${invited ? ` · ${invited} invited` : ''}`}
+            onClick={() => onGo('staff')}
+          />
+          <NavRow
+            icon={<GearIcon />}
+            color="#8e8e93"
+            label="Settings"
+            sub={academy.role === 'owner' ? 'Details, logo and getting verified' : 'The academy’s details'}
+            detail=""
+            alert={
+              academy.role === 'owner' && (academy.verification === 'unverified' || academy.verification === 'rejected')
+                ? 'Get verified'
+                : undefined
+            }
             onClick={() => onGo('settings')}
           />
-        )}
-      </div>
+        </div>
+      </Section>
 
       <JoinCode academy={academy} />
     </div>

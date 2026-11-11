@@ -16,8 +16,20 @@ import { CompetitionsSkeleton } from './skeletons';
 /** Friendlies have no table, so they are not offered here. */
 const TYPES: CompetitionType[] = ['league', 'tournament', 'cup', 'other'];
 
-/** The academy's own competitions, and their tables. */
-export function TablesScreen({ academy, request }: { academy: StaffAcademy; request?: AddRequest | null }) {
+/**
+ * The academy's own competitions, and their tables. `embedded` is inside
+ * Matches, which has the screen's title already.
+ */
+export function TablesScreen({
+  academy,
+  request,
+  embedded = false,
+}: {
+  academy: StaffAcademy;
+  request?: AddRequest | null;
+  embedded?: boolean;
+}) {
+  const wrapClass = embedded ? 'embedded-screen' : 'screen';
   const { api } = useAcademy();
   const competitions = useLoad(api ? () => api.competitions(academy.id) : null, academy.id);
   const squads = useLoad(api ? () => api.squads(academy.id) : null, academy.id);
@@ -54,7 +66,7 @@ export function TablesScreen({ academy, request }: { academy: StaffAcademy; requ
 
   if (open) {
     return (
-      <div className="screen">
+      <div className={wrapClass}>
         <button className="back-link" onClick={() => setOpenId(null)}>
           <span className="back-chevron" aria-hidden="true">
             <ChevronIcon />
@@ -79,15 +91,25 @@ export function TablesScreen({ academy, request }: { academy: StaffAcademy; requ
   }
 
   return (
-    <div className="screen">
-      <div className="screen-head">
-        <h1>Tables</h1>
-        {editable && (
-          <button className="toolbar-btn" onClick={() => setForm({ competition: null })} aria-label="New competition">
-            <PlusIcon />
-          </button>
-        )}
-      </div>
+    <div className={wrapClass}>
+      {embedded ? (
+        editable && (
+          <div className="button-row">
+            <button className="ghost-btn" onClick={() => setForm({ competition: null })}>
+              <PlusIcon /> New competition
+            </button>
+          </div>
+        )
+      ) : (
+        <div className="screen-head">
+          <h1>Tables</h1>
+          {editable && (
+            <button className="toolbar-btn" onClick={() => setForm({ competition: null })} aria-label="New competition">
+              <PlusIcon />
+            </button>
+          )}
+        </div>
+      )}
 
       {competitions.error && <p className="notice warn">{competitions.error}</p>}
       {!competitions.data && !competitions.error && <CompetitionsSkeleton />}

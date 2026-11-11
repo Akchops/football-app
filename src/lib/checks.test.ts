@@ -155,6 +155,19 @@ describe('games waiting for a result', () => {
     ]);
   });
 
+  it('counts one game however differently each player named the other side', () => {
+    const waiting = waitingForResult(
+      [player('a', [game('2026-11-08', 'Vale')]), player('b', [game('2026-11-08', 'Vale Juniors')]), player('c', [game('2026-11-08', 'Moor')])],
+      [],
+      new Map(),
+      { now },
+    );
+    expect(waiting.map((w) => [w.opponent, w.claims.length])).toEqual([
+      ['Moor', 1],
+      ['Vale Juniors', 2],
+    ]);
+  });
+
   it('leaves out games the coach already has a result for, or has checked, or are old or not in a squad', () => {
     const covered = game('2026-11-08', 'Vale');
     const checked = game('2026-11-07', 'Moor');

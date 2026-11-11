@@ -7,6 +7,7 @@ import { useAcademy } from '../../store/AcademyProvider';
 import { AGE_GROUPS, ALL_POSITIONS } from '../../types';
 import { Field, Sheet } from '../ui';
 import { StatusChip } from './parts';
+import { PlayerRecord } from './PlayerGames';
 import { isActive, playerFacts } from './useRoster';
 
 const STATUS_LINE: Record<PlayerStatus, string> = {
@@ -312,6 +313,24 @@ function PlayerSheetBody({
   return (
     <Sheet open title={player.name} subtitle={PLAYER_STATUS_LABEL[player.status]} onClose={onClose}>
       <p className="small">{STATUS_LINE[player.status]}</p>
+
+      {player.status === 'linked' && player.playerId && can(role, 'coach') && (
+        <section className="section">
+          <div className="section-head">
+            <h2>Their games</h2>
+          </div>
+          <PlayerRecord
+            academy={academy}
+            player={{ name: player.name, position: player.position, ageGroup: player.ageGroup, playerId: player.playerId }}
+            squadIds={squads.filter((s) => s.memberIds.includes(player.id)).map((s) => s.id)}
+            mayClear={
+              can(role, 'run-squads') || squads.some((s) => s.memberIds.includes(player.id) && s.coachIds.includes(me))
+            }
+          />
+        </section>
+      )}
+
+      {editable && <h2 className="sheet-subhead">Details</h2>}
 
       {editable ? (
         <>

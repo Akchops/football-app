@@ -142,7 +142,7 @@ export function StaffInviteCard({ invite, onJoined }: { invite: StaffInvite; onJ
 }
 
 /** What the big + asked for, handed to the screen that does it. `n` makes asking twice count twice. */
-export type AddWhat = 'player' | 'squad' | 'competition' | 'staff' | 'pick';
+export type AddWhat = 'result' | 'player' | 'squad' | 'competition' | 'staff' | 'pick';
 export interface AddRequest {
   what: AddWhat;
   n: number;

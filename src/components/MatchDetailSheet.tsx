@@ -9,6 +9,7 @@ import { formatLoad, matchLoad, rpeLabel } from '../lib/load';
 import { downloadICS, matchToICS } from '../lib/ics';
 import { renderShareCard, shareCard } from '../lib/share';
 import { GroundLink } from './GroundLink';
+import { MatchCheckNote } from './MatchCheckNote';
 import { MediaGallery } from './MediaGallery';
 import { Sheet } from './ui';
 import { useMatchActions } from './UndoToast';
@@ -112,6 +113,8 @@ export function MatchDetailSheet({
           </div>
         </div>
       )}
+
+      {result && <MatchCheckNote match={match} />}
 
       {performance && result && (
         <div className="performance">
