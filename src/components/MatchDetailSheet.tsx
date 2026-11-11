@@ -5,6 +5,7 @@ import { METRIC_BY_ID, VENUE_LABEL, type Competition, type Match, type MetricId 
 import { formatDateLong, formatTime, kickoffAt, relativeDayLabel } from '../lib/date';
 import { isWalkover, outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
+import { formatLoad, matchLoad, rpeLabel } from '../lib/load';
 import { downloadICS, matchToICS } from '../lib/ics';
 import { renderShareCard, shareCard } from '../lib/share';
 import { GroundLink } from './GroundLink';
@@ -179,6 +180,14 @@ export function MatchDetailSheet({
           <dt>Match length</dt>
           <dd>{match.durationMinutes} minutes</dd>
         </div>
+        {result?.rpe && matchLoad(result) !== null && (
+          <div>
+            <dt>Effort</dt>
+            <dd>
+              RPE {rpeLabel(result.rpe)} · load {formatLoad(matchLoad(result)!)}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Venue</dt>
           <dd>{VENUE_LABEL[match.venue]}</dd>

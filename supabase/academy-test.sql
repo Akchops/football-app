@@ -626,6 +626,132 @@ set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000a';
 update public.app_settings set require_verification = false;
 
 -- ===========================================================================
+-- Checking players' results.
+-- ===========================================================================
+-- Arjun puts in his own figures for both his games.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000006';
+update public.matches
+   set data = data || '{"result": {"goalsFor": 2, "goalsAgainst": 1, "didPlay": true, "minutes": 60, "motm": true, "metrics": {"saves": 9}}}'::jsonb,
+       updated_at = now()
+ where player_id = public.t_get('pid_arjun')::uuid;
+
+-- His coach enters the squad's result. Nobody else's coach can, and the office never sees one.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+do $$
+declare sm uuid;
+begin
+  insert into public.squad_matches (academy_id, squad_id, date, opponent, goals_for, goals_against, created_by)
+    values (public.t_get('aid')::uuid, public.t_get('elite')::uuid, '2026-11-08', 'Vale', 2, 1, auth.uid()) returning id into sm;
+  perform public.t_set('sm', sm::text);
+  raise notice 'PASS: a coach enters their squad''s result';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004';
+select public.t_refused(format($$insert into public.squad_matches (academy_id, squad_id, date) values (%L, %L, '2026-11-08')$$, public.t_get('aid'), public.t_get('elite')),
+  'row-level security', 'a coach cannot enter a result for a squad they do not coach');
+select public.t_refused(format($$insert into public.squad_matches (academy_id, date) values (%L, '2026-11-08')$$, public.t_get('aid')),
+  'row-level security', 'a coach cannot enter a result for no squad');
+select public.t_refused(format($$select public.review_match(%L, %L, 'm_a1', true)$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'only the owner', 'a coach cannot check a player outside their squads');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000005';
+select public.t_expect($$select * from public.squad_matches$$, 0, 'the admin role sees no results');
+select public.t_refused(format($$select public.review_match(%L, %L, 'm_a1', true)$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'only the owner', 'the admin role cannot check results');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000009';
+select public.t_refused(format($$select public.review_match(%L, %L, 'm_a1', true)$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'only the owner', 'a stranger cannot check results');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000006';
+select public.t_refused(format($$select public.review_match(%L, %L, 'm_a1', true)$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'only the owner', 'a player cannot approve their own figures');
+select public.t_refused(format($$insert into public.match_reviews (academy_id, player_id, match_id, verdict, claimed) values (%L, %L, 'm_a1', 'approved', '{}')$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'permission denied', 'nobody writes a verdict straight in');
+
+-- His coach approves one game ...
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+do $$ begin
+  perform public.review_match(public.t_get('aid')::uuid, public.t_get('pid_arjun')::uuid, 'm_a1', true, null, '', public.t_get('sm')::uuid);
+  if (select verdict from public.match_reviews_for(array[public.t_get('pid_arjun')::uuid]) where match_id = 'm_a1') <> 'approved'
+     or (select reviewed_by from public.match_reviews_for(array[public.t_get('pid_arjun')::uuid]) where match_id = 'm_a1') <> 'coach_one' then
+    raise exception 'FAIL: the approval was not recorded against the coach';
+  end if;
+  raise notice 'PASS: a coach approves a player''s figures, under their username';
+end $$;
+select public.t_refused(format($$select public.review_match(%L, %L, 'm_nope', true)$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'has gone', 'a match that is not there cannot be checked');
+
+-- ... and denies the other, putting in what really happened.
+do $$
+declare d jsonb;
+begin
+  perform public.review_match(public.t_get('aid')::uuid, public.t_get('pid_arjun')::uuid, 'm_a2', false,
+    '{"goalsFor": 0, "goalsAgainst": 3, "motm": false, "metrics": {"saves": 2}, "opponent": "Hacked"}'::jsonb, 'Three conceded, not one');
+  select data into d from public.matches where player_id = public.t_get('pid_arjun')::uuid and id = 'm_a2';
+  if (d -> 'result' ->> 'goalsAgainst')::int <> 3 or (d -> 'result' -> 'metrics' ->> 'saves')::int <> 2
+     or (d -> 'result' ->> 'minutes')::int <> 60 or (d -> 'result' ->> 'motm')::boolean then
+    raise exception 'FAIL: the correction was not made: %', d -> 'result';
+  end if;
+  if d ->> 'opponent' <> 'Moor' or (d -> 'result') ? 'opponent' or d ->> 'updatedAt' is null then
+    raise exception 'FAIL: a correction changed more than the result: %', d;
+  end if;
+  if (select (claimed ->> 'goalsAgainst')::int from public.match_reviews where player_id = public.t_get('pid_arjun')::uuid and match_id = 'm_a2') <> 1 then
+    raise exception 'FAIL: what the player claimed was not kept';
+  end if;
+  raise notice 'PASS: denying puts the coach''s figures in the player''s match, and keeps what they claimed';
+end $$;
+
+-- The family sees both verdicts and the flag; nobody else does.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000007';
+do $$ begin
+  if (select count(*) from public.my_match_reviews()) <> 2
+     or not (select flag_active from public.my_match_reviews() where match_id = 'm_a2') then
+    raise exception 'FAIL: the family does not see the verdicts and the flag';
+  end if;
+  raise notice 'PASS: the family sees the verdicts on their player''s matches, and the flag';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000008';
+select public.t_expect($$select * from public.my_match_reviews()$$, 0, 'another family sees none of them');
+select public.t_expect($$select * from public.match_reviews$$, 0, 'another family reads none of them directly');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004';
+select public.t_expect(format($$select * from public.match_reviews_for(array[%L]::uuid[])$$, public.t_get('pid_arjun')), 0,
+  'a coach of another squad sees none of them');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000001';
+select public.t_expect(format($$select * from public.match_reviews_for(array[%L]::uuid[])$$, public.t_get('pid_arjun')), 2,
+  'the owner sees every verdict');
+
+-- Checking a corrected game again still remembers the original claim.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+do $$ begin
+  perform public.review_match(public.t_get('aid')::uuid, public.t_get('pid_arjun')::uuid, 'm_a2', false, '{"goalsAgainst": 3}'::jsonb);
+  if (select (claimed ->> 'goalsAgainst')::int from public.match_reviews where player_id = public.t_get('pid_arjun')::uuid and match_id = 'm_a2') <> 1 then
+    raise exception 'FAIL: checking again forgot what the player claimed';
+  end if;
+  raise notice 'PASS: checking a corrected game again keeps what the player first claimed';
+end $$;
+
+-- Only the academy's own coaching staff take the flag off.
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004';
+select public.t_refused(format($$select public.clear_flags(%L, %L)$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'only the owner', 'a coach of another squad cannot take the flag off');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000006';
+select public.t_refused(format($$select public.clear_flags(%L, %L)$$, public.t_get('aid'), public.t_get('pid_arjun')),
+  'only the owner', 'a player cannot take their own flag off');
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000003';
+do $$ begin
+  if public.clear_flags(public.t_get('aid')::uuid, public.t_get('pid_arjun')::uuid) <> 1 then raise exception 'FAIL: no flag was taken off'; end if;
+  if (select flag_active from public.match_reviews_for(array[public.t_get('pid_arjun')::uuid]) where match_id = 'm_a2')
+     or (select verdict from public.match_reviews_for(array[public.t_get('pid_arjun')::uuid]) where match_id = 'm_a2') <> 'denied' then
+    raise exception 'FAIL: taking the flag off did the wrong thing';
+  end if;
+  perform public.forget_review((select id from public.match_reviews where player_id = public.t_get('pid_arjun')::uuid and match_id = 'm_a1'));
+  if exists (select 1 from public.match_reviews where player_id = public.t_get('pid_arjun')::uuid and match_id = 'm_a1') then
+    raise exception 'FAIL: the verdict was not taken back';
+  end if;
+  raise notice 'PASS: the coach takes the flag off (the denial stays on record) and takes back a verdict';
+end $$;
+set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000004';
+select public.t_refused(format($$select public.forget_review(%L)$$, (select id from public.match_reviews where match_id = 'm_a2' limit 1)),
+  'only the owner', 'a coach of another squad cannot take back a verdict');
+
+-- ===========================================================================
 -- Roles, ownership and leaving.
 -- ===========================================================================
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000002';
@@ -679,6 +805,8 @@ select public.t_expect(format($$select * from public.matches where player_id = %
   'once a player leaves, nobody at the academy sees their matches');
 select public.t_expect(format($$select * from public.academy_players where id = %L and status = 'left' and player_id is null$$,
   public.t_get('link_arjun')), 1, 'the academy keeps the name, marked as left');
+select public.t_expect(format($$select * from public.match_reviews_for(array[%L]::uuid[])$$, public.t_get('pid_arjun')), 0,
+  'once a player leaves, the academy sees none of the verdicts on their matches');
 
 -- ===========================================================================
 reset role;

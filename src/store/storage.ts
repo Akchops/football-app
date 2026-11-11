@@ -1,5 +1,5 @@
 import {
-  DEFAULT_MATCH_LENGTH, DEFAULT_PROFILE, DEFAULT_SETTINGS, TEAM_COLORS, groupForPosition,
+  DEFAULT_MATCH_LENGTH, DEFAULT_PROFILE, DEFAULT_SETTINGS, RPE_MAX, RPE_MIN, TEAM_COLORS, groupForPosition,
   type AppData, type Competition, type Match, type MatchResult, type MetricTotals, type Profile, type Result,
   type Team, type TrainingSession,
 } from '../types';
@@ -35,6 +35,12 @@ interface LegacyResult {
   positionGroup?: MatchResult['positionGroup'];
 }
 
+/** A 6-20 rating as a whole number, or null for anything else - including results from before it existed. */
+export function cleanRpe(value: unknown): number | null {
+  const n = typeof value === 'number' ? Math.round(value) : NaN;
+  return n >= RPE_MIN && n <= RPE_MAX ? n : null;
+}
+
 function migrateResult(raw: MatchResult | null): MatchResult | null {
   if (!raw) return null;
   const legacy = raw as MatchResult & LegacyResult;
@@ -58,6 +64,7 @@ function migrateResult(raw: MatchResult | null): MatchResult | null {
     yellowCards: raw.yellowCards ?? 0,
     redCards: raw.redCards ?? 0,
     walkover: raw.walkover === 'us' || raw.walkover === 'them' ? raw.walkover : null,
+    rpe: cleanRpe(raw.rpe),
     metrics,
   };
 }

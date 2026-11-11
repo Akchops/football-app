@@ -22,6 +22,28 @@ export interface SquadPlayer {
   /** Their matches, from their own Matchday. Empty for a name with no app. */
   matches: Match[];
   competitions: Competition[];
+  /** Their Matchday player, when linked - what a coach's check is made against. */
+  playerId?: string | null;
+  /** A coach has denied figures of theirs and not yet taken the flag off. */
+  flagged?: boolean;
+}
+
+/**
+ * What a flag costs: while a coach's denial stands, a player's match score
+ * counts this much lower wherever the academy ranks or picks players.
+ */
+export const FLAG_PENALTY = 15;
+
+/** A player's average match score as the academy weighs it - lower while they are flagged. */
+export function ratingOf(averageScore: number | null, flagged = false): number | null {
+  if (averageScore === null) return null;
+  return flagged ? Math.max(0, averageScore - FLAG_PENALTY) : averageScore;
+}
+
+/** The number a board ranks a player by, with a flag counting against their match score. */
+export function boardValue(board: Board, player: Pick<SquadPlayer, 'flagged'>, stats: Stats): number | null {
+  const value = board.value(stats);
+  return board.id === 'matchScore' ? ratingOf(value, player.flagged) : value;
 }
 
 export type StageFilter = 'all' | 'group' | 'knockout';
@@ -184,7 +206,7 @@ export function leaderboard(players: SquadPlayer[], filter: StatsFilter, board: 
     if (!boardApplies(board, player)) continue;
     const stats = computeStats(matchesFor(player, filter));
     if (stats.appearances === 0) continue;
-    const value = board.value(stats);
+    const value = boardValue(board, player, stats);
     if (value === null) continue;
     rows.push({ player, stats, value });
   }
@@ -217,7 +239,7 @@ export function compareRows(players: SquadPlayer[], filter: StatsFilter): Compar
   const keepers = players.some((p) => p.positionGroup === 'goalkeeper');
   const outfield = players.some((p) => p.positionGroup !== 'goalkeeper');
   return BOARDS.filter((b) => b.for === 'all' || (b.for === 'keeper' ? keepers : outfield)).map((board) => {
-    const values = stats.map((s, i) => (s.appearances && boardApplies(board, players[i]) ? board.value(s) : null));
+    const values = stats.map((s, i) => (s.appearances && boardApplies(board, players[i]) ? boardValue(board, players[i], s) : null));
     const present = values.filter((v): v is number => v !== null);
     const target = present.length > 1 ? (board.ascending ? Math.min(...present) : Math.max(...present)) : null;
     return {

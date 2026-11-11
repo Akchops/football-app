@@ -4,6 +4,7 @@ import { POSITION_GROUP_LABEL, VENUE_LABEL, type PositionGroup } from '../types'
 import { formatDateShort } from '../lib/date';
 import { positionStatCards, showsTeamAttack } from '../lib/metrics';
 import { scoreBand, scoreVerdict } from '../lib/score';
+import { formatLoad } from '../lib/load';
 import {
   computeStats, isPlayed, mainPositionGroup, recentScores, recordSummary, scoreline, seasonsPlayed, statsByCompetition,
   statsByMonth, statsByOpponent, statsByStage, statsByTeam, statsByTournament, statsByVenue, type StageBreakdown,
@@ -323,6 +324,15 @@ export function StatsScreen({
             </span>
             <span className="table-sub">{stats.motm} man of the match</span>
           </div>
+          {stats.rpeGames > 0 && (
+            <div className="table-row">
+              <span className="table-name">Match load</span>
+              <span className="table-value">{formatLoad(stats.load)}</span>
+              <span className="table-sub">
+                Average effort {stats.averageRpe!.toFixed(1)}/20 · {stats.rpeGames} game{stats.rpeGames === 1 ? '' : 's'} rated
+              </span>
+            </div>
+          )}
         </div>
       </Section>
 

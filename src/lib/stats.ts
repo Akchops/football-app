@@ -1,6 +1,7 @@
 import type { Competition, Match, MatchResult, MetricTotals, PositionGroup, Settings, Team, Venue } from '../types';
 import { MONTH_NAMES, fromISODate, kickoffAt, toISODate } from './date';
 import { addMetrics } from './metrics';
+import { matchLoad } from './load';
 import { matchScore } from './score';
 
 export type Outcome = 'W' | 'D' | 'L';
@@ -113,6 +114,11 @@ export interface Stats extends Record_ {
   minutesPerGoalContribution: number | null;
   /** Average performance score out of 100 across matches played. */
   averageScore: number | null;
+  /** Match load (RPE × minutes, in AU) added up over the games that gave an effort rating. */
+  load: number;
+  /** Games with an effort rating, and their average on the 6-20 scale. */
+  rpeGames: number;
+  averageRpe: number | null;
   /** Most recent first, max 5. */
   form: Outcome[];
   streak: { type: Outcome; count: number } | null;
@@ -159,6 +165,9 @@ export function computeStats(matches: Match[]): Stats {
   let motm = 0;
   let scoreSum = 0;
   let scoreCount = 0;
+  let load = 0;
+  let rpeSum = 0;
+  let rpeGames = 0;
   const totals: MetricTotals = {};
   let biggestWin: (Match & { result: MatchResult }) | null = null;
   let heaviestDefeat: (Match & { result: MatchResult }) | null = null;
@@ -184,6 +193,12 @@ export function computeStats(matches: Match[]): Stats {
       if (r.motm) motm += 1;
       scoreSum += matchScore(r, match.durationMinutes).score;
       scoreCount += 1;
+      const gameLoad = matchLoad(r);
+      if (gameLoad !== null && r.rpe) {
+        load += gameLoad;
+        rpeSum += r.rpe;
+        rpeGames += 1;
+      }
     }
 
     const margin = r.goalsFor - r.goalsAgainst;
@@ -237,6 +252,9 @@ export function computeStats(matches: Match[]): Stats {
     goalsPerMatch: appearances ? goals / appearances : 0,
     minutesPerGoalContribution: contributions ? minutes / contributions : null,
     averageScore: scoreCount ? scoreSum / scoreCount : null,
+    load,
+    rpeGames,
+    averageRpe: rpeGames ? rpeSum / rpeGames : null,
     form,
     streak,
   };

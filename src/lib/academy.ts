@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Competition, CompetitionType, Match, MatchStage, Profile, Result } from '../types';
+import type { Competition, CompetitionType, Match, MatchResult, MatchStage, Profile, Result, Venue } from '../types';
 import { cleanDetail, toStage } from './stage';
 import { fromServer, profileFromServer } from './sync';
+import { normaliseMatch } from '../store/storage';
 
 /**
  * Academies, through Supabase. Like remote.ts, every call runs as the
@@ -199,6 +200,54 @@ export interface DocumentUpload {
   data: string;
 }
 
+/** A squad's game as its coach records it: when, who against, and the score. */
+export interface SquadMatch {
+  id: string;
+  squadId: string | null;
+  /** 'YYYY-MM-DD' */
+  date: string;
+  opponent: string;
+  venue: Venue;
+  goalsFor: number;
+  goalsAgainst: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SquadMatchInput = Omit<SquadMatch, 'id' | 'createdAt' | 'updatedAt'>;
+
+export type CheckVerdict = 'approved' | 'denied';
+
+/** A coach's verdict on a player's own figures for one of their matches. */
+export interface MatchCheck {
+  id: string;
+  academyId: string;
+  academyName: string;
+  playerId: string;
+  matchId: string;
+  squadMatchId: string | null;
+  verdict: CheckVerdict;
+  /** The player's result as it stood when it was checked. */
+  claimed: MatchResult | null;
+  /** The coach's figures, when they denied and corrected it - now in the player's own match. */
+  corrected: MatchResult | null;
+  note: string;
+  /** The coach's username. */
+  reviewedBy: string;
+  reviewedAt: string;
+  /** A denial that still counts against the player, until a coach takes the flag off. */
+  flagActive: boolean;
+}
+
+export interface ReviewInput {
+  approve: boolean;
+  /** When denying: the right figures, written into the player's match. */
+  corrected?: MatchResult | null;
+  note?: string;
+  squadMatchId?: string | null;
+}
+
 /** An academy as Matchday's admins review it. */
 export interface ReviewItem {
   id: string;
@@ -270,6 +319,22 @@ export interface AcademyApi {
 
   /** Linked players' own records, as far as the rules let the viewer see: a coach gets only their squads'. */
   playerRecords(playerIds: string[]): Promise<PlayerRecords[]>;
+
+  // Checking players' results.
+  squadMatches(academyId: string): Promise<SquadMatch[]>;
+  /** Records a squad's result, or with an id, changes one. */
+  saveSquadMatch(academyId: string, input: SquadMatchInput, id?: string): Promise<string>;
+  deleteSquadMatch(id: string): Promise<void>;
+  /** Verdicts on these players' matches - from this academy and any other the family shares them with. */
+  matchChecks(playerIds: string[]): Promise<MatchCheck[]>;
+  /** Approves or denies a player's figures for one match. Denying flags them. */
+  reviewMatch(academyId: string, playerId: string, matchId: string, input: ReviewInput): Promise<string>;
+  /** Takes a verdict back. */
+  forgetCheck(checkId: string): Promise<void>;
+  /** Takes a player's flag off at this academy. */
+  clearFlags(academyId: string, playerId: string): Promise<void>;
+  /** The family's side: every verdict on their player's matches. */
+  myMatchChecks(): Promise<MatchCheck[]>;
   selections(academyId: string): Promise<Selection[]>;
   saveSelection(academyId: string, input: SelectionInput, id?: string): Promise<string>;
   deleteSelection(id: string): Promise<void>;
@@ -442,6 +507,10 @@ export function describeAcademyError(e: unknown): string {
   }
   if (/jwt|not authenticated/i.test(message)) return 'Your sign-in has run out. Sign out and in again.';
   if (/permission denied|row-level security/i.test(message)) return "You don't have permission to do that.";
+  // A project whose database is older than the app: a call to something it doesn't have yet.
+  if (/schema cache|could not find the function|relation .* does not exist|function .* does not exist/i.test(message)) {
+    return "The server needs the latest update for this - whoever runs Matchday's database runs supabase/schema.sql again.";
+  }
   if (!message) return 'Something went wrong. Try again.';
   // The server's own messages are written to be shown; give them a capital and a full stop.
   const sentence = message.charAt(0).toUpperCase() + message.slice(1);
@@ -593,6 +662,88 @@ function resultRow(input: AcademyResultInput): Record<string, unknown> {
 function insertedOrThere(result: Result_<unknown>): void {
   if (result.error?.code === '23505') return;
   check(result);
+}
+
+interface SquadMatchRow {
+  id: string;
+  squad_id: string | null;
+  date: string;
+  opponent: string;
+  venue: Venue;
+  goals_for: number;
+  goals_against: number;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const SQUAD_MATCH_COLUMNS = 'id, squad_id, date, opponent, venue, goals_for, goals_against, notes, created_at, updated_at';
+
+function toSquadMatch(r: SquadMatchRow): SquadMatch {
+  return {
+    id: r.id,
+    squadId: r.squad_id,
+    date: r.date,
+    opponent: r.opponent ?? '',
+    venue: r.venue === 'away' || r.venue === 'neutral' ? r.venue : 'home',
+    goalsFor: r.goals_for ?? 0,
+    goalsAgainst: r.goals_against ?? 0,
+    notes: r.notes ?? '',
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+function squadMatchRow(input: SquadMatchInput): Record<string, unknown> {
+  return {
+    squad_id: input.squadId,
+    date: input.date,
+    opponent: input.opponent.trim(),
+    venue: input.venue,
+    goals_for: input.goalsFor,
+    goals_against: input.goalsAgainst,
+    notes: input.notes.trim(),
+  };
+}
+
+interface CheckRow {
+  id: string;
+  academy_id: string;
+  academy_name: string;
+  player_id: string;
+  match_id: string;
+  squad_match_id: string | null;
+  verdict: CheckVerdict;
+  claimed: unknown;
+  corrected: unknown;
+  note: string;
+  reviewed_by: string;
+  reviewed_at: string;
+  flag_active: boolean;
+}
+
+/** A result from the server, filled in the way a match's own result is. */
+function resultFrom(value: unknown): MatchResult | null {
+  if (!value || typeof value !== 'object') return null;
+  return normaliseMatch({ result: value } as unknown as Match).result;
+}
+
+function toCheck(r: CheckRow): MatchCheck {
+  return {
+    id: r.id,
+    academyId: r.academy_id,
+    academyName: r.academy_name ?? '',
+    playerId: r.player_id,
+    matchId: r.match_id,
+    squadMatchId: r.squad_match_id,
+    verdict: r.verdict === 'denied' ? 'denied' : 'approved',
+    claimed: resultFrom(r.claimed),
+    corrected: resultFrom(r.corrected),
+    note: r.note ?? '',
+    reviewedBy: r.reviewed_by ?? '',
+    reviewedAt: r.reviewed_at,
+    flagActive: Boolean(r.flag_active),
+  };
 }
 
 function toRow(patch: Partial<AcademyDetails>): Record<string, unknown> {
@@ -997,6 +1148,79 @@ export function academyApi(sb: SupabaseClient, userId: string): AcademyApi {
       for (const row of matches) byPlayer.get(row.player_id)?.matches.push(fromServer('matches', row.data));
       for (const row of competitions) byPlayer.get(row.player_id)?.competitions.push(fromServer('competitions', row.data));
       return [...byPlayer.values()];
+    },
+
+    async squadMatches(academyId) {
+      const rows = check(
+        (await sb
+          .from('squad_matches')
+          .select(SQUAD_MATCH_COLUMNS)
+          .eq('academy_id', academyId)
+          .order('date', { ascending: false })
+          .order('created_at', { ascending: false })) as Result_<SquadMatchRow[]>,
+      );
+      return rows.map(toSquadMatch);
+    },
+
+    async saveSquadMatch(academyId, input, id) {
+      if (id) {
+        const rows = check(
+          (await sb
+            .from('squad_matches')
+            .update({ ...squadMatchRow(input), updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select('id')) as Result_<{ id: string }[]>,
+        );
+        changedOne(rows, "You can't change this result - only the owner, a manager or the squad's coach can.");
+        return id;
+      }
+      const row = check(
+        (await sb
+          .from('squad_matches')
+          .insert({ academy_id: academyId, created_by: userId, ...squadMatchRow(input) })
+          .select('id')
+          .single()) as Result_<{ id: string }>,
+      );
+      return row.id;
+    },
+
+    async deleteSquadMatch(id) {
+      const rows = check((await sb.from('squad_matches').delete().eq('id', id).select('id')) as Result_<{ id: string }[]>);
+      changedOne(rows, "You can't delete this result.");
+    },
+
+    async matchChecks(playerIds) {
+      const ids = [...new Set(playerIds)];
+      if (ids.length === 0) return [];
+      const rows = check((await sb.rpc('match_reviews_for', { pids: ids })) as Result_<CheckRow[]>);
+      return rows.map(toCheck);
+    },
+
+    async reviewMatch(academyId, playerId, matchId, input) {
+      return check(
+        (await sb.rpc('review_match', {
+          aid: academyId,
+          pid: playerId,
+          mid: matchId,
+          approve: input.approve,
+          corrected: input.approve ? null : input.corrected ?? null,
+          note: (input.note ?? '').trim(),
+          squad_match: input.squadMatchId ?? null,
+        })) as Result_<string>,
+      );
+    },
+
+    async forgetCheck(checkId) {
+      check((await sb.rpc('forget_review', { review_id: checkId })) as Result_<unknown>);
+    },
+
+    async clearFlags(academyId, playerId) {
+      check((await sb.rpc('clear_flags', { aid: academyId, pid: playerId })) as Result_<unknown>);
+    },
+
+    async myMatchChecks() {
+      const rows = check((await sb.rpc('my_match_reviews')) as Result_<CheckRow[]>);
+      return rows.map(toCheck);
     },
 
     async selections(academyId) {

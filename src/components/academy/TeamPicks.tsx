@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { describeAcademyError, type Selection, type StaffAcademy } from '../../lib/academy';
 import {
-  BOARDS, BOARD_BY_ID, boardApplies, selectionText, statsFor, type Board, type BoardId, type SquadPlayer, type StatsFilter,
+  BOARDS, BOARD_BY_ID, boardApplies, boardValue, selectionText, statsFor, type Board, type BoardId, type SquadPlayer, type StatsFilter,
 } from '../../lib/academyStats';
 import { useAcademy } from '../../store/AcademyProvider';
 import { BusyLabel, Field, Section, Sheet } from '../ui';
@@ -116,7 +116,7 @@ function PickSheet({
     .filter((p) => !squadId || p.squadIds.includes(squadId))
     .map((p) => {
       const stats = statsFor(p, scope);
-      const value = stats.appearances && boardApplies(board, p) ? board.value(stats) : null;
+      const value = stats.appearances && boardApplies(board, p) ? boardValue(board, p, stats) : null;
       return { player: p, stats, value };
     })
     .sort(

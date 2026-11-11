@@ -183,7 +183,34 @@ export interface MatchResult {
   /** Won or lost without a ball kicked - the other side didn't turn up. No goals
       count either way. Missing on results saved before walkovers existed. */
   walkover?: Walkover;
+  /** How hard it felt, on Borg's 6-20 scale of perceived exertion, or null when
+      not said. Times the minutes played it gives the match load. Missing on
+      results saved before it existed. */
+  rpe?: number | null;
 }
+
+/** Borg's scale of perceived exertion: 6 is resting, 20 is all-out. */
+export const RPE_MIN = 6;
+export const RPE_MAX = 20;
+
+/** The words Borg's scale puts against its numbers; the ones between take the nearest. */
+export const RPE_LABEL: Record<number, string> = {
+  6: 'No exertion at all',
+  7: 'Extremely light',
+  8: 'Extremely light',
+  9: 'Very light',
+  10: 'Very light',
+  11: 'Light',
+  12: 'Light',
+  13: 'Somewhat hard',
+  14: 'Somewhat hard',
+  15: 'Hard',
+  16: 'Hard',
+  17: 'Very hard',
+  18: 'Very hard',
+  19: 'Extremely hard',
+  20: 'Maximal exertion',
+};
 
 /** Which side was given the match: 'us' is a win, 'them' a loss. */
 export type Walkover = 'us' | 'them' | null;
@@ -384,6 +411,7 @@ export function emptyResult(position: string, group?: PositionGroup, durationMin
     redCards: 0,
     metrics: {},
     walkover: null,
+    rpe: null,
   };
 }
 

@@ -8,6 +8,7 @@ import {
 import { formatDateShort, formatTime } from '../lib/date';
 import { concededFollowsScore, formMetricsFor, pruneMetrics } from '../lib/metrics';
 import { matchScore, scoreBand, scoreVerdict } from '../lib/score';
+import { RPE_VALUES, formatLoad, matchLoad, rpeLabel } from '../lib/load';
 import { Disclosure, Field, Segmented, Sheet, Stepper } from './ui';
 import { NoEntryIcon } from './icons';
 
@@ -122,6 +123,7 @@ export function ResultSheet({
           redCards: 0,
           metrics: {},
           walkover,
+          rpe: null,
         }
       : {
           ...result,
@@ -133,6 +135,7 @@ export function ResultSheet({
           redCards: result.didPlay ? result.redCards : 0,
           metrics: result.didPlay ? pruneMetrics(result.metrics) : {},
           walkover: null,
+          rpe: result.didPlay ? result.rpe ?? null : null,
         };
     saveResult(match.id, cleaned);
     if (notes !== match.notes) updateMatch(match.id, { notes });
@@ -232,7 +235,11 @@ export function ResultSheet({
       {result.didPlay && !walkover && (
         <Disclosure
           label="More detail"
-          detail="Minutes played, yellow and red cards"
+          detail={
+            result.rpe
+              ? `Effort ${result.rpe}/20 · load ${formatLoad(matchLoad(result) ?? 0)}`
+              : 'Minutes played, effort (RPE), yellow and red cards'
+          }
           open={showDetail}
           onToggle={() => setShowDetail((s) => !s)}
         >
@@ -248,6 +255,33 @@ export function ResultSheet({
               <Stepper label="Yellows" value={result.yellowCards} onChange={(v) => patch({ yellowCards: v })} max={2} />
               <Stepper label="Reds" value={result.redCards} onChange={(v) => patch({ redCards: v })} max={1} />
             </div>
+
+            <Field
+              label="How hard was it? (RPE)"
+              hint="Rate of perceived exertion, 6 (resting) to 20 (all-out). Times your minutes, it gives the match load."
+            >
+              <select
+                className="input"
+                value={result.rpe ?? ''}
+                onChange={(e) => patch({ rpe: e.target.value ? Number(e.target.value) : null })}
+              >
+                <option value="">Not set</option>
+                {RPE_VALUES.map((v) => (
+                  <option key={v} value={v}>
+                    {rpeLabel(v)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {result.rpe ? (
+              <p className="load-readout" aria-live="polite">
+                <span>Match load</span>
+                <strong>{formatLoad(matchLoad(result) ?? 0)}</strong>
+                <span className="muted small">
+                  RPE {result.rpe} × {result.minutes} min
+                </span>
+              </p>
+            ) : null}
 
             {secondary.length > 0 && (
               <div className="stat-steppers">

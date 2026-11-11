@@ -1684,17 +1684,292 @@ grant execute on function
   public.review_academy(uuid, boolean, text), public.academies_for_review()
   to authenticated;
 
+-- ===========================================================================
+-- CHECKING PLAYERS' RESULTS
+--
+-- Players log their own games, and an academy reads them - so a player could
+-- make theirs look better than they were. Here a coach enters the squad's
+-- result, sees each player's own figures for that game beside it, and
+-- approves or denies them:
+--
+--   - Approved: the figures carry a tick, wherever the player's matches are
+--     read - by the family, and by any academy the family shares them with.
+--   - Denied: the player is flagged at that academy until a coach there takes
+--     the flag off, and the coach can put in the right figures. Those are
+--     written into the player's own match, as a newer edit, so the family's
+--     phones pull them like any other change. This is the one write an
+--     academy makes to a player's records, and only to a match it checked.
+--
+-- The server takes the snapshot of what the player claimed itself, so it is
+-- what the player's record really said, not what a phone sent.
+-- ===========================================================================
+
+-- A squad's game as the coach records it: the date, who against, the score.
+create table if not exists public.squad_matches (
+  id            uuid primary key default gen_random_uuid(),
+  academy_id    uuid not null references public.academies(id) on delete cascade,
+  squad_id      uuid references public.academy_squads(id) on delete set null,
+  date          text not null check (date ~ '^\d{4}-\d{2}-\d{2}$'),
+  opponent      text not null default '' check (length(opponent) <= 80),
+  venue         text not null default 'home' check (venue in ('home', 'away', 'neutral')),
+  goals_for     integer not null default 0 check (goals_for between 0 and 99),
+  goals_against integer not null default 0 check (goals_against between 0 and 99),
+  notes         text not null default '' check (length(notes) <= 500),
+  created_by    uuid references auth.users(id) on delete set null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists squad_matches_academy_idx on public.squad_matches (academy_id, date);
+
+-- One verdict per academy per player's match.
+create table if not exists public.match_reviews (
+  id              uuid primary key default gen_random_uuid(),
+  academy_id      uuid not null references public.academies(id) on delete cascade,
+  player_id       uuid not null references public.players(id) on delete cascade,
+  match_id        text not null,
+  squad_match_id  uuid references public.squad_matches(id) on delete set null,
+  verdict         text not null check (verdict in ('approved', 'denied')),
+  -- The player's result as it stood when it was checked.
+  claimed         jsonb not null,
+  -- The coach's figures, when they denied and corrected it.
+  corrected       jsonb,
+  note            text not null default '' check (length(note) <= 300),
+  reviewed_by     uuid references auth.users(id) on delete set null,
+  reviewed_at     timestamptz not null default now(),
+  -- A denial flags the player until a coach takes the flag off.
+  flag_cleared_at timestamptz,
+  flag_cleared_by uuid references auth.users(id) on delete set null,
+  unique (academy_id, player_id, match_id)
+);
+create index if not exists match_reviews_player_idx on public.match_reviews (player_id);
+
+-- Whether the caller may check this player's results for this academy: they
+-- are linked to it, and the caller runs it or coaches one of their squads.
+create or replace function public.can_review(aid uuid, pid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (
+    select 1
+    from public.academy_players ap
+    where ap.academy_id = aid and ap.player_id = pid and ap.status = 'linked'
+      and (
+        public.runs_academy(aid)
+        or (public.coaches_at(aid) and exists (
+          select 1
+          from public.squad_players sp
+          join public.squad_coaches sc on sc.squad_id = sp.squad_id
+          where sp.academy_player_id = ap.id and sc.user_id = auth.uid()
+        ))
+      )
+  );
+$$;
+
+alter table public.squad_matches enable row level security;
+alter table public.match_reviews enable row level security;
+
+-- The coaching staff see their academy's results; the owner and managers
+-- enter any, a coach those of the squads they coach.
+drop policy if exists squad_matches_read on public.squad_matches;
+create policy squad_matches_read on public.squad_matches
+  for select using (public.coaches_at(academy_id));
+drop policy if exists squad_matches_write on public.squad_matches;
+create policy squad_matches_write on public.squad_matches
+  for all using (public.runs_academy(academy_id) or (squad_id is not null and public.coaches_squad(squad_id)))
+  with check (
+    (public.runs_academy(academy_id) or (squad_id is not null and public.coaches_squad(squad_id)))
+    and (squad_id is null or exists (
+      select 1 from public.academy_squads s where s.id = squad_id and s.academy_id = squad_matches.academy_id
+    ))
+  );
+
+-- A verdict is read wherever the match itself may be: by the family, and by
+-- any academy the family shares the player's records with. Written only
+-- through the functions below.
+drop policy if exists match_reviews_read on public.match_reviews;
+create policy match_reviews_read on public.match_reviews
+  for select using (public.owns_player(player_id) or public.can_view_player(player_id));
+
+-- Approve or deny a player's own figures for one of their matches. Denying
+-- flags them; with `corrected`, the coach's figures replace theirs in the
+-- player's match.
+create or replace function public.review_match(
+  aid uuid, pid uuid, mid text, approve boolean,
+  corrected jsonb default null, note text default '', squad_match uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  current_result jsonb;
+  earlier public.match_reviews;
+  snapshot jsonb;
+  fixed jsonb := null;
+  rid uuid;
+  stamp text := to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+begin
+  if not public.can_review(aid, pid) then
+    raise exception 'Only the owner, a manager or their squad''s coach can check this player''s results';
+  end if;
+  if squad_match is not null and not exists (select 1 from public.squad_matches where id = squad_match and academy_id = aid) then
+    raise exception 'That result is not at this academy';
+  end if;
+  select data -> 'result' into current_result
+    from public.matches where player_id = pid and id = mid and deleted_at is null;
+  if not found then raise exception 'That match has gone - the player may have deleted it'; end if;
+  if current_result is null or jsonb_typeof(current_result) <> 'object' then
+    raise exception 'The player has not put in a result for that match yet';
+  end if;
+
+  -- Checked again after a correction: what they claimed is still the earlier claim.
+  select * into earlier from public.match_reviews where academy_id = aid and player_id = pid and match_id = mid;
+  snapshot := case when earlier.corrected is not null and earlier.corrected = current_result then earlier.claimed else current_result end;
+
+  if not approve and corrected is not null then
+    if jsonb_typeof(corrected) <> 'object' or length(corrected::text) > 4000 then
+      raise exception 'Those figures could not be read';
+    end if;
+    -- Only the parts of a result a coach would correct; anything else stays the player's.
+    fixed := current_result || coalesce((
+      select jsonb_object_agg(key, value) from jsonb_each(corrected)
+      where key in ('goalsFor', 'goalsAgainst', 'penaltiesFor', 'penaltiesAgainst', 'didPlay', 'minutes', 'position',
+                    'positionGroup', 'motm', 'yellowCards', 'redCards', 'metrics', 'walkover', 'rpe')
+    ), '{}'::jsonb);
+    update public.matches
+       set data = jsonb_set(jsonb_set(data, '{result}', fixed), '{updatedAt}', to_jsonb(stamp)),
+           updated_at = stamp::timestamptz
+     where player_id = pid and id = mid;
+  end if;
+
+  insert into public.match_reviews as r
+    (academy_id, player_id, match_id, squad_match_id, verdict, claimed, corrected, note, reviewed_by, reviewed_at,
+     flag_cleared_at, flag_cleared_by)
+  values
+    (aid, pid, mid, squad_match, case when approve then 'approved' else 'denied' end, snapshot, fixed,
+     left(btrim(coalesce(note, '')), 300), auth.uid(), now(), null, null)
+  on conflict (academy_id, player_id, match_id) do update
+    set squad_match_id = coalesce(excluded.squad_match_id, r.squad_match_id),
+        verdict = excluded.verdict, claimed = excluded.claimed, corrected = excluded.corrected, note = excluded.note,
+        reviewed_by = excluded.reviewed_by, reviewed_at = excluded.reviewed_at,
+        flag_cleared_at = null, flag_cleared_by = null
+  returning id into rid;
+  return rid;
+end;
+$$;
+
+-- Take back a verdict given by mistake. A correction already made stays in
+-- the player's match; checking it again is how to change it.
+create or replace function public.forget_review(review_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  rec public.match_reviews;
+begin
+  select * into rec from public.match_reviews where id = review_id;
+  if not found or not public.can_review(rec.academy_id, rec.player_id) then
+    raise exception 'Only the owner, a manager or their squad''s coach can change this player''s checks';
+  end if;
+  delete from public.match_reviews where id = rec.id;
+end;
+$$;
+
+-- Take the flag off a player: every denial of theirs at this academy stays
+-- a denial, but stops counting against them.
+create or replace function public.clear_flags(aid uuid, pid uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  n integer;
+begin
+  if not public.can_review(aid, pid) then
+    raise exception 'Only the owner, a manager or their squad''s coach can take a player''s flag off';
+  end if;
+  update public.match_reviews
+     set flag_cleared_at = now(), flag_cleared_by = auth.uid()
+   where academy_id = aid and player_id = pid and verdict = 'denied' and flag_cleared_at is null;
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+-- The verdicts on players' matches, with who gave them, for staff: only for
+-- players whose records the caller may read. For the family, my_match_reviews.
+create or replace function public.match_reviews_for(pids uuid[])
+returns table (id uuid, academy_id uuid, academy_name text, player_id uuid, match_id text, squad_match_id uuid,
+               verdict text, claimed jsonb, corrected jsonb, note text, reviewed_by text, reviewed_at timestamptz,
+               flag_active boolean)
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select r.id, r.academy_id, a.name, r.player_id, r.match_id, r.squad_match_id, r.verdict, r.claimed, r.corrected,
+         r.note, coalesce(p.username, ''), r.reviewed_at, (r.verdict = 'denied' and r.flag_cleared_at is null)
+  from public.match_reviews r
+  join public.academies a on a.id = r.academy_id
+  left join public.profiles p on p.user_id = r.reviewed_by
+  where r.player_id = any(pids) and public.can_view_player(r.player_id)
+  order by r.reviewed_at desc;
+$$;
+
+create or replace function public.my_match_reviews()
+returns table (id uuid, academy_id uuid, academy_name text, player_id uuid, match_id text, squad_match_id uuid,
+               verdict text, claimed jsonb, corrected jsonb, note text, reviewed_by text, reviewed_at timestamptz,
+               flag_active boolean)
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select r.id, r.academy_id, a.name, r.player_id, r.match_id, r.squad_match_id, r.verdict, r.claimed, r.corrected,
+         r.note, coalesce(p.username, ''), r.reviewed_at, (r.verdict = 'denied' and r.flag_cleared_at is null)
+  from public.match_reviews r
+  join public.academies a on a.id = r.academy_id
+  left join public.profiles p on p.user_id = r.reviewed_by
+  where public.owns_player(r.player_id)
+  order by r.reviewed_at desc;
+$$;
+
+revoke all on public.squad_matches, public.match_reviews from anon, authenticated;
+grant select on public.squad_matches, public.match_reviews to authenticated;
+grant insert (academy_id, squad_id, date, opponent, venue, goals_for, goals_against, notes, created_by),
+      update (squad_id, date, opponent, venue, goals_for, goals_against, notes, updated_at),
+      delete on public.squad_matches to authenticated;
+
+revoke all on function public.can_review(uuid, uuid) from public, anon;
+revoke all on function
+  public.review_match(uuid, uuid, text, boolean, jsonb, text, uuid), public.forget_review(uuid),
+  public.clear_flags(uuid, uuid), public.match_reviews_for(uuid[]), public.my_match_reviews()
+  from public, anon;
+grant execute on function
+  public.can_review(uuid, uuid),
+  public.review_match(uuid, uuid, text, boolean, jsonb, text, uuid), public.forget_review(uuid),
+  public.clear_flags(uuid, uuid), public.match_reviews_for(uuid[]), public.my_match_reviews()
+  to authenticated;
+
 -- Which version of this file a project has, so a check can tell whether the
 -- latest one was run. Bump it with any change the app depends on.
 --   1  households, players and their records
 --   2  other teams' results, for competition tables
 --   3  academies, first draft
 --   4  academies: squads, linking, tables, team picks and verification
+--   5  coaches' results, and checking players' own figures against them
 create or replace function public.schema_version()
 returns integer
 language sql
 immutable
-as $$ select 4 $$;
+as $$ select 5 $$;
 
 revoke all on function public.schema_version() from public;
 grant execute on function public.schema_version() to anon, authenticated;
