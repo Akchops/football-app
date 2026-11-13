@@ -104,9 +104,13 @@ export function clipSystem(sawVideo: boolean): string {
   ].join(' ');
 }
 
+/**
+ * What the coach is told about the player: what changes the advice, and
+ * nothing that says who they are. Their name would make no drill better, so it
+ * is never sent.
+ */
 export function playerLine(profile: Profile): string {
   return [
-    profile.name ? `Name: ${profile.name}` : null,
     `Position: ${profile.position} (${POSITION_GROUP_LABEL[profile.positionGroup]})`,
     profile.ageGroup ? `Age group: ${profile.ageGroup}` : null,
   ]

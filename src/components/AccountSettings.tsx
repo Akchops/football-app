@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { deleteAccount, wipePhone } from '../lib/account';
+import { childOnly, updateGate, useAgeGate } from '../lib/ageGate';
 import { describeAuthError, googleAvailable, sendCode, signInWithGoogle, verifyCode } from '../lib/auth';
 import type { Invite, Person, SentInvite } from '../lib/syncEngine';
+import { useStore } from '../store/AppStore';
 import { useSync, type SyncValue } from '../store/SyncProvider';
 import { BusyLabel, Field, LoadingLine, Section } from './ui';
 
@@ -11,7 +14,24 @@ import { BusyLabel, Field, LoadingLine, Section } from './ui';
  */
 export function AccountSection() {
   const sync = useSync();
+  const gate = useAgeGate();
   if (!sync.available) return null;
+
+  if (!sync.account && childOnly(gate)) {
+    return (
+      <Section title="Sharing with your family">
+        <p className="muted small">
+          Everything is on this phone only - nothing leaves it. A parent or guardian can sign in with their own email to
+          save it to an account, share it with the family, and switch on the coach and reminders.
+        </p>
+        <div className="button-row">
+          <button className="ghost-btn" onClick={() => updateGate({ localOnly: false })}>
+            A parent or guardian is here
+          </button>
+        </div>
+      </Section>
+    );
+  }
 
   return (
     <Section title="Sharing with your family">
@@ -34,9 +54,15 @@ function message(e: unknown): string {
 export function SignInForm({
   intro = true,
   footnote = 'Everything on this phone stays where it is when you sign in.',
+  onSignedIn,
+  allowGoogle = true,
 }: {
   intro?: boolean;
   footnote?: string;
+  /** Straight after the code is accepted. */
+  onSignedIn?: () => void;
+  /** Off where the code itself is the check - Google sign-in leaves the page and comes back without it. */
+  allowGoogle?: boolean;
 }) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -72,7 +98,11 @@ export function SignInForm({
       setStage('code');
     });
 
-  const verify = () => run(() => verifyCode(email, code));
+  const verify = () =>
+    run(async () => {
+      await verifyCode(email, code);
+      onSignedIn?.();
+    });
 
   return (
     <>
@@ -134,7 +164,7 @@ export function SignInForm({
         </>
       )}
 
-      {google && stage === 'email' && (
+      {google && allowGoogle && stage === 'email' && (
         <>
           <div className="button-row">
             <button className="ghost-btn" disabled={busy} onClick={() => void run(signInWithGoogle)}>
@@ -343,6 +373,98 @@ function SignedIn({ sync }: { sync: SyncValue }) {
         Match photos and clips stay on each phone. Signing out goes back to the sign-in screen; everything on this phone
         stays as it is.
       </p>
+
+      <DeleteAccount people={people} />
     </>
+  );
+}
+
+/**
+ * Deleting the account, from the account itself - not an email to ask for it.
+ * What goes is said before anything happens, and nothing is deleted until the
+ * last button; the server then does it all or none of it.
+ */
+function DeleteAccount({ people }: { people: Person[] }) {
+  const { profile, clearAllData } = useStore();
+  const [open, setOpen] = useState(false);
+  const [everything, setEverything] = useState(false);
+  const [sure, setSure] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const me = people.find((p) => p.isMe);
+  const others = people.filter((p) => !p.isMe);
+  const owner = me?.role === 'owner';
+  const name = profile.name.trim() || 'the player';
+  // Who else is in the family comes from the server; until it has, say what the server will decide.
+  const known = me !== undefined;
+  const recordsGo = known && (others.length === 0 || (owner && everything));
+
+  const remove = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await deleteAccount(owner && everything);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+      return;
+    }
+    clearAllData();
+    await wipePhone();
+    window.location.reload();
+  };
+
+  if (!open) {
+    return (
+      <div className="button-row">
+        <button className="danger-link" onClick={() => setOpen(true)}>
+          Delete my account
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="detail-block delete-account">
+      <p>
+        <strong>Delete your account?</strong>
+      </p>
+      <p className="small">
+        This deletes your email address and username from Matchday&apos;s server
+        {!known
+          ? `, and ${name}'s profile and photo, matches, training, teams, competitions, tables and settings with them - unless others in your family share them, who keep them. Any academy ${name} is linked to stops seeing them straight away.`
+          : recordsGo
+            ? `, and ${name}'s profile and photo, matches, training, teams, competitions, tables and settings with them. Any academy ${name} is linked to stops seeing them straight away and keeps only the name on its list, marked as left.`
+            : `. ${others.map((p) => p.email).join(', ')} ${others.length === 1 ? 'keeps' : 'keep'} ${name}'s records.`}{' '}
+        It also clears this phone: the records, photos and clips, and any AI key. It can&apos;t be undone - to keep a
+        copy, use Export backup under Your data first.
+      </p>
+      {owner && others.length > 0 && (
+        <div className="choice-list">
+          <label className="toggle-row">
+            <input type="radio" name="delete-scope" checked={!everything} onChange={() => setEverything(false)} />
+            <span>Just my account - the family keeps {name}&apos;s records</span>
+          </label>
+          <label className="toggle-row">
+            <input type="radio" name="delete-scope" checked={everything} onChange={() => setEverything(true)} />
+            <span>Everything - delete {name}&apos;s records for the whole family too</span>
+          </label>
+        </div>
+      )}
+      <label className="toggle-row consent">
+        <input type="checkbox" checked={sure} onChange={(e) => setSure(e.target.checked)} />
+        <span>I understand this can&apos;t be undone.</span>
+      </label>
+      {error && <p className="notice warn">{error}</p>}
+      <div className="button-row">
+        <button className="danger-btn" disabled={busy || !sure} onClick={() => void remove()}>
+          <BusyLabel busy={busy} text="Deleting…">Delete my account</BusyLabel>
+        </button>
+        <button className="ghost-btn" disabled={busy} onClick={() => setOpen(false)}>
+          Keep it
+        </button>
+      </div>
+    </div>
   );
 }

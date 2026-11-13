@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   accountsAvailable, currentAccount, onAccountChange, rememberedAccount, signOut as endSession, type Account,
 } from '../lib/auth';
+import { declareAge } from '../lib/account';
+import { bandToDeclare, readGate, updateGate, useAgeGate } from '../lib/ageGate';
 import { supabaseRemote } from '../lib/remote';
 import { supabase } from '../lib/supabase';
 import { syncOnce, type Household, type Invite, type Person, type Remote, type SentInvite, type SyncState } from '../lib/syncEngine';
@@ -188,6 +190,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       // nothing that depends on it starts over.
       setAccount((before) => (before && found && before.id === found.id && before.email === found.email ? before : found));
       if (!found) {
+        // A parent or guardian who signs out leaves a child's phone behind the
+        // parent check again - nobody else signs in on it as them.
+        const gate = readGate();
+        if (gate?.holder === 'child' && gate.parent) updateGate({ parent: false });
         remoteRef.current = null;
         setHousehold(null);
         setCheckedFor(null);
@@ -216,6 +222,28 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       stop();
     };
   }, [available, run]);
+
+  // The age band of whoever signed in, once per account and band: what lets
+  // the server tell a parent's yes from a child's (supabase/schema.sql).
+  const gate = useAgeGate();
+  useEffect(() => {
+    const band = bandToDeclare(gate);
+    if (!account || !band || !gate) return;
+    const mark = `${account.id}:${band}`;
+    if (gate.recorded.includes(mark)) return;
+    let live = true;
+    declareAge(band)
+      .then(() => {
+        const now = readGate();
+        if (live && now) updateGate({ recorded: [...now.recorded.filter((r) => !r.startsWith(`${account.id}:`)), mark] });
+      })
+      .catch(() => {
+        // No signal, or a server not updated yet: asked again next time.
+      });
+    return () => {
+      live = false;
+    };
+  }, [account, gate]);
 
   // A few seconds after any change on this phone.
   const data = store.data;

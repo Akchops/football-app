@@ -3,14 +3,23 @@ Copyright (c) 2026 Aarav Chopra. All rights reserved.
 
 Matchday is proprietary software. See LICENSE for terms.
 
-Third-party components used under their own licences:
-  React, React DOM        MIT     https://github.com/facebook/react
-  Vite                    MIT     https://github.com/vitejs/vite
-  vite-plugin-pwa         MIT     https://github.com/vite-pwa/vite-plugin-pwa
-  Workbox                 MIT     https://github.com/GoogleChrome/workbox
-  Vitest                  MIT     https://github.com/vitest-dev/vitest
-  TypeScript              Apache-2.0  https://github.com/microsoft/TypeScript
-  Anthropic SDK           MIT     https://github.com/anthropics/anthropic-sdk-typescript
+Third-party components used under their own licences. The full text of every
+licence that ships inside the app - every one of them MIT,
+ISC, BSD, Apache-2.0, 0BSD, Unlicense or OFL - is generated at build time by
+scripts/licences.mjs and published beside the app as licences.txt.
+
+Shipped in the app:
+  React, React DOM        MIT         https://github.com/facebook/react
+  Motion                  MIT         https://github.com/motiondivision/motion
+  Supabase JS             MIT         https://github.com/supabase/supabase-js
+  Anthropic SDK           MIT         https://github.com/anthropics/anthropic-sdk-typescript
   Google Gen AI SDK       Apache-2.0  https://github.com/googleapis/js-genai
+  Workbox                 MIT         https://github.com/GoogleChrome/workbox
+  Barlow Condensed font   OFL-1.1     Copyright 2017 The Barlow Project Authors
+                                      (https://github.com/jpt/barlow), via Fontsource (MIT)
+
+Used to build and test it, not shipped:
+  Vite, vite-plugin-pwa, Vitest   MIT
+  TypeScript                      Apache-2.0
 
 Their licences apply to those components only, not to Matchday itself.

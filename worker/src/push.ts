@@ -5,7 +5,8 @@ import { fromB64url, generateVapidKeys, isPushEndpoint, sendPush, type Delivery,
  * Oakfield" the evening before, "How did it go?" after full time - and sends
  * the list here whenever the fixtures change. Each phone gets one Durable
  * Object holding its list and an alarm set for the first one due. All this
- * server ever keeps is that list, and it's gone once sent.
+ * server ever keeps is that list and the phone's push address to send it to -
+ * and once nothing is left to send, it forgets both.
  */
 
 /** One reminder, as the app worked it out. */
@@ -94,6 +95,11 @@ export class PushStore {
         return Response.json(keys);
       }
       case 'schedule': {
+        // Nothing to send: keep nothing, not even where to send it.
+        if (message.reminders.length === 0) {
+          await this.forget();
+          return Response.json({ next: null });
+        }
         await storage.put({ target: message.target, reminders: message.reminders, vapid: message.vapid, subject: message.subject });
         return Response.json({ next: await this.arm(message.reminders) });
       }
@@ -168,6 +174,8 @@ export class PushStore {
         keep.push({ ...reminder, at: now + RETRY_MS, tries: (reminder.tries ?? 0) + 1 });
       }
     }
+    // All sent: the phone's address goes too. The app sends it again with the next fixture.
+    if (keep.length === 0) return this.forget();
     await storage.put('reminders', keep);
     await this.arm(keep);
   }

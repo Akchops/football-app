@@ -60,6 +60,8 @@ export default defineConfig(({ mode }) => {
         // offline would be ~600KB of dead weight. They load on demand instead.
         globIgnores: ['**/gemini-*.js', '**/claude-*.js'],
           navigateFallback: 'index.html',
+          // Pages that are not the app: opening them must show them, not the app.
+          navigateFallbackDenylist: [/\/privacy\.html$/, /\/licences\.txt$/],
           cleanupOutdatedCaches: true,
           // Match reminders: showing a push and opening the app from it (public/push-sw.js).
           importScripts: ['push-sw.js'],

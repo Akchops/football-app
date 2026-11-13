@@ -71,9 +71,19 @@ It is deliberately **not** a general Gemini proxy:
 - It owns the system prompts and response schemas. Callers send a position and
   a question, or a clip and a description — not arbitrary prompts. A leaked URL
   can waste quota but can't be used as a free AI endpoint.
-- Only the app's origin is allowed (`ALLOWED_ORIGINS` in `wrangler.toml`).
-- Each IP gets `DAILY_LIMIT` requests a day (40 by default). Past that, the app
-  tells the player to add their own free key in Setup.
+- Only the app's origin is allowed (`ALLOWED_ORIGINS` in `wrangler.toml`) -
+  which stops other websites using it from their visitors' browsers, and
+  nothing else: a script can send any Origin it likes. The caps below are what
+  actually limit it.
+- Each person gets `DAILY_LIMIT` requests a day (40 by default), counted by IP
+  address - stored only as a hash with the day and the worker's secret, never
+  the address itself, and forgotten within two days. Past that, the app tells
+  the player to add their own free key in Setup.
+- **The hard cap:** every call to Google - each model tried, each retry - takes
+  one from `GLOBAL_DAILY_LIMIT` (500 by default), one allowance for everyone,
+  counted exactly in a single Durable Object (`src/allowance.ts`). When it is
+  gone, nothing more reaches Google until midnight UTC, however many people or
+  addresses are asking. Without the Durable Object bound, it spends nothing.
 - Requests over ~22MB are refused before reaching Gemini.
 - Errors say what failed in plain words, then in brackets the status, the model
   and Google's own reason, with anything shaped like a key removed - so a
@@ -101,13 +111,38 @@ phone turns them on in Setup → Match reminders.
 
 ## Costs and limits
 
-The Gemini free tier is shared across everyone using your proxy, and it is rate
-limited per key rather than per user. If Matchday gets busy the free tier will
-run out and requests fail until it resets — the app handles this by telling
-players to add their own key.
+What a day can cost is capped three ways in the worker:
 
-If you later put a card on the Google account, every clip analysed bills to
-you. `DAILY_LIMIT` in `wrangler.toml` is the lever: lower it to cap exposure.
+| Cap | Where | Default |
+|---|---|---|
+| Calls to Google per day, for everyone | `GLOBAL_DAILY_LIMIT`, `wrangler.toml` | 500 |
+| Length of each answer, thinking included | `MAX_OUTPUT_TOKENS`, `src/index.ts` | 8,192 tokens (16,384 for a schedule) |
+| Size of each request | `MAX_BODY_BYTES`, `src/index.ts` | 22 MB |
+
+So the most a day can cost is about `GLOBAL_DAILY_LIMIT` × (the price of one
+call at those sizes). Lower `GLOBAL_DAILY_LIMIT` to spend less.
+
+**Also cap it at Google's end**, because a cap in the worker can't stop someone
+who gets hold of the key itself:
+
+1. The Gemini key lives in a Google Cloud project. In the Cloud console, open
+   **APIs & Services → Generative Language API → Quotas & system limits**, and
+   set the requests-per-day quota to match `GLOBAL_DAILY_LIMIT`. Google refuses
+   anything past it - that is a hard stop.
+2. **Billing → Budgets & alerts**: set a monthly budget with email alerts.
+   A budget only *warns*; it does not stop spending. The quota in step 1 does.
+3. On the free tier none of this costs money, but Google may use what the key
+   sends to improve its products - which matters for a children's app. A paid
+   key does not do that, and is what the caps above make safe to use.
+
+Anthropic is not used by the worker. A player who adds their own Claude or
+Gemini key in Setup spends on their own account; Anthropic's console has a
+monthly spend limit (Settings → Limits) for that.
+
+**Google's terms:** the Gemini API Additional Terms say it may not be used in a
+service "directed towards or likely to be accessed by individuals under the age
+of 18". Matchday is for youth players. Settle that before launch - see the
+Coach section of the main README.
 
 ## Which model it uses
 

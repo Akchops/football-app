@@ -49,7 +49,7 @@ function stored(overrides: Record<string, unknown> = {}): string {
 
 describe('accountFromStoredSession', () => {
   it('keeps the person signed in when the access token has only run out', () => {
-    expect(accountFromStoredSession(stored())).toEqual({ id: 'user-1', email: 'sam@example.com', name: 'Sam Smith' });
+    expect(accountFromStoredSession(stored())).toEqual({ id: 'user-1', email: 'sam@example.com' });
   });
 
   it('is nobody when nothing is stored', () => {
@@ -66,8 +66,11 @@ describe('accountFromStoredSession', () => {
     expect(accountFromStoredSession(stored({ user: { id: '' } }))).toBeNull();
   });
 
-  it('falls back to the email for a name', () => {
-    expect(accountFromStoredSession(stored({ user: { id: 'u2', email: 'a@b.co' } }))?.name).toBe('a@b.co');
+  it('keeps nothing a provider sends beyond the id and email - no name, no picture', () => {
+    const account = accountFromStoredSession(
+      stored({ user: { id: 'u2', email: 'a@b.co', user_metadata: { full_name: 'A B', avatar_url: 'https://x/y.png' } } }),
+    );
+    expect(account).toEqual({ id: 'u2', email: 'a@b.co' });
   });
 });
 

@@ -414,6 +414,14 @@ export function SetupScreen({
       </Section>
 
       <p className="version-note">
+        <a href="./privacy.html" target="_blank" rel="noopener">
+          Privacy notice
+        </a>{' '}
+        ·{' '}
+        <a href="./licences.txt" target="_blank" rel="noopener">
+          Open-source licences
+        </a>
+        <br />
         Matchday · {matches.length} matches tracked
         <br />Build {__BUILD_ID__} UTC
         <br />© {new Date().getFullYear()} Aarav Chopra. All rights reserved.

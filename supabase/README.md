@@ -35,6 +35,7 @@ required to run or build Matchday.
 | `check-setup.mjs` | Checks a real project is ready, using only its public URL and key. Run by the *Check accounts setup* workflow. |
 | `rls-test.sql` | Proves two families cannot see each other's data, and someone signed out sees nothing. Run it after any change to the access rules. |
 | `academy-test.sql` | The same for academies: plays an owner, manager, two coaches, the office admin, two players, a parent, a stranger and a Matchday admin, and has each try what they should and shouldn't. |
+| `privacy-test.sql` | Deleting an account, under-13s, and what an academy can learn before a family says yes: that a stranger's academy can't turn a username into a child's name, that an invite can't claim to be from someone else, that only an adult can share an under-13, and that deleting an account removes exactly what it should - or nothing, when it refuses. |
 | `local-auth-stub.sql` | Stands in for the Supabase-provided `auth` schema so the files above can run against a plain local Postgres. Never run this against the real project. |
 | `local-api.mjs` | A local stand-in for a whole project, for testing sync in a browser. See the end of this file. Never point it at anything real. |
 
@@ -140,6 +141,7 @@ psql -h localhost -p 5433 -U postgres -f supabase/local-auth-stub.sql
 psql -h localhost -p 5433 -U postgres -f supabase/schema.sql
 psql -h localhost -p 5433 -U postgres -f supabase/rls-test.sql
 psql -h localhost -p 5433 -U postgres -f supabase/academy-test.sql
+psql -h localhost -p 5433 -U postgres -f supabase/privacy-test.sql
 ```
 
 The family checks end with `ALL RLS CHECKS PASSED` or stop at the first thing
@@ -163,7 +165,28 @@ working once a new one is made; an owner cannot verify their own academy; a
 verified academy that changes its name, place or logo goes back for review;
 and with approval required, an unverified academy cannot take on any player.
 
-The two files can be run in either order, and again, on the same database.
+The privacy checks end with `ALL PRIVACY CHECKS PASSED`.
+
+The three files can be run in any order, and again, on the same database.
+
+## Deleting an account
+
+Setup → Delete my account calls `delete_my_account()`, which does the whole job
+in one transaction - the family's records when nobody else shares them (or for
+everyone, when its owner asks), academies run alone, the username, the age
+answer and finally the row in `auth.users`, which every other table deletes
+with or forgets. It runs as the function's owner (`postgres`, when the schema is
+run from the SQL editor), which is what lets it delete from `auth.users`. If a
+project ever refuses that, the delete fails as a whole and the app says so -
+nothing is half-deleted.
+
+## Under 13
+
+The app asks the age of whoever signs in before it sends a code; nobody under 13
+gets an account of their own. Each account keeps only `teen` or `adult`
+(`account_ages`), never a date. Sharing a player with an academy checks the
+player's date of birth: under 13 - or no date at all - needs an account whose
+holder said they are an adult.
 
 ## Testing sync end to end, locally
 

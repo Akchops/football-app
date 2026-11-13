@@ -7,15 +7,30 @@
 // Run from GitHub by .github/workflows/check-accounts.yml.
 
 /** What `schema_version()` in schema.sql returns. Bump both together. */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const TABLES = [
   'households', 'household_members', 'household_invites', 'players', 'player_settings',
   'matches', 'training_sessions', 'teams', 'competitions', 'results',
   'profiles', 'academies', 'academy_members', 'academy_staff_invites', 'academy_squads', 'squad_coaches',
   'academy_players', 'squad_players', 'academy_competitions', 'academy_results', 'academy_selections',
-  'academy_documents', 'app_admins', 'app_settings',
+  'academy_documents', 'app_admins', 'app_settings', 'account_ages',
 ];
+
+/**
+ * Every function the API exposes, with harmless arguments. Someone not signed
+ * in must either be turned away or get nothing back - never a row. The ones
+ * that change things all refuse anyone not signed in before doing anything.
+ */
+const NONE = '00000000-0000-0000-0000-000000000000';
+const FUNCTIONS = {
+  my_invites: {}, household_people: { hid: NONE }, create_household: { name: 'probe' }, accept_invite: { invite_id: NONE },
+  is_household_member: { hid: NONE }, owns_player: { pid: NONE }, player_of: { uid: NONE }, user_by_username: { name: 'probe' },
+  username_available: { name: 'probe_name' }, claim_username: { name: 'probe_name' }, my_staff_invites: {},
+  pending_staff: { aid: NONE }, academy_staff: { aid: NONE }, my_player_invites: {}, my_join_requests: {}, my_academies: {},
+  academies_for_review: {}, can_view_player: { pid: NONE }, player_is_child: { pid: NONE }, is_declared_adult: {},
+  declare_age: { band: 'adult' }, join_by_code: { code: 'ZZZZZZ', consent: false }, delete_my_account: { everything: false },
+};
 
 const url = (process.env.VITE_SUPABASE_URL ?? '').trim().replace(/\/+$/, '');
 const key = (process.env.VITE_SUPABASE_ANON_KEY ?? '').trim();
@@ -107,6 +122,34 @@ for (const table of TABLES) {
   } else {
     fail(`${table}: unexpected answer ${res.status} ${JSON.stringify(res.body).slice(0, 160)}`);
   }
+}
+
+// 4. Every function, called the same way: turned away, or nothing to show.
+for (const [name, args] of Object.entries(FUNCTIONS)) {
+  const res = await call(`/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
+  const body = res.body;
+  const empty = body === null || body === false || body === '' || (Array.isArray(body) && body.length === 0);
+  const code = typeof body === 'object' && body ? body.code : '';
+  const refused = res.status === 401 || res.status === 403 || code === '42501' || code === 'P0001';
+  if (res.status === 404 || code === 'PGRST202') {
+    fail(`${name}(): missing`, 'run all of supabase/schema.sql');
+  } else if (refused || (res.status === 200 && empty) || res.status === 204) {
+    pass(`${name}(): ${refused ? 'turned away' : 'nothing'} for anyone not signed in`);
+  } else {
+    fail(`${name}(): answered someone not signed in with ${res.status} ${JSON.stringify(body).slice(0, 160)}`,
+      'run all of supabase/schema.sql again - it locks this down');
+  }
+}
+
+// 5. The admin side of sign-in, and file storage, with the public key.
+const users = await call('/auth/v1/admin/users');
+if (users.status === 200) fail('the public key lists every account', 'the key in the app is the secret one - replace it with the publishable key, and rotate the secret');
+else pass(`listing accounts is refused (${users.status})`);
+const buckets = await call('/storage/v1/bucket');
+if (buckets.status === 200 && Array.isArray(buckets.body) && buckets.body.length > 0) {
+  fail(`storage buckets are listable without signing in: ${buckets.body.map((b) => b.name).join(', ')}`, 'Matchday uses no storage - delete them, or make them private');
+} else {
+  pass('no file storage is open to anyone not signed in');
 }
 
 console.log('');

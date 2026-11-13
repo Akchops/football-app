@@ -149,6 +149,17 @@ describe('push routes', () => {
     await device.store.alarm();
     expect(sent).toHaveLength(2);
     expect(device.memory.alarm()).toBeNull();
+    // Nothing left to send, so nothing is kept - not even the phone's push address.
+    expect(device.memory.data.size).toBe(0);
+  });
+
+  it('keeps nothing for a phone with no reminders to come', async () => {
+    const subscription = await phone();
+    await post('/push/schedule', { subscription, reminders: [reminder(NOW + 30 * MIN, 'x')] });
+    await post('/push/schedule', { subscription, reminders: [] });
+    const [device] = push.devices();
+    expect(device.memory.data.size).toBe(0);
+    expect(device.memory.alarm()).toBeNull();
   });
 
   it('drops a reminder that is hours late rather than sending it', async () => {

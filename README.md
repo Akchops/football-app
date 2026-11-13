@@ -18,6 +18,17 @@ everything on the one phone.)
 ## What it does
 
 **Signing in (first screen)**
+- First, once on each phone: "When were you born?" - a month and year, for
+  whoever is holding the phone, with nothing on screen to say what any answer
+  leads to. Only the band it falls in is kept on the phone, and an account only
+  ever records "13-17" or "18 or over"
+- Someone under 13 doesn't get an account of their own. A parent or guardian
+  signs in with their own email - the code goes to them - after agreeing to the
+  privacy notice; or the child uses Matchday on the phone only, with nothing
+  leaving it and the coach and reminders off. A phone that was signed in before
+  this existed is asked once too, and if the person holding it is under 13, it
+  asks whose email the account is: a parent confirms theirs, and a child's own
+  account is deleted, keeping everything on the phone
 - The app opens on signing in and nothing else, whenever the build has an
   account backend: an email, then the six-digit code sent to it (or Google,
   once switched on). There's no password, and no separate "sign up"
@@ -195,7 +206,15 @@ everything on the one phone.)
 - Clips are capped at two minutes. Full-match automatic stat extraction is not
   offered — see below.
 - Note on privacy: Google may use free-tier Gemini data to improve their
-  models. Worth knowing before uploading match video of a child.
+  models. Worth knowing before uploading match video of a child. The coach is
+  told the player's position and age group, never their name, and it is off
+  for an under-13 until a parent or guardian has signed in.
+- **Google's terms for the Gemini API say it must not be used in a service
+  "directed towards or likely to be accessed by individuals under the age of
+  18".** Matchday is for youth players, so the shared coach as it stands is
+  against those terms. Decide before launch: move the shared coach to a
+  provider whose terms allow it (Anthropic's allow products for minors, with
+  safeguards), restrict it to adults, or switch it off.
 
 **Training**
 - Log sessions as well as matches: team training, keeper sessions, gym,
@@ -238,6 +257,13 @@ everything on the one phone.)
   most-played opponents
 
 **Your data**
+- **Delete my account** (Setup → Sharing with your family): deletes the
+  account, and the player's records with it when nobody else shares them - or
+  for everyone, if the person who started the family chooses "Everything".
+  Linked academies lose sight at once, as if the family had left. An academy
+  owner with staff hands it over first. Then it clears the phone: records,
+  photos and clips, AI keys, the coach's conversation and the reminders the
+  server holds. One transaction on the server: all of it, or nothing
 - Export a JSON backup, import it back on another device (older backups are
   migrated automatically)
 - Videos and photos are not in the backup file — they stay on the device
@@ -277,10 +303,17 @@ phone or a laptop:
 The player's own app gains league and group **tables** for any competition too:
 enter other teams' results and the table, with your team marked, follows.
 
-Before real families and academies use accounts, the drafts in
-[docs/privacy.md](docs/privacy.md) and [docs/terms.md](docs/terms.md) need
-reviewing - it is children's data - and publishing where the app can link to
-them.
+The privacy notice is [public/privacy.html](public/privacy.html), shipped with
+the app and linked from the sign-in screens and Setup; it names every service
+the data touches. It and [docs/terms.md](docs/terms.md) need a review by someone
+who knows UK data protection law before real families and academies use
+accounts - it is children's data - and the highlighted parts of the notice
+filling in.
+
+An academy that invites a player learns only the username it typed until the
+family says yes; for a player under 13 (or with no date of birth), only an
+account whose holder said they are an adult can say yes. Verification documents
+are deleted as soon as they have been checked.
 
 ## The match score
 
@@ -304,7 +337,7 @@ The breakdown is always visible on the match, so the number is never a black box
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm run build    # production build into dist/
+npm run build    # production build into dist/, with dist/licences.txt
 npm test         # unit tests for the date, stats, scoring and migration logic
 ```
 
@@ -339,8 +372,16 @@ JavaScript. So sharing one key across all players needs a small server.
 
 `worker/` is a Cloudflare Worker that does exactly that, and nothing more: it
 owns the system prompts and response schemas, so it can't be repurposed as a
-free AI endpoint, only the app's origin may call it, and each IP gets a capped
-number of requests a day.
+free AI endpoint, and each person (by IP address) gets a capped number of
+requests a day.
+
+It **cannot overspend**: every call it makes to Google comes out of one
+allowance for the whole day (`GLOBAL_DAILY_LIMIT` in `worker/wrangler.toml`,
+counted exactly in a Durable Object), whoever is asking and from however many
+addresses, and each answer's length is capped. The origin check only stops
+other websites using it from a visitor's browser - anything that isn't a
+browser can claim any origin, which is why the allowance exists.
+[worker/README.md](worker/README.md) has the caps to set on Google's side too.
 
 It can be deployed **without opening a terminal**: add two repository secrets
 (`GEMINI_API_KEY`, `CLOUDFLARE_API_TOKEN`), then run the **Deploy AI proxy**
@@ -431,7 +472,12 @@ but that is not permission to copy it: no licence to reuse, modify or
 redistribute the code is granted.
 
 Third-party components are used under their own licences, listed in
-[NOTICE](NOTICE).
+[NOTICE](NOTICE). Every licence that ships inside the app is written to
+`licences.txt` beside it by `npm run build` (scripts/licences.mjs), and linked
+from Setup.
+
+There is no analytics, advertising or tracking in Matchday, so it needs no
+cookie banner. `src/lib/noTrackers.test.ts` fails the build if any turns up.
 
 ## Ideas for later
 

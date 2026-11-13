@@ -88,7 +88,7 @@ declare hid uuid; pid uuid;
 begin
   hid := public.create_household('Arjun''s family');
   insert into public.players (household_id, data, updated_at)
-    values (hid, '{"name":"Arjun","position":"GK","ageGroup":"U16"}', now()) returning id into pid;
+    values (hid, '{"name":"Arjun","position":"GK","ageGroup":"U16","dateOfBirth":"2010-05-01"}', now()) returning id into pid;
   insert into public.matches (player_id, id, data, updated_at) values
     (pid, 'm_a1', '{"opponent":"Vale","status":"played"}', now()),
     (pid, 'm_a2', '{"opponent":"Moor","status":"played"}', now());
@@ -107,7 +107,7 @@ declare hid uuid; pid uuid;
 begin
   hid := public.create_household('Sam''s family');
   insert into public.players (household_id, data, updated_at)
-    values (hid, '{"name":"Sam","position":"CB","ageGroup":"U14"}', now()) returning id into pid;
+    values (hid, '{"name":"Sam","position":"CB","ageGroup":"U14","dateOfBirth":"2012-06-01"}', now()) returning id into pid;
   insert into public.matches (player_id, id, data, updated_at) values (pid, 'm_s1', '{"opponent":"Hilltop"}', now());
   perform public.t_set('pid_sam', pid::text);
 end $$;
@@ -119,7 +119,7 @@ declare hid uuid; pid uuid;
 begin
   hid := public.create_household('Priya''s family');
   insert into public.players (household_id, data, updated_at)
-    values (hid, '{"name":"Priya","position":"ST","ageGroup":"U14"}', now()) returning id into pid;
+    values (hid, '{"name":"Priya","position":"ST","ageGroup":"U14","dateOfBirth":"2012-07-01"}', now()) returning id into pid;
   insert into public.matches (player_id, id, data, updated_at) values (pid, 'm_p1', '{"opponent":"Castle"}', now());
   perform public.t_set('pid_priya', pid::text);
 end $$;
@@ -582,6 +582,8 @@ do $$ begin
   end if;
   raise notice 'PASS: Matchday''s admin reviews and verifies it';
 end $$;
+select public.t_expect($$select * from public.academy_documents$$, 0,
+  'once reviewed, the certificates are deleted - not kept a day longer than the check');
 
 -- Renaming a verified academy sends it back for another look; its contact details do not.
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000005';
@@ -591,11 +593,11 @@ do $$ begin
     raise exception 'FAIL: changing the contact email lost the badge';
   end if;
   update public.academies set name = 'Manchester United Academy' where id = public.t_get('aid')::uuid;
-  if (select verification from public.academies where id = public.t_get('aid')::uuid) <> 'pending'
+  if (select verification from public.academies where id = public.t_get('aid')::uuid) <> 'unverified'
      or (select verified_at from public.academies where id = public.t_get('aid')::uuid) is not null then
     raise exception 'FAIL: a verified academy renamed itself and kept the badge';
   end if;
-  raise notice 'PASS: a verified academy that changes its name goes back for review';
+  raise notice 'PASS: a verified academy that changes its name loses the badge until it sends its documents again';
 end $$;
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-00000000000a';
 select public.review_academy(public.t_get('aid')::uuid, true, 'Name change checked');

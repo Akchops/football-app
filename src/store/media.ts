@@ -87,6 +87,11 @@ export async function deleteMedia(id: string): Promise<void> {
   await tx<undefined>('readwrite', (store) => store.delete(id) as IDBRequest<undefined>);
 }
 
+/** Every photo and clip on this phone - for deleting an account. */
+export async function clearAllMedia(): Promise<void> {
+  await tx('readwrite', (store) => store.clear());
+}
+
 export async function deleteMediaForMatch(matchId: string): Promise<void> {
   const items = await listMedia(matchId);
   await Promise.all(items.map((item) => deleteMedia(item.id)));

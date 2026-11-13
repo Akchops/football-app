@@ -75,6 +75,12 @@ export interface GenerateOptions {
   /** The whole request, every attempt included, has to finish inside this. */
   budgetMs: number;
   maxOutputTokens?: number;
+  /**
+   * Takes one billable call from the day's allowance, or says there is none
+   * left. Asked before every call to Google - each model, each retry - so the
+   * cap counts what is actually spent, not requests. Left out, nothing is capped.
+   */
+  spend?: () => Promise<boolean>;
   /** Tests shrink these; nothing else should. */
   minRetryMs?: number;
   pauseMs?: number;
@@ -312,6 +318,13 @@ export async function generate(
     throw failure('No usable Gemini model is available to this key.', { code: 'nomodel', status: 503 });
   }
 
+  // Out of allowance ends the request there and then - never a reason to try another model.
+  const requireAllowance = async () => {
+    if (options.spend && !(await options.spend())) {
+      throw failure("The shared coach has used up today's allowance.", { code: 'budget', status: 429 });
+    }
+  };
+
   const asFailure = (error: unknown, model: string) =>
     Object.assign(error instanceof Error ? error : new Error(String(error)), { model }) as Failure;
 
@@ -339,6 +352,7 @@ export async function generate(
     asked.add(model);
 
     const settings = settingsFor(model, purpose);
+    await requireAllowance();
     try {
       const result = await callOnce(env, model, parts, system, schema, settings, deadline - Date.now(), options.maxOutputTokens);
       await remember(env, purpose, model, lastGood);
@@ -351,6 +365,7 @@ export async function generate(
       // which part was wrong. When this request carried such a setting, that is
       // the likeliest culprit, so the same model gets one go without it.
       if (last.status === 400 && Object.keys(settings).length > 0 && deadline - Date.now() >= minRetry) {
+        await requireAllowance();
         try {
           const result = await callOnce(env, model, parts, system, schema, {}, deadline - Date.now(), options.maxOutputTokens);
           await remember(env, purpose, model, lastGood);
@@ -393,7 +408,14 @@ export function describeFailure(error: unknown): { status: number; body: { error
   let tag: string;
   let httpStatus = status >= 400 && status < 600 ? status : 500;
 
-  if (status === 429 || code === 'busy') {
+  if (code === 'budget') {
+    // The whole app's allowance, not this person's: a 429, so the app offers a personal key.
+    [friendly, tag, httpStatus] = [
+      "The shared coach has used up today's allowance. It's back tomorrow - or add your own key in Setup.",
+      'budget',
+      429,
+    ];
+  } else if (status === 429 || code === 'busy') {
     // Google out of quota is not this person's daily limit, and the app treats
     // any 429 as exactly that - so it goes back as "busy" with a 503.
     [friendly, tag, httpStatus] = ['The coach is busy right now. Try again in a minute.', 'busy', 503];

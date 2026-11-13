@@ -43,7 +43,9 @@ async function person(who: string): Promise<{ api: AcademyApi; name: string; sb:
 async function family(who: string, playerName: string) {
   const p = await person(who);
   const data = emptyData();
-  data.profile = { ...data.profile, name: playerName, position: 'GK', ageGroup: 'U16' };
+  // Fifteen: old enough to say yes to an academy themselves. An under-13 needs
+  // a parent's account, which supabase/privacy-test.sql covers.
+  data.profile = { ...data.profile, name: playerName, position: 'GK', ageGroup: 'U16', dateOfBirth: '2011-01-15' };
   const household = await supabaseRemote(p.sb, p.userId).createHousehold(`${playerName}'s family`, data.profile, data.settings);
   const at = new Date().toISOString();
   const match = await p.sb.from('matches').insert({ player_id: household.playerId, id: `m_${who}_${RUN}`, data: { opponent: 'Vale' }, updated_at: at });
@@ -336,10 +338,12 @@ describe.skipIf(!URL)('academies, against PostgREST and the real schema', () => 
       const verified = (await owner.api.staffAcademies())[0];
       expect(verified).toMatchObject({ verification: 'verified', verificationNote: 'Checked the registration' });
       expect(verified.verifiedAt).not.toBeNull();
+      // Checked, so the documents are gone.
+      expect(await owner.api.documents(id)).toEqual([]);
 
-      // A rename sends it back for another look.
+      // A rename takes the tick away until the documents are sent again.
       await owner.api.updateAcademy(id, { name: 'Castle Park Academy' });
-      expect((await owner.api.staffAcademies())[0].verification).toBe('pending');
+      expect((await owner.api.staffAcademies())[0].verification).toBe('unverified');
 
       // With approval required, an unverified academy cannot add players.
       await expect(owner.api.setRequireVerification(true)).rejects.toThrow(/only matchday/i);

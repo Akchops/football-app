@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { childOnly, useAgeGate } from '../lib/ageGate';
 import { PROVIDER_LABEL, type Provider } from '../lib/aiTypes';
 import { getApiKey, getModel, getProvider, setApiKey, setModel, setProvider } from '../lib/apiKey';
 import { proxyAvailable, sharedUsage } from '../lib/proxy';
@@ -24,7 +25,13 @@ const KEY_HELP: Record<Provider, { where: string; hint: string; cost: string }> 
   },
 };
 
+/** Hidden for a child with no parent or guardian signed in: a personal key would send their data out too. */
 export function AiSection() {
+  const gate = useAgeGate();
+  return childOnly(gate) ? null : <AiKeySection />;
+}
+
+function AiKeySection() {
   const [provider, setProviderState] = useState<Provider>(() => getProvider());
   const [key, setKeyState] = useState(() => getApiKey(getProvider()));
   const [model, setModelState] = useState(() => getModel(getProvider()));

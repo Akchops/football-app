@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Allowance, requesterKey, takeOne, type CountStore } from './allowance';
 import worker, { type Env } from './index';
 
 /**
@@ -18,12 +19,37 @@ function kv(seed: Record<string, string> = {}) {
   };
 }
 
-function makeEnv(store = kv()): Env {
+/** Durable Object storage, as far as the allowance uses it. */
+function memory(): CountStore & { data: Map<string, unknown> } {
+  const data = new Map<string, unknown>();
+  return {
+    data,
+    get: async <T,>(key: string) => data.get(key) as T | undefined,
+    put: async <T,>(key: string, value: T) => void data.set(key, value),
+    list: async <T,>({ prefix = '' } = {}) =>
+      new Map([...data].filter(([k]) => k.startsWith(prefix))) as Map<string, T>,
+    delete: async (key: string) => data.delete(key),
+  };
+}
+
+/** One Allowance object behind a namespace, the way the runtime hands it to the worker. */
+function allowance(storage = memory()) {
+  const object = new Allowance({ storage } as unknown as DurableObjectState);
+  const namespace = {
+    idFromName: (name: string) => name,
+    get: () => ({ fetch: (url: string, init: RequestInit) => object.fetch(new Request(url, init)) }),
+  } as unknown as DurableObjectNamespace;
+  return { namespace, storage };
+}
+
+function makeEnv(store = kv(), extra: Partial<Env> = {}): Env {
   return {
     GEMINI_API_KEY: 'test-key',
     ALLOWED_ORIGINS: ORIGIN,
     DAILY_LIMIT: '40',
     RATE_LIMIT: store as unknown as KVNamespace,
+    ALLOWANCE: allowance().namespace,
+    ...extra,
   };
 }
 
@@ -149,7 +175,7 @@ describe('worker', () => {
   it('still gives the real daily limit as a 429', async () => {
     google(() => answerWith({}));
     const day = new Date().toISOString().slice(0, 10);
-    const store = kv({ [`rl:${day}:unknown`]: '40' });
+    const store = kv({ [`rl:${day}:${await requesterKey('unknown', day, 'test-key')}`]: '40' });
     const response = await worker.fetch(post('/drills', { player: 'GK', ask: 'warm-up' }), makeEnv(store));
     const body = (await response.json()) as { rateLimited?: boolean };
 
@@ -166,9 +192,85 @@ describe('worker', () => {
     expect(seen).toEqual(['gemini-2.5-flash', 'gemini-2.5-flash-lite']);
   });
 
+  it('stops calling Google, for everyone, once the day\'s allowance is spent', async () => {
+    const seen = google(() => answerWith({ title: 'Session' }));
+    const { namespace } = allowance();
+    const ask = (ip: string) => {
+      const request = post('/drills', { player: 'GK', ask: 'warm-up' });
+      request.headers.set('cf-connecting-ip', ip);
+      return worker.fetch(request, makeEnv(kv(), { ALLOWANCE: namespace, GLOBAL_DAILY_LIMIT: '2' }));
+    };
+
+    // Three different addresses - the per-person limit never comes into it.
+    expect((await ask('198.51.100.1')).status).toBe(200);
+    expect((await ask('198.51.100.2')).status).toBe(200);
+    const third = await ask('198.51.100.3');
+    const body = (await third.json()) as { error: string; code: string };
+
+    expect(seen).toHaveLength(2);
+    expect(third.status).toBe(429);
+    expect(body.code).toBe('budget');
+    expect(body.error).toContain("used up today's allowance");
+  });
+
+  it('counts every try at every model, not just requests', async () => {
+    const seen = google(() => ({ status: 503, body: { error: { message: 'The model is overloaded.' } } }));
+    const response = await worker.fetch(
+      post('/drills', { player: 'GK', ask: 'warm-up' }),
+      makeEnv(kv(), { GLOBAL_DAILY_LIMIT: '1' }),
+    );
+
+    expect(seen).toEqual(['gemini-2.5-flash']);
+    expect(response.status).toBe(429);
+  });
+
+  it('spends nothing at all without an allowance to spend from', async () => {
+    const seen = google(() => answerWith({}));
+    const response = await worker.fetch(post('/drills', { player: 'GK', ask: 'warm-up' }), makeEnv(kv(), { ALLOWANCE: undefined }));
+
+    expect(seen).toEqual([]);
+    expect(response.status).toBe(429);
+  });
+
+  it('keeps no IP address in its store', async () => {
+    google(() => answerWith({}));
+    const store = kv();
+    const request = post('/drills', { player: 'GK', ask: 'warm-up' });
+    request.headers.set('cf-connecting-ip', '203.0.113.77');
+    await worker.fetch(request, makeEnv(store));
+
+    const keys = [...store.data.keys()].filter((k) => k.startsWith('rl:'));
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).not.toContain('203.0.113.77');
+  });
+
+  it('caps how long an answer can be billed for', async () => {
+    const limits: unknown[] = [];
+    google((_model, body) => {
+      limits.push(body.generationConfig?.maxOutputTokens);
+      return answerWith({});
+    });
+    await worker.fetch(post('/drills', { player: 'GK', ask: 'warm-up' }), makeEnv());
+    await worker.fetch(post('/clip', { prompt: 'Judge.', media: [{ mimeType: 'video/webm', data: 'AAAA' }] }), makeEnv());
+    await worker.fetch(post('/fixtures', schedule), makeEnv());
+
+    expect(limits).toEqual([8192, 8192, 16384]);
+  });
+
   it('still only serves the app', async () => {
     google(() => answerWith({}));
     const response = await worker.fetch(post('/drills', { ask: 'x' }, 'https://example.com'), makeEnv());
     expect(response.status).toBe(403);
+  });
+});
+
+describe('the day\'s allowance', () => {
+  it('is exact, and forgets earlier days as a new one starts', async () => {
+    const storage = memory();
+    expect((await takeOne(storage, '2026-11-12', 2)).ok).toBe(true);
+    expect((await takeOne(storage, '2026-11-12', 2)).ok).toBe(true);
+    expect(await takeOne(storage, '2026-11-12', 2)).toEqual({ ok: false, used: 2, limit: 2 });
+    expect((await takeOne(storage, '2026-11-13', 2)).used).toBe(1);
+    expect([...storage.data.keys()]).toEqual(['day:2026-11-13']);
   });
 });

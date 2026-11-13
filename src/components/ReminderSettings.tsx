@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { childOnly, useAgeGate } from '../lib/ageGate';
 import { useStore } from '../store/AppStore';
 import {
   pushStatus, reminderPrefs, sendTestReminder, setReminderPrefs, turnOffReminders, turnOnReminders, type PushStatus,
@@ -13,7 +14,11 @@ export function ReminderSettings() {
   const [prefs, setPrefs] = useState<ReminderPrefs>(() => reminderPrefs());
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const gate = useAgeGate();
   if (status === 'no-server') return null;
+  // A reminder goes through Matchday's server and the phone maker's push
+  // service - for an under-13, only once a parent or guardian has signed in.
+  if (childOnly(gate)) return null;
 
   const data = { matches, competitions };
   const run = async (work: () => Promise<void>, done?: string) => {

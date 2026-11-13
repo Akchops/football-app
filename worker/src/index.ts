@@ -4,15 +4,23 @@
  * Holds the one Gemini key so players don't each need their own. It is
  * deliberately NOT a general Gemini proxy: it owns the system prompts and
  * response schemas and only accepts the three shapes the app needs, so a leaked
- * URL can waste quota but cannot be repurposed as a free LLM endpoint.
+ * URL can waste quota but cannot be repurposed as a free LLM endpoint - and
+ * wasting it is capped too: every call to Google comes out of one allowance for
+ * the whole day (allowance.ts), however many people or addresses are asking.
+ *
+ * The origin check below keeps other websites' pages from using this from a
+ * visitor's browser. It is not a lock: anything that is not a browser can send
+ * any Origin it likes, which is why the allowance exists.
  */
 
+import { requesterKey, spendOne, type AllowanceEnv } from './allowance';
 import { describeFailure, generate } from './gemini';
 import { handlePush, type PushEnv } from './push';
 
+export { Allowance } from './allowance';
 export { PushStore } from './push';
 
-export interface Env extends PushEnv {
+export interface Env extends PushEnv, AllowanceEnv {
   GEMINI_API_KEY: string;
   /** Comma-separated origins allowed to call this worker. */
   ALLOWED_ORIGINS: string;
@@ -37,6 +45,13 @@ const BUDGET_MS = { drills: 80_000, clip: 80_000, fixtures: 80_000 };
 const DEFAULT_DAILY_LIMIT = 40;
 /** Clip requests carry base64 video; anything larger is refused outright. */
 const MAX_BODY_BYTES = 22 * 1024 * 1024;
+/**
+ * The longest answer each job may be billed for, thinking included. A drill
+ * plan or a clip review is a page of JSON; a whole tournament's fixtures are
+ * the longest thing asked for. With the request size capped above and the day's
+ * calls capped in allowance.ts, these put a ceiling on what a day can cost.
+ */
+const MAX_OUTPUT_TOKENS = { drills: 8_192, clip: 8_192, fixtures: 16_384 };
 
 const DRILLS_SYSTEM =
   'You are an experienced football coach writing a training session for one player. ' +
@@ -182,12 +197,12 @@ function json(body: unknown, status: number, headers: Record<string, string>): R
   });
 }
 
-/** One counter per IP per UTC day; the key expires on its own. */
+/** One counter per person per UTC day; the key expires on its own. */
 async function checkRateLimit(request: Request, env: Env): Promise<{ ok: boolean; used: number; limit: number }> {
   const limit = Number(env.DAILY_LIMIT ?? DEFAULT_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   const day = new Date().toISOString().slice(0, 10);
-  const key = `rl:${day}:${ip}`;
+  const key = `rl:${day}:${await requesterKey(ip, day, env.GEMINI_API_KEY)}`;
 
   const current = Number((await env.RATE_LIMIT.get(key)) ?? '0');
   if (current >= limit) return { ok: false, used: current, limit };
@@ -262,7 +277,7 @@ export default {
           [{ text: `${player}\n\nWhat they want to work on: ${ask}` }],
           DRILLS_SYSTEM,
           DRILL_SCHEMA,
-          { budgetMs: BUDGET_MS.drills },
+          { budgetMs: BUDGET_MS.drills, maxOutputTokens: MAX_OUTPUT_TOKENS.drills, spend: () => spendOne(env) },
         );
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
@@ -289,6 +304,8 @@ export default {
         const sawVideo = (media as { mimeType?: string }[]).some((m) => String(m.mimeType).startsWith('video/'));
         const { result, model } = await generate(env, 'standard', parts, clipSystem(sawVideo), CLIP_SCHEMA, {
           budgetMs: BUDGET_MS.clip,
+          maxOutputTokens: MAX_OUTPUT_TOKENS.clip,
+          spend: () => spendOne(env),
         });
         return json({ result, used: limit.used, limit: limit.limit, model }, 200, headers);
       }
@@ -315,7 +332,8 @@ export default {
         // this quick; nothing here treats a PDF differently from a photo.
         const { result, model } = await generate(env, 'fast', parts, FIXTURES_SYSTEM, FIXTURES_SCHEMA, {
           budgetMs: BUDGET_MS.fixtures,
-          maxOutputTokens: 16_384,
+          maxOutputTokens: MAX_OUTPUT_TOKENS.fixtures,
+          spend: () => spendOne(env),
         });
         // Naming the model is not sensitive and makes a slow read attributable
         // to a specific one, rather than to the feature in general.

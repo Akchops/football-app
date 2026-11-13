@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { childOnly, useAgeGate } from '../lib/ageGate';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, m } from 'motion/react';
 import { useStore } from '../store/AppStore';
@@ -108,6 +109,29 @@ function usePending() {
 // ---------------------------------------------------------------- screen
 
 export default function AIScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
+  const gate = useAgeGate();
+  if (childOnly(gate)) {
+    return (
+      <div className="screen">
+        <div className="screen-head">
+          <h1>Coach</h1>
+        </div>
+        <div className="coach-off">
+          <span className="coach-avatar big" aria-hidden="true">
+            <CoachIcon on />
+          </span>
+          <h2>Ask a parent or guardian</h2>
+          <p>
+            The coach sends what you ask, and any clip you pick, to an AI service to read - so for anyone under 13, a
+            parent or guardian signs in first. They can do that in Setup, under Sharing with your family.
+          </p>
+          <button className="primary-btn" onClick={onOpenSetup}>
+            Go to Setup
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (!coachReady()) {
     return (
       <div className="screen">

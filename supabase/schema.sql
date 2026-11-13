@@ -303,10 +303,23 @@ create policy invites_read on public.household_invites
     or lower(email) = lower(auth.jwt() ->> 'email')
   );
 
+-- An invite says who sent it, and the invitee is shown that person's email -
+-- so it can only ever name the person sending it. Without that, anyone who knew
+-- another account's id (an academy's staff list carries them) could address an
+-- invite "from" that person to themselves and read their email address. And
+-- only the owner can invite someone in as an owner, since an owner can remove
+-- people and delete the family's records.
 drop policy if exists invites_write on public.household_invites;
 create policy invites_write on public.household_invites
   for all using (public.is_household_member(household_id))
-  with check (public.is_household_member(household_id));
+  with check (
+    public.is_household_member(household_id)
+    and invited_by = auth.uid()
+    and (role <> 'owner' or exists (
+      select 1 from public.household_members m
+      where m.household_id = household_invites.household_id and m.user_id = auth.uid() and m.role = 'owner'
+    ))
+  );
 
 -- Players and everything hanging off them: readable and writable by the
 -- household, invisible to everyone else. Written once here rather than checked
@@ -1289,6 +1302,80 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Ages and parents.
+--
+-- Nobody under 13 gets an account of their own: the app asks the age of
+-- whoever is signing in before it sends any code, and someone under 13 is
+-- asked to fetch a parent or guardian, who signs in with their own email. Each
+-- account keeps only the band its holder said they were in - never a date.
+--
+-- The one place that is enforced here is the one that matters most: sharing a
+-- player under 13 with an academy, which only an account whose holder said they
+-- are an adult can agree to. A player whose date of birth is missing counts as
+-- under 13 - the cautious reading, not the convenient one.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.account_ages (
+  user_id     uuid primary key references auth.users(id) on delete cascade,
+  -- 'adult' is 18 or over; 'teen' is 13 to 17.
+  band        text not null check (band in ('teen', 'adult')),
+  declared_at timestamptz not null default now()
+);
+
+alter table public.account_ages enable row level security;
+drop policy if exists account_ages_own on public.account_ages;
+create policy account_ages_own on public.account_ages for select using (user_id = auth.uid());
+revoke all on public.account_ages from anon, authenticated;
+grant select on public.account_ages to authenticated;
+
+-- The answer to the age question, recorded against the account that gave it.
+create or replace function public.declare_age(band text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null then raise exception 'Sign in first'; end if;
+  if band is null or band not in ('teen', 'adult') then
+    raise exception 'Someone under 13 needs a parent or guardian to sign in for them';
+  end if;
+  insert into public.account_ages (user_id, band) values (auth.uid(), band)
+  on conflict (user_id) do update set band = excluded.band, declared_at = now();
+end;
+$$;
+
+create or replace function public.is_declared_adult()
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (select 1 from public.account_ages where user_id = auth.uid() and band = 'adult');
+$$;
+
+-- Under 13 by the date of birth on the player's profile - or no usable date at all.
+create or replace function public.player_is_child(pid uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+declare
+  born date;
+begin
+  begin
+    select (data ->> 'dateOfBirth')::date into born from public.players where id = pid;
+  exception when others then
+    return true;
+  end;
+  return born is null or born > current_date - interval '13 years';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Players joining and leaving.
 -- ---------------------------------------------------------------------------
 
@@ -1337,7 +1424,11 @@ begin
   if exists (select 1 from public.academy_players where academy_id = aid and player_id = pid and status in ('invited', 'requested', 'linked')) then
     raise exception 'They are already invited or linked';
   end if;
-  select coalesce(nullif(btrim(p.data ->> 'name'), ''), lower(btrim(username))) into pname from public.players p where p.id = pid;
+  -- Until the family says yes, the academy knows only what it typed: the
+  -- username. The player's name, position and age group come across when they
+  -- accept (answer_player_invite), never before - otherwise anyone who made an
+  -- academy could turn a list of usernames into children's real names.
+  pname := lower(btrim(username));
 
   if roster_id is not null then
     update public.academy_players
@@ -1347,8 +1438,7 @@ begin
     if apid is null then raise exception 'That roster entry cannot be linked'; end if;
   else
     insert into public.academy_players (academy_id, player_id, display_name, position, age_group, status, invited_by)
-    select aid, pid, pname, coalesce(p.data ->> 'position', ''), coalesce(p.data ->> 'ageGroup', ''), 'invited', auth.uid()
-    from public.players p where p.id = pid
+    values (aid, pid, pname, '', '', 'invited', auth.uid())
     returning id into apid;
   end if;
   if squad is not null then
@@ -1376,6 +1466,9 @@ begin
   select id into aid from public.academies where join_code = upper(btrim(coalesce(code, '')));
   if aid is null then raise exception 'No academy has that code'; end if;
   if pid is null then raise exception 'Sign in on your own phone first, so there is a player to link'; end if;
+  if public.player_is_child(pid) and not public.is_declared_adult() then
+    raise exception 'A parent or guardian needs to say yes for a player under 13 - they sign in to Matchday with their own email';
+  end if;
   if not public.can_take_players(aid) then raise exception 'This academy is not verified yet, so it cannot take players'; end if;
   select id into apid from public.academy_players
    where academy_id = aid and player_id = pid and status in ('invited', 'requested', 'linked');
@@ -1419,16 +1512,26 @@ begin
   select * into rec from public.academy_players where id = invite_id and status = 'invited';
   if not found or not public.owns_player(rec.player_id) then raise exception 'That invite has gone - the academy may have cancelled it'; end if;
   if accept and not coalesce(consent, false) then raise exception 'Agree to share your matches and stats with the academy first'; end if;
+  if accept and public.player_is_child(rec.player_id) and not public.is_declared_adult() then
+    raise exception 'A parent or guardian needs to say yes for a player under 13 - they sign in to Matchday with their own email';
+  end if;
   if accept and not public.can_take_players(rec.academy_id) then
     raise exception 'This academy is not verified yet, so it cannot take players';
   end if;
-  update public.academy_players
-     set status = case when accept then 'linked' else 'declined' end,
-         consent_by = case when accept then auth.uid() else null end,
-         consent_at = case when accept then now() else null end,
-         player_id = case when accept then player_id else null end
-   where id = rec.id;
-  if not accept then delete from public.squad_players where academy_player_id = rec.id; end if;
+  if accept then
+    -- Only now does the academy learn the player's name, position and age group.
+    update public.academy_players ap
+       set status = 'linked', consent_by = auth.uid(), consent_at = now(),
+           display_name = coalesce(nullif(btrim(p.data ->> 'name'), ''), ap.display_name),
+           position = coalesce(p.data ->> 'position', ap.position),
+           age_group = coalesce(p.data ->> 'ageGroup', ap.age_group)
+      from public.players p
+     where ap.id = rec.id and p.id = rec.player_id;
+  else
+    update public.academy_players set status = 'declined', consent_by = null, consent_at = null, player_id = null
+     where id = rec.id;
+    delete from public.squad_players where academy_player_id = rec.id;
+  end if;
 end;
 $$;
 
@@ -1569,13 +1672,18 @@ begin
          verification_note = coalesce(note, ''),
          verified_at = case when approve then now() else null end
    where id = aid;
+  -- The documents were sent to be checked, and now they have been. They can
+  -- name real people - coaches on a certificate - so they are not kept a day
+  -- longer than that. The note above is the record of what was seen.
+  delete from public.academy_documents where academy_id = aid;
 end;
 $$;
 
 -- The badge vouches for who the academy said it was. Changing that - its
--- name, its town or country, its logo - sends it back for another look, so
--- a verified academy cannot rename itself into someone else and keep the
--- tick. Its contact email and age groups can change freely.
+-- name, its town or country, its logo - takes the tick away, so a verified
+-- academy cannot rename itself into someone else and keep it. The documents it
+-- was verified on are gone by then (review_academy), so it sends them again.
+-- Its contact email and age groups can change freely.
 create or replace function public.recheck_identity()
 returns trigger
 language plpgsql
@@ -1585,8 +1693,8 @@ begin
        new.name is distinct from old.name or new.town is distinct from old.town
        or new.country is distinct from old.country or new.logo is distinct from old.logo
      ) then
-    new.verification := 'pending';
-    new.verification_note := 'Its name, place or logo changed - Matchday checks it again';
+    new.verification := 'unverified';
+    new.verification_note := 'Its name, place or logo changed - send your documents again to get the tick back';
     new.verified_at := null;
   end if;
   return new;
@@ -1684,17 +1792,120 @@ grant execute on function
   public.review_academy(uuid, boolean, text), public.academies_for_review()
   to authenticated;
 
+-- ===========================================================================
+-- DELETING AN ACCOUNT
+--
+-- Setup -> Delete my account calls this, and it does the whole job in one
+-- transaction: if any step fails, nothing is deleted and the app says why.
+--
+--   - A family with nobody else in it goes completely: the player, their
+--     profile and photo, every match, training session, team, competition and
+--     result, the settings, and any invites it sent.
+--   - A family with other people in it keeps the player's records for them,
+--     unless the person deleting started it (its owner) and asks for
+--     everything to go - then it goes for everyone. When the owner leaves
+--     without that, the longest-standing member becomes the owner.
+--   - Academies the player was linked to lose sight of them first, exactly as
+--     if the family had left: the academy keeps the name it has, marked as
+--     left, and nothing else.
+--   - An academy this account runs alone goes with it. One with other staff
+--     has to be handed over first, so no academy is left without an owner.
+--   - Last, the account itself - the email address, the username, the age
+--     answer, every staff role and invite - through auth.users, which every
+--     other table either deletes with (on delete cascade) or forgets
+--     (on delete set null).
+-- ===========================================================================
+
+create or replace function public.delete_my_account(everything boolean default false)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  me uuid := auth.uid();
+  my_email text;
+  a record;
+  h record;
+  ap record;
+  others integer;
+begin
+  if me is null then raise exception 'Sign in first'; end if;
+  select u.email into my_email from auth.users u where u.id = me;
+
+  for a in
+    select ac.id, ac.name from public.academies ac
+    join public.academy_members m on m.academy_id = ac.id
+    where m.user_id = me and m.role = 'owner'
+  loop
+    if exists (select 1 from public.academy_members where academy_id = a.id and user_id <> me) then
+      raise exception 'Hand % over to someone on its staff, or delete it, before deleting your account', a.name;
+    end if;
+    delete from public.academies where id = a.id;
+  end loop;
+
+  for h in select m.household_id, m.role from public.household_members m where m.user_id = me loop
+    select count(*) into others from public.household_members
+     where household_id = h.household_id and user_id <> me;
+
+    if others = 0 or (coalesce(everything, false) and h.role = 'owner') then
+      for ap in
+        select x.id, x.status from public.academy_players x
+        join public.players p on p.id = x.player_id
+        where p.household_id = h.household_id
+      loop
+        delete from public.squad_players where academy_player_id = ap.id;
+        if ap.status = 'requested' then
+          delete from public.academy_players where id = ap.id;
+        else
+          update public.academy_players
+             set status = case when ap.status = 'invited' then 'declined' else 'left' end, player_id = null
+           where id = ap.id;
+        end if;
+      end loop;
+      -- Players, settings, matches, training, teams, competitions, results,
+      -- members and invites all hang off the household (on delete cascade).
+      delete from public.households where id = h.household_id;
+    else
+      delete from public.household_members where household_id = h.household_id and user_id = me;
+      if h.role = 'owner' then
+        update public.household_members set role = 'owner'
+         where household_id = h.household_id
+           and user_id = (select m2.user_id from public.household_members m2
+                           where m2.household_id = h.household_id order by m2.created_at limit 1);
+      end if;
+    end if;
+  end loop;
+
+  -- Invites to this address waiting in other families.
+  if my_email is not null then
+    delete from public.household_invites where lower(email) = lower(my_email);
+  end if;
+
+  delete from auth.users where id = me;
+end;
+$$;
+
+revoke all on function public.delete_my_account(boolean) from public, anon;
+grant execute on function public.delete_my_account(boolean) to authenticated;
+
+revoke all on function public.declare_age(text), public.is_declared_adult() from public, anon;
+grant execute on function public.declare_age(text), public.is_declared_adult() to authenticated;
+-- Used only inside the functions above: it reads any player's date of birth.
+revoke all on function public.player_is_child(uuid) from public, anon, authenticated;
+
 -- Which version of this file a project has, so a check can tell whether the
 -- latest one was run. Bump it with any change the app depends on.
 --   1  households, players and their records
 --   2  other teams' results, for competition tables
 --   3  academies, first draft
 --   4  academies: squads, linking, tables, team picks and verification
+--   5  deleting an account, ages and parents, and keeping less
 create or replace function public.schema_version()
 returns integer
 language sql
 immutable
-as $$ select 4 $$;
+as $$ select 5 $$;
 
 revoke all on function public.schema_version() from public;
 grant execute on function public.schema_version() to anon, authenticated;

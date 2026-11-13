@@ -23,8 +23,12 @@ checked figures.
 
 - You sign in with your email to use Matchday. Keep that email account
   secure; a sign-in code is the key to your account.
-- Under 13s should use Matchday with a parent or guardian, and only a parent or
-  guardian, or a player of 13 or over, may agree to share with an academy.
+- Nobody under 13 has an account of their own: a parent or guardian signs in
+  with their own email and looks after the account. Only a parent or guardian
+  can agree to share an under-13's records with an academy; a player of 13 or
+  over may agree for themselves.
+- Answer the age question truthfully, and don't sign in as a parent or
+  guardian if you aren't one.
 - Pick a username that isn't offensive and doesn't pretend to be someone else.
 
 ## Academies
@@ -53,9 +57,14 @@ checked figures.
 
 ## Ending
 
-You can stop using Matchday at any time and ask for your account to be deleted
-(see the privacy notice). We may suspend an account or academy that breaks
+You can stop using Matchday at any time, and delete your account from the app
+(Setup → Sharing with your family → Delete my account) - see the privacy
+notice for what that deletes. We may suspend an account or academy that breaks
 these terms.
+
+**The coach** gives advice for a young player to try, nothing more. Its ratings
+and drills are written by an AI from what it is shown; stop any drill that
+hurts, and check anything that matters with a real coach.
 
 ## Liability
 

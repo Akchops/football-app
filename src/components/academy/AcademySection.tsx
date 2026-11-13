@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { bandToDeclare, playerIsChild, useAgeGate } from '../../lib/ageGate';
 import { ROLE_LABEL, cleanJoinCode, describeAcademyError, type Membership, type PlayerInvite } from '../../lib/academy';
 import { useAcademy } from '../../store/AcademyProvider';
 import { useStore } from '../../store/AppStore';
@@ -161,11 +162,31 @@ function WhatTheySee({ name }: { name: string }) {
   );
 }
 
+/**
+ * Who may say yes. For a player under 13 - or with no date of birth in Setup -
+ * only a parent or guardian, signed in as themselves; the server checks the
+ * same (supabase/schema.sql, player_is_child).
+ */
 function Consent({ name, checked, onChange }: { name: string; checked: boolean; onChange: (on: boolean) => void }) {
+  const { profile } = useStore();
+  const gate = useAgeGate();
+  const child = playerIsChild(profile.dateOfBirth);
+  if (child && bandToDeclare(gate) !== 'adult') {
+    return (
+      <p className="notice">
+        {profile.dateOfBirth ? `${name} is under 13` : `${name} has no date of birth in Setup`}, so a parent or guardian
+        says yes, signed in with their own email.
+      </p>
+    );
+  }
   return (
     <label className="toggle-row consent">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>I&apos;m 13 or over, or I&apos;m {name}&apos;s parent or guardian.</span>
+      <span>
+        {child
+          ? `I'm ${name}'s parent or guardian, and I'm 18 or over.`
+          : `I'm 13 or over, or I'm ${name}'s parent or guardian.`}
+      </span>
     </label>
   );
 }

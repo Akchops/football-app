@@ -178,7 +178,7 @@ export type DocumentKind = 'registration' | 'coaching' | 'safeguarding' | 'other
 export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   registration: 'Registration',
   coaching: 'Coaching qualifications',
-  safeguarding: 'Safeguarding certificate',
+  safeguarding: 'Safeguarding policy or letter',
   other: 'Something else',
 };
 

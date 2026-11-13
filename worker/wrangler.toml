@@ -5,8 +5,14 @@ compatibility_date = "2026-08-01"
 [vars]
 # Origins allowed to call this worker. Add your own if you move the app.
 ALLOWED_ORIGINS = "https://akchops.github.io"
-# Coach requests allowed per person per day, before they're asked for their own key.
+# Coach requests allowed per person (per IP address) per day, before they're asked for their own key.
 DAILY_LIMIT = "40"
+# The hard cap: calls to Google allowed per UTC day across EVERYONE, counted
+# exactly (src/allowance.ts). Every try at every model counts, so one request
+# can use a few. Once it is used up, the shared coach stops until midnight UTC
+# and players are offered their own key. With output capped per call (index.ts)
+# this is the ceiling on a day's bill: lower it to spend less.
+GLOBAL_DAILY_LIMIT = "500"
 # Models to try first, best first. These are trusted: they are always tried
 # before anything else Google lists, and a busy one gets a second go. Measured on
 # this key (free tier), 24-25 Sep 2026:
@@ -34,3 +40,12 @@ class_name = "PushStore"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PushStore"]
+
+# The day's allowance for the shared key (src/allowance.ts): one object, one exact count.
+[[durable_objects.bindings]]
+name = "ALLOWANCE"
+class_name = "Allowance"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Allowance"]

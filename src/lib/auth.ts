@@ -4,8 +4,6 @@ import { authSettings, configured, returnAddress, sessionKey, supabase } from '.
 export interface Account {
   id: string;
   email: string;
-  /** Whatever the provider gave us, falling back to the email. */
-  name: string;
 }
 
 /** Whether signing in is possible in this build. */
@@ -16,14 +14,12 @@ export function accountsAvailable(): boolean {
 interface RawUser {
   id: string;
   email?: string | null;
-  user_metadata?: { full_name?: string; name?: string } | null;
 }
 
+/** Only who they are and where codes go. Whatever else a provider sends - a name, a picture - is never used. */
 function toAccount(user: RawUser | null | undefined): Account | null {
   if (!user) return null;
-  const email = user.email ?? '';
-  const meta = user.user_metadata ?? {};
-  return { id: user.id, email, name: meta.full_name || meta.name || email };
+  return { id: user.id, email: user.email ?? '' };
 }
 
 /**

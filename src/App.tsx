@@ -31,7 +31,8 @@ import { TournamentSheet } from './components/TournamentSheet';
 import { ImportFixturesSheet } from './components/ImportFixturesSheet';
 import { TrainingFormSheet, type TrainingFormTarget } from './components/TrainingFormSheet';
 import { OnboardingScreen } from './components/OnboardingScreen';
-import { CheckingAccount, OpeningSplash, SignInScreen } from './components/SignInScreen';
+import { AgeQuestion, CheckingAccount, ChildAccountScreen, OpeningSplash, SignInScreen } from './components/SignInScreen';
+import { childOnly, useAgeGate } from './lib/ageGate';
 import { WhoIsThisFor } from './components/WhoIsThisFor';
 import { ACADEMY } from './lib/features';
 import { MediaScreen } from './components/MediaScreen';
@@ -76,6 +77,7 @@ function Shell() {
   const { matches, settings, profile, training, competitions, teams } = useStore();
   const academy = useAcademy();
   const sync = useSync();
+  const gate = useAgeGate();
   const now = useNow();
   // Dark by default, Light or Automatic from Setup; the accent is the team's own colour.
   useAppearance(teams[0]?.color);
@@ -224,10 +226,20 @@ function Shell() {
   const showInvite = inviteYear !== null && !showPrompt && !sheetOpen && !showAgeAsk && !wrappedView;
 
   // With accounts in this build, nothing opens until someone signs in. A phone
-  // that has signed in before opens at once, signal or not.
+  // that has signed in before opens at once, signal or not. The one way in
+  // without an account is a child's, with everything kept on the phone.
   if (sync.available && !sync.account) {
-    return sync.status === 'checking' ? <OpeningSplash /> : <SignInScreen />;
+    if (sync.status === 'checking') return <OpeningSplash />;
+    if (!(childOnly(gate) && gate?.localOnly)) return <SignInScreen />;
   }
+
+  // Signed in before the age question existed: asked once, then - if the
+  // person holding the phone is under 13 - whose account this is.
+  if (sync.available && sync.account) {
+    if (!gate) return <AgeQuestion />;
+    if (childOnly(gate)) return <ChildAccountScreen />;
+  }
+  const signedIn = sync.account !== null;
 
   // Academy staff: their half of the app, with no player's calendar unless this phone has one.
   // (ACADEMY first each time: with the release switched off, the build drops all of this.)
@@ -246,7 +258,7 @@ function Shell() {
     ACADEMY && academy.enabled && academy.mode === null && !academy.loaded &&
     (academy.status === 'idle' || academy.status === 'loading');
   if (
-    sync.available && !carryOn &&
+    sync.available && signedIn && !carryOn &&
     ((!sync.checked && (!profile.onboardedAt || signedInHere === accountId)) ||
       (!profile.onboardedAt && sync.checked && academyUnknown))
   ) {
@@ -256,8 +268,10 @@ function Shell() {
   // First run: collect the player's details before showing the app proper -
   // once it is clear this phone is for a player rather than an academy.
   if (!profile.onboardedAt) {
-    if (ACADEMY && academy.enabled && academy.mode === null) return <WhoIsThisFor onPick={academy.setMode} />;
-    return <OnboardingScreen onBack={ACADEMY && academy.enabled ? () => academy.setMode(null) : undefined} />;
+    // An academy needs an account, so a child on this phone only goes straight to their own setup.
+    const askWho = ACADEMY && academy.enabled && signedIn;
+    if (askWho && academy.mode === null) return <WhoIsThisFor onPick={academy.setMode} />;
+    return <OnboardingScreen onBack={askWho ? () => academy.setMode(null) : undefined} />;
   }
 
   return (

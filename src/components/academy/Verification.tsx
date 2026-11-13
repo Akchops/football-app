@@ -100,8 +100,11 @@ export function VerificationSection({ academy }: { academy: StaffAcademy }) {
       ) : (
         <>
           <p className="muted small">
-            Registration with your FA or league, coaching qualifications and safeguarding certificates. Photos are
-            shrunk before sending; a PDF can be up to 2 MB. Only you and Matchday&apos;s admins can see them.
+            The academy&apos;s own documents: registration with your FA or league, coaching qualifications, and your
+            safeguarding policy or a letter from your league confirming your checks. Please don&apos;t send passports,
+            ID cards or DBS certificates - Matchday doesn&apos;t need anyone&apos;s personal papers. Photos are shrunk
+            before sending; a PDF can be up to 2 MB. Only you and Matchday&apos;s admins can see them, and they are
+            deleted as soon as they have been checked.
           </p>
           {!docs.data && !docs.error && <CardsSkeleton label="Loading documents…" count={2} />}
           {list.length > 0 && (

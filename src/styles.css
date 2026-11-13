@@ -4164,3 +4164,21 @@ button.nav-row:active { background: var(--surface-2); }
   .sk::after { display: none; }
   .btn-spinner { animation-duration: 2.1s; }
 }
+
+/* Deleting an account: the one destructive button, red and full-weight, and only live once confirmed. */
+.danger-btn {
+  background: var(--loss);
+  color: #fff;
+  border: 0;
+  font-size: 17px;
+  font-weight: 600;
+  border-radius: 14px;
+  min-height: 50px;
+  padding: 13px 20px;
+}
+.danger-btn:disabled { opacity: 0.45; }
+.delete-account { display: flex; flex-direction: column; gap: 10px; }
+.choice-list { display: flex; flex-direction: column; gap: 6px; }
+.choice-list .toggle-row { align-items: flex-start; line-height: 1.4; }
+/* The age question: two selects side by side, and nothing that hints at an answer. */
+.age-pick { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
