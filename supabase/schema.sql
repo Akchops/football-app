@@ -1304,20 +1304,25 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Ages and parents.
 --
--- Nobody under 13 gets an account of their own: the app asks the age of
--- whoever is signing in before it sends any code, and someone under 13 is
--- asked to fetch a parent or guardian, who signs in with their own email. Each
--- account keeps only the band its holder said they were in - never a date.
+-- Matchday follows India's Digital Personal Data Protection Act, 2023: everyone
+-- under 18 is a child, and a child's data needs the verifiable consent of a
+-- parent or lawful guardian (section 9). So nobody under 18 gets an account of
+-- their own: the app asks the age of whoever is signing in before it sends any
+-- code, and someone under 18 is asked to fetch a parent or guardian, who signs
+-- in with their own email. An account records only that its holder said they
+-- are an adult - never a date.
 --
 -- The one place that is enforced here is the one that matters most: sharing a
--- player under 13 with an academy, which only an account whose holder said they
--- are an adult can agree to. A player whose date of birth is missing counts as
--- under 13 - the cautious reading, not the convenient one.
+-- child with an academy, which only an account whose holder said they are an
+-- adult can agree to. A player whose date of birth is missing counts as a
+-- child - the cautious reading, not the convenient one.
 -- ---------------------------------------------------------------------------
 
 create table if not exists public.account_ages (
   user_id     uuid primary key references auth.users(id) on delete cascade,
-  -- 'adult' is 18 or over; 'teen' is 13 to 17.
+  -- 'adult' is 18 or over. ('teen' is allowed by the column for a law with a
+  -- lower age, but declare_age records only adults: under the DPDP Act anyone
+  -- under 18 is a child, and has no account of their own.)
   band        text not null check (band in ('teen', 'adult')),
   declared_at timestamptz not null default now()
 );
@@ -1337,8 +1342,8 @@ set search_path = public, pg_temp
 as $$
 begin
   if auth.uid() is null then raise exception 'Sign in first'; end if;
-  if band is null or band not in ('teen', 'adult') then
-    raise exception 'Someone under 13 needs a parent or guardian to sign in for them';
+  if band is distinct from 'adult' then
+    raise exception 'Someone under 18 needs a parent or guardian to sign in for them';
   end if;
   insert into public.account_ages (user_id, band) values (auth.uid(), band)
   on conflict (user_id) do update set band = excluded.band, declared_at = now();
@@ -1355,7 +1360,7 @@ as $$
   select exists (select 1 from public.account_ages where user_id = auth.uid() and band = 'adult');
 $$;
 
--- Under 13 by the date of birth on the player's profile - or no usable date at all.
+-- Under 18 by the date of birth on the player's profile - or no usable date at all.
 create or replace function public.player_is_child(pid uuid)
 returns boolean
 language plpgsql
@@ -1371,7 +1376,7 @@ begin
   exception when others then
     return true;
   end;
-  return born is null or born > current_date - interval '13 years';
+  return born is null or born > current_date - interval '18 years';
 end;
 $$;
 
@@ -1467,7 +1472,7 @@ begin
   if aid is null then raise exception 'No academy has that code'; end if;
   if pid is null then raise exception 'Sign in on your own phone first, so there is a player to link'; end if;
   if public.player_is_child(pid) and not public.is_declared_adult() then
-    raise exception 'A parent or guardian needs to say yes for a player under 13 - they sign in to Matchday with their own email';
+    raise exception 'A parent or guardian needs to say yes for a player under 18 - they sign in to Matchday with their own email';
   end if;
   if not public.can_take_players(aid) then raise exception 'This academy is not verified yet, so it cannot take players'; end if;
   select id into apid from public.academy_players
@@ -1513,7 +1518,7 @@ begin
   if not found or not public.owns_player(rec.player_id) then raise exception 'That invite has gone - the academy may have cancelled it'; end if;
   if accept and not coalesce(consent, false) then raise exception 'Agree to share your matches and stats with the academy first'; end if;
   if accept and public.player_is_child(rec.player_id) and not public.is_declared_adult() then
-    raise exception 'A parent or guardian needs to say yes for a player under 13 - they sign in to Matchday with their own email';
+    raise exception 'A parent or guardian needs to say yes for a player under 18 - they sign in to Matchday with their own email';
   end if;
   if accept and not public.can_take_players(rec.academy_id) then
     raise exception 'This academy is not verified yet, so it cannot take players';

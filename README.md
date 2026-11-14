@@ -21,12 +21,14 @@ everything on the one phone.)
 - First, once on each phone: "When were you born?" - a month and year, for
   whoever is holding the phone, with nothing on screen to say what any answer
   leads to. Only the band it falls in is kept on the phone, and an account only
-  ever records "13-17" or "18 or over"
-- Someone under 13 doesn't get an account of their own. A parent or guardian
+  ever records that its holder is 18 or over
+- Matchday follows India's Digital Personal Data Protection Act, 2023, under
+  which everyone under 18 is a child. Someone under 18 doesn't get an account
+  of their own. A parent or guardian
   signs in with their own email - the code goes to them - after agreeing to the
   privacy notice; or the child uses Matchday on the phone only, with nothing
   leaving it and the coach and reminders off. A phone that was signed in before
-  this existed is asked once too, and if the person holding it is under 13, it
+  this existed is asked once too, and if the person holding it is under 18, it
   asks whose email the account is: a parent confirms theirs, and a child's own
   account is deleted, keeping everything on the phone
 - The app opens on signing in and nothing else, whenever the build has an
@@ -208,7 +210,7 @@ everything on the one phone.)
 - Note on privacy: Google may use free-tier Gemini data to improve their
   models. Worth knowing before uploading match video of a child. The coach is
   told the player's position and age group, never their name, and it is off
-  for an under-13 until a parent or guardian has signed in.
+  for a child (under 18) until a parent or guardian has signed in.
 - **Google's terms for the Gemini API say it must not be used in a service
   "directed towards or likely to be accessed by individuals under the age of
   18".** Matchday is for youth players, so the shared coach as it stands is
@@ -287,7 +289,7 @@ phone or a laptop:
   each squad's coaches see its players
 - **Linking players** - invite by username, or the family types the academy's
   join code. Either way the family sees exactly what the academy will see and
-  ticks consent ("I'm 13 or over, or I'm their parent or guardian") before
+  ticks consent - for a player under 18, only a parent or guardian can - before
   anything is shared. They can leave at any time, and the academy loses sight of
   it at once. Players without the app go on the list by name
 - **Tables** - the academy's own leagues and tournaments, with every team's
@@ -306,12 +308,13 @@ enter other teams' results and the table, with your team marked, follows.
 The privacy notice is [public/privacy.html](public/privacy.html), shipped with
 the app and linked from the sign-in screens and Setup; it names every service
 the data touches. It and [docs/terms.md](docs/terms.md) need a review by someone
-who knows UK data protection law before real families and academies use
+who knows Indian data protection law (the DPDP Act, 2023, its Rules, 2025,
+and the IT Act, 2000 and its rules) before real families and academies use
 accounts - it is children's data - and the highlighted parts of the notice
-filling in.
+filling in, including the Grievance Officer.
 
 An academy that invites a player learns only the username it typed until the
-family says yes; for a player under 13 (or with no date of birth), only an
+family says yes; for a player under 18 (or with no date of birth), only an
 account whose holder said they are an adult can say yes. Verification documents
 are deleted as soon as they have been checked.
 

@@ -23,10 +23,10 @@ checked figures.
 
 - You sign in with your email to use Matchday. Keep that email account
   secure; a sign-in code is the key to your account.
-- Nobody under 13 has an account of their own: a parent or guardian signs in
-  with their own email and looks after the account. Only a parent or guardian
-  can agree to share an under-13's records with an academy; a player of 13 or
-  over may agree for themselves.
+- Nobody under 18 has an account of their own: a parent or lawful guardian
+  signs in with their own email, accepts these terms for the child, and looks
+  after the account. Only a parent or guardian can agree to share a child's
+  records with an academy.
 - Answer the age question truthfully, and don't sign in as a parent or
   guardian if you aren't one.
 - Pick a username that isn't offensive and doesn't pretend to be someone else.
@@ -53,7 +53,8 @@ checked figures.
   agreed to.
 - Try to see data you haven't been given access to, or to get round the app's
   rules.
-- Upload anything you don't have the right to share.
+- Upload anything you don't have the right to share, or anything unlawful,
+  obscene, harmful to children, or that impersonates someone.
 
 ## Ending
 
@@ -74,6 +75,10 @@ not excluding anything that cannot be excluded.]
 ## Changes and law
 
 We may update these terms; if a change matters, the app will say so. These
-terms are governed by the law of [England and Wales].
+terms are governed by the laws of India, and the courts at [city] have
+exclusive jurisdiction.
+
+Questions or complaints about Matchday, including about content someone else
+has entered, go to the Grievance Officer named in the privacy notice.
 
 Last updated: [date].

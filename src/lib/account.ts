@@ -8,7 +8,7 @@ import { sessionKey, supabase } from './supabase';
  * and deleting the account with everything stored for it.
  */
 
-export async function declareAge(band: 'teen' | 'adult'): Promise<void> {
+export async function declareAge(band: 'adult'): Promise<void> {
   const { error } = await (await supabase()).rpc('declare_age', { band });
   if (error) throw new Error(error.message);
 }
@@ -73,7 +73,7 @@ export async function wipePhone(): Promise<void> {
 }
 
 /**
- * After an under-13's own account is deleted: the phone keeps the player's
+ * After an under-18's own account is deleted: the phone keeps the player's
  * records, but nothing that tied it to the account - or to the reminder server.
  */
 export async function forgetAccountOnPhone(): Promise<void> {

@@ -163,9 +163,9 @@ function WhatTheySee({ name }: { name: string }) {
 }
 
 /**
- * Who may say yes. For a player under 13 - or with no date of birth in Setup -
- * only a parent or guardian, signed in as themselves; the server checks the
- * same (supabase/schema.sql, player_is_child).
+ * Who may say yes. For a player under 18 - a child under India's DPDP Act - or
+ * with no date of birth in Setup, only a parent or guardian, signed in as
+ * themselves; the server checks the same (supabase/schema.sql, player_is_child).
  */
 function Consent({ name, checked, onChange }: { name: string; checked: boolean; onChange: (on: boolean) => void }) {
   const { profile } = useStore();
@@ -174,7 +174,7 @@ function Consent({ name, checked, onChange }: { name: string; checked: boolean; 
   if (child && bandToDeclare(gate) !== 'adult') {
     return (
       <p className="notice">
-        {profile.dateOfBirth ? `${name} is under 13` : `${name} has no date of birth in Setup`}, so a parent or guardian
+        {profile.dateOfBirth ? `${name} is under 18` : `${name} has no date of birth in Setup`}, so a parent or guardian
         says yes, signed in with their own email.
       </p>
     );
@@ -185,7 +185,7 @@ function Consent({ name, checked, onChange }: { name: string; checked: boolean; 
       <span>
         {child
           ? `I'm ${name}'s parent or guardian, and I'm 18 or over.`
-          : `I'm 13 or over, or I'm ${name}'s parent or guardian.`}
+          : `I'm ${name}, and I'm 18 or over - or I'm their parent or guardian.`}
       </span>
     </label>
   );

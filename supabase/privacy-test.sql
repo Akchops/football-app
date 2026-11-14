@@ -87,7 +87,8 @@ insert into public.household_members (household_id, user_id, role) values
   (public.p_get('hid_maya')::uuid, '0e000000-0000-0000-0000-000000000003', 'player');
 set role authenticated;
 set request.jwt.claim.sub = '0e000000-0000-0000-0000-000000000003';
-select public.declare_age('teen');
+select public.p_refused($$select public.declare_age('teen')$$, 'under 18 needs a parent',
+  'a 13 to 17-year-old cannot record an account of their own - under the DPDP Act they are a child');
 
 -- ===========================================================================
 -- What an academy learns before anyone says yes.
@@ -111,7 +112,7 @@ select public.p_expect(format($$select * from public.academy_players where acade
   'after the family says no, the academy still has only the username it typed');
 
 -- ===========================================================================
--- Under 13: only an adult can share with an academy.
+-- Under 18: only an adult can share with an academy.
 -- ===========================================================================
 set request.jwt.claim.sub = '0e000000-0000-0000-0000-000000000005';
 do $$ begin
@@ -121,11 +122,11 @@ do $$ begin
   perform public.p_set('real_link', public.invite_player(public.p_get('real')::uuid, 'maya_gk')::text);
 end $$;
 select public.p_refused($$select public.declare_age('child')$$, 'parent or guardian',
-  'nobody can record themselves as under 13 - they do not get an account');
+  'nobody can record themselves as a child - they do not get an account');
 
 set request.jwt.claim.sub = '0e000000-0000-0000-0000-000000000003';
 select public.p_refused(format($$select public.answer_player_invite(%L, true, true)$$, public.p_get('real_link')),
-  'parent or guardian needs to say yes', 'a teenage sibling cannot share an under-13 with an academy');
+  'parent or guardian needs to say yes', 'a teenage sibling cannot share a child with an academy');
 select public.p_refused(format($$select public.join_by_code(%L, true)$$, public.p_get('real_code')),
   'parent or guardian needs to say yes', 'nor ask to join one with its code');
 
@@ -136,19 +137,18 @@ select public.p_refused(format($$select public.answer_player_invite(%L, true, tr
 set request.jwt.claim.sub = '0e000000-0000-0000-0000-000000000001';
 do $$ begin
   perform public.answer_player_invite(public.p_get('real_link')::uuid, true, true);
-  raise notice 'PASS: the parent says yes for their under-13';
+  raise notice 'PASS: the parent says yes for their child';
 end $$;
 set request.jwt.claim.sub = '0e000000-0000-0000-0000-000000000005';
 select public.p_expect(format($$select * from public.academy_players where id = %L and display_name = 'Maya Patel'
   and position = 'GK' and age_group = 'U11' and consent_by = '0e000000-0000-0000-0000-000000000001'$$, public.p_get('real_link')), 1,
   'once the parent says yes, the academy gets her name, and the yes is recorded as the parent''s');
 
--- A player with no date of birth counts as under 13.
+-- A player with no date of birth counts as a child.
 set request.jwt.claim.sub = '0e000000-0000-0000-0000-000000000006';
 do $$
 declare hid uuid; pid uuid;
 begin
-  perform public.declare_age('teen');
   hid := public.create_household('P-Solo');
   insert into public.players (household_id, data, updated_at)
     values (hid, '{"name":"Solo","position":"CB","ageGroup":"U15"}', now()) returning id into pid;
@@ -157,11 +157,16 @@ begin
   perform public.p_set('pid_solo', pid::text);
 end $$;
 select public.p_refused(format($$select public.join_by_code(%L, true)$$, public.p_get('real_code')),
-  'parent or guardian needs to say yes', 'a player with no date of birth is treated as under 13');
+  'parent or guardian needs to say yes', 'a player with no date of birth is treated as a child');
 do $$ begin
   update public.players set data = data || '{"dateOfBirth":"2011-01-15"}' where id = public.p_get('pid_solo')::uuid;
+end $$;
+select public.p_refused(format($$select public.join_by_code(%L, true)$$, public.p_get('real_code')),
+  'parent or guardian needs to say yes', 'a 15-year-old cannot ask to join for themselves - a child under the DPDP Act');
+do $$ begin
+  update public.players set data = data || '{"dateOfBirth":"2006-01-15"}' where id = public.p_get('pid_solo')::uuid;
   perform public.p_set('solo_req', public.join_by_code(public.p_get('real_code'), true)::text);
-  raise notice 'PASS: a player of 13 or over can ask to join for themselves';
+  raise notice 'PASS: a player of 18 or over can ask to join for themselves';
 end $$;
 set request.jwt.claim.sub = '0e000000-0000-0000-0000-000000000005';
 select public.answer_join_request(public.p_get('solo_req')::uuid, true);

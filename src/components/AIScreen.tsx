@@ -122,7 +122,7 @@ export default function AIScreen({ onOpenSetup }: { onOpenSetup: () => void }) {
           </span>
           <h2>Ask a parent or guardian</h2>
           <p>
-            The coach sends what you ask, and any clip you pick, to an AI service to read - so for anyone under 13, a
+            The coach sends what you ask, and any clip you pick, to an AI service to read - so for anyone under 18, a
             parent or guardian signs in first. They can do that in Setup, under Sharing with your family.
           </p>
           <button className="primary-btn" onClick={onOpenSetup}>

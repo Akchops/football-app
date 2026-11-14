@@ -129,7 +129,7 @@ export function AgeQuestion() {
   );
 }
 
-/** Someone under 13 with no parent or guardian signed in: no account of their own. */
+/** Someone under 18 with no parent or guardian signed in: no account of their own. */
 function NeedsParent({ onParent }: { onParent: () => void }) {
   return (
     <Frame>
@@ -199,7 +199,7 @@ function ParentSignIn({ onBack }: { onBack: () => void }) {
 
 /**
  * A phone already signed in when the age question arrived, held by someone
- * under 13. Either the account is a parent's - who confirms it - or it is the
+ * under 18. Either the account is a parent's - who confirms it - or it is the
  * child's own, which Matchday can't keep: it is deleted, and everything on the
  * phone stays.
  */
@@ -262,7 +262,7 @@ export function ChildAccountScreen() {
       <Frame>
         <h1>Your account needs to go</h1>
         <p className="onboard-lead">
-          Matchday can&apos;t keep an account for someone under 13. Your account - {email}, and what is saved with it on
+          Matchday can&apos;t keep an account for someone under 18. Your account - {email}, and what is saved with it on
           Matchday&apos;s server - will be deleted.
         </p>
         <p className="muted small">

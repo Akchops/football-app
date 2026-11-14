@@ -78,6 +78,12 @@ insert into auth.users (id, email) values
   ('0a000000-0000-0000-0000-00000000000b', 'priya@third.test');
 insert into public.app_admins (user_id) values ('0a000000-0000-0000-0000-00000000000a') on conflict do nothing;
 update public.app_settings set require_verification = false;
+-- The families' accounts are the adults' who look after them: the players
+-- here are under 18, so only an adult's account can say yes to an academy.
+-- (Who may agree for a child is checked on its own in privacy-test.sql.)
+insert into public.account_ages (user_id, band)
+  select id, 'adult' from auth.users where id::text like '0a000000-%'
+  on conflict (user_id) do update set band = 'adult';
 
 set role authenticated;
 

@@ -10,8 +10,10 @@ keeps something new, or keeps it for longer changes that page in the same
 commit.
 
 > **Not legal advice.** Matchday handles children's information. Before real
-> families and academies use it, have the notice read by someone who knows UK
-> data protection law (UK GDPR, the Data Protection Act 2018 and the ICO's
-> Children's code), and fill in the highlighted parts: the contact email, the
-> database region, which service sends sign-in emails, which Gemini tier the
-> shared key is on, the backup period, and the date.
+> families and academies use it, have the notice read by someone who knows
+> Indian data protection law (the Digital Personal Data Protection Act, 2023,
+> the DPDP Rules, 2025, and the Information Technology Act, 2000 and its rules),
+> and fill in the highlighted parts: the address, the Grievance Officer, the
+> database region, which service sends sign-in emails, which Gemini plan the
+> shared key is on, the log and backup periods, and the date. The Act also asks
+> for the notice to be available in the Eighth Schedule languages on request.

@@ -35,14 +35,14 @@ required to run or build Matchday.
 | `check-setup.mjs` | Checks a real project is ready, using only its public URL and key. Run by the *Check accounts setup* workflow. |
 | `rls-test.sql` | Proves two families cannot see each other's data, and someone signed out sees nothing. Run it after any change to the access rules. |
 | `academy-test.sql` | The same for academies: plays an owner, manager, two coaches, the office admin, two players, a parent, a stranger and a Matchday admin, and has each try what they should and shouldn't. |
-| `privacy-test.sql` | Deleting an account, under-13s, and what an academy can learn before a family says yes: that a stranger's academy can't turn a username into a child's name, that an invite can't claim to be from someone else, that only an adult can share an under-13, and that deleting an account removes exactly what it should - or nothing, when it refuses. |
+| `privacy-test.sql` | Deleting an account, children (under 18), and what an academy can learn before a family says yes: that a stranger's academy can't turn a username into a child's name, that an invite can't claim to be from someone else, that only an adult can share a child, and that deleting an account removes exactly what it should - or nothing, when it refuses. |
 | `local-auth-stub.sql` | Stands in for the Supabase-provided `auth` schema so the files above can run against a plain local Postgres. Never run this against the real project. |
 | `local-api.mjs` | A local stand-in for a whole project, for testing sync in a browser. See the end of this file. Never point it at anything real. |
 
 ## Setting up the real project (about 15 minutes, free, no card)
 
 1. Go to **supabase.com**, sign in with GitHub, and create a **New project**:
-   name it `matchday`, pick the region nearest you (London for the UK), and
+   name it `matchday`, pick the region nearest you (Mumbai for India), and
    choose any database password (save it somewhere; the app never needs it).
 2. **SQL Editor** → New query → paste all of `schema.sql` → **Run**.
 3. **Email sending — needed before anyone else can get a code.** Supabase's
@@ -180,13 +180,14 @@ run from the SQL editor), which is what lets it delete from `auth.users`. If a
 project ever refuses that, the delete fails as a whole and the app says so -
 nothing is half-deleted.
 
-## Under 13
+## Children (under 18)
 
-The app asks the age of whoever signs in before it sends a code; nobody under 13
-gets an account of their own. Each account keeps only `teen` or `adult`
-(`account_ages`), never a date. Sharing a player with an academy checks the
-player's date of birth: under 13 - or no date at all - needs an account whose
-holder said they are an adult.
+Matchday follows India's DPDP Act, 2023, under which everyone under 18 is a
+child. The app asks the age of whoever signs in before it sends a code; nobody
+under 18 gets an account of their own. Each account records only that its
+holder is an adult (`account_ages`), never a date. Sharing a player with an
+academy checks the player's date of birth: under 18 - or no date at all - needs
+an account whose holder said they are an adult.
 
 ## Testing sync end to end, locally
 

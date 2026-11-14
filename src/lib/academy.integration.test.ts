@@ -43,10 +43,12 @@ async function person(who: string): Promise<{ api: AcademyApi; name: string; sb:
 async function family(who: string, playerName: string) {
   const p = await person(who);
   const data = emptyData();
-  // Fifteen: old enough to say yes to an academy themselves. An under-13 needs
-  // a parent's account, which supabase/privacy-test.sql covers.
+  // A 15-year-old: a child under the DPDP Act, so the account is a parent's,
+  // and says so - only an adult's account can say yes to an academy for them.
   data.profile = { ...data.profile, name: playerName, position: 'GK', ageGroup: 'U16', dateOfBirth: '2011-01-15' };
   const household = await supabaseRemote(p.sb, p.userId).createHousehold(`${playerName}'s family`, data.profile, data.settings);
+  const adult = await p.sb.rpc('declare_age', { band: 'adult' });
+  if (adult.error) throw adult.error;
   const at = new Date().toISOString();
   const match = await p.sb.from('matches').insert({ player_id: household.playerId, id: `m_${who}_${RUN}`, data: { opponent: 'Vale' }, updated_at: at });
   if (match.error) throw match.error;

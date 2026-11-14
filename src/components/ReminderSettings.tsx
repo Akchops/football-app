@@ -17,7 +17,7 @@ export function ReminderSettings() {
   const gate = useAgeGate();
   if (status === 'no-server') return null;
   // A reminder goes through Matchday's server and the phone maker's push
-  // service - for an under-13, only once a parent or guardian has signed in.
+  // service - for a child (under 18), only once a parent or guardian has signed in.
   if (childOnly(gate)) return null;
 
   const data = { matches, competitions };
