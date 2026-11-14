@@ -8,13 +8,14 @@
  */
 
 import { allowanceKey, type Allowance } from './allowance';
+import { whoIsAsking, type AuthEnv, type Caller } from './auth';
 import { describeFailure, generate } from './gemini';
 import { handlePush, type PushEnv } from './push';
 
 export { CoachAllowance } from './allowance';
 export { PushStore } from './push';
 
-export interface Env extends PushEnv {
+export interface Env extends PushEnv, AuthEnv {
   GEMINI_API_KEY: string;
   /** Comma-separated origins allowed to call this worker. */
   ALLOWED_ORIGINS: string;
@@ -173,7 +174,7 @@ function corsHeaders(origin: string | null, env: Env): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': ok ? (origin as string) : allowed[0] ?? '',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Allow-Headers': 'content-type, authorization',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -187,13 +188,19 @@ function json(body: unknown, status: number, headers: Record<string, string>): R
 }
 
 /**
- * One counter per person per UTC day. cf-connecting-ip is set by Cloudflare
- * itself and cannot be sent in by the caller; IPv6 counts by household (see
- * allowanceKey).
+ * One counter per person per UTC day: per account when the app has accounts,
+ * which is what a person is. Otherwise per address - cf-connecting-ip is set by
+ * Cloudflare itself and cannot be sent in by the caller, and IPv6 counts by
+ * household (see allowanceKey).
  */
-async function checkRateLimit(request: Request, env: Env): Promise<Allowance> {
+async function checkRateLimit(request: Request, env: Env, caller: Caller): Promise<Allowance> {
   const limit = Number(env.DAILY_LIMIT ?? DEFAULT_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
-  const who = allowanceKey(request.headers.get('cf-connecting-ip'));
+  const who =
+    caller.kind === 'account'
+      ? `account:${caller.id}`
+      : caller.kind === 'check'
+        ? 'check'
+        : allowanceKey(request.headers.get('cf-connecting-ip'));
   const day = new Date().toISOString().slice(0, 10);
 
   if (env.COACH_ALLOWANCE) {
@@ -246,7 +253,10 @@ export default {
       return json({ error: 'That clip is too big. Trim it to the passage of play you want looked at.' }, 413, headers);
     }
 
-    const limit = await checkRateLimit(request, env);
+    const caller = await whoIsAsking(request, env);
+    if ('error' in caller) return json({ error: caller.error, signIn: caller.status === 401 }, caller.status, headers);
+
+    const limit = await checkRateLimit(request, env, caller);
     if (!limit.ok) {
       return json(
         {

@@ -7,7 +7,7 @@
 // Run from GitHub by .github/workflows/check-accounts.yml.
 
 /** What `schema_version()` in schema.sql returns. Bump both together. */
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const TABLES = [
   'households', 'household_members', 'household_invites', 'players', 'player_settings',

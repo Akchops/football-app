@@ -3,6 +3,7 @@ import { clipPrompt, playerLine, clampRating, type ClipAnalysis, type DrillPlan 
 import type { Frame } from './frames';
 import { formatClock } from './frames';
 import { fixturesPrompt, type FixtureRead } from './fixtures';
+import { configured, supabase } from './supabase';
 
 /**
  * The shared coach: a small server that holds one Gemini key so players don't
@@ -40,12 +41,28 @@ export function lastModelUsed(): string {
   return lastModel;
 }
 
+/**
+ * The signed-in person's sign-in, which the coach checks before spending its
+ * shared allowance - and counts that allowance against. getSession renews it
+ * first if it has run out and there is signal.
+ */
+async function signIn(): Promise<Record<string, string>> {
+  if (!configured()) return {};
+  try {
+    const { data } = await (await supabase()).auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   let response: Response;
   try {
     response = await fetch(`${PROXY_URL}${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...(await signIn()) },
       body: JSON.stringify(body),
     });
   } catch {

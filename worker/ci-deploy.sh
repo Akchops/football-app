@@ -140,8 +140,20 @@ sed -i.bak "s/REPLACE_WITH_KV_ID/$id/" wrangler.toml && rm -f wrangler.toml.bak
 echo "Storing the Gemini key as a secret..."
 printf '%s' "$GEMINI_API_KEY" | npx wrangler secret put GEMINI_API_KEY
 
+# The coach answers only people signed in to the app's Supabase project. Without
+# it - a build with no accounts - it falls back to counting by address, which
+# anyone with the worker's URL can spend.
+vars=()
+if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_ANON_KEY:-}" ]; then
+  echo "The coach will require a Matchday sign-in ($SUPABASE_URL)."
+  vars=(--var "SUPABASE_URL:$SUPABASE_URL" --var "SUPABASE_ANON_KEY:$SUPABASE_ANON_KEY")
+else
+  echo "WARNING: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set as repository" >&2
+  echo "variables, so the coach will answer anyone who has its address." >&2
+fi
+
 echo "Deploying..."
-if npx wrangler deploy > deploy.log 2>&1; then
+if npx wrangler deploy "${vars[@]}" > deploy.log 2>&1; then
   cat deploy.log
 else
   cat deploy.log

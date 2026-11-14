@@ -9,6 +9,9 @@
 //                   candidate really answers - status, seconds, Google's words.
 //   PROXY_URL       optional. Calls the deployed worker exactly the way the app
 //                   does, for every AI feature.
+//   WORKER_CHECK_KEY  the Gemini key again, for the worker: it answers only
+//                   signed-in people, or a caller that proves it holds the key
+//                   (src/auth.ts). Only a hash of it is sent.
 //
 // Run with: node --experimental-strip-types worker/scripts/check-ai.mjs
 // The key is never printed, and anything shaped like one is redacted.
@@ -16,6 +19,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHECK_HEADER, checkToken } from '../src/auth.ts';
 import { rankModels, thinkingOff } from '../src/models.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -24,6 +28,7 @@ const API = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapi
 const KEY = process.env.GEMINI_API_KEY ?? '';
 const PROXY = (process.env.PROXY_URL ?? '').replace(/\/+$/, '');
 const ORIGIN = process.env.ORIGIN || 'https://akchops.github.io';
+const CHECK_KEY = process.env.WORKER_CHECK_KEY ?? '';
 const TODAY = new Date().toISOString().slice(0, 10);
 /** Only the schedule import, sent several times - reliability, not one lucky pass. */
 const IMPORT_ONLY = process.env.IMPORT_ONLY === 'true';
@@ -321,7 +326,11 @@ async function callWorker(path, payload) {
   try {
     const response = await fetch(`${PROXY}${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin: ORIGIN },
+      headers: {
+        'content-type': 'application/json',
+        origin: ORIGIN,
+        ...(CHECK_KEY ? { [CHECK_HEADER]: await checkToken(CHECK_KEY) } : {}),
+      },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(130_000),
     });

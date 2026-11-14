@@ -2,6 +2,7 @@ import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { contentSecurityPolicy } from './csp';
 
 export default defineConfig(({ mode }) => {
   // Served from https://<user>.github.io/football-app/ - an absolute base keeps the
@@ -66,12 +67,14 @@ export default defineConfig(({ mode }) => {
         },
         devOptions: { enabled: false },
       }),
+      // Last, so it hashes the page's inline scripts as they finally are.
+      contentSecurityPolicy(env),
   ],
     server: { host: true, port: 5173 },
     test: {
       globals: true,
       environment: 'node',
-      include: ['src/**/*.test.ts', 'worker/src/**/*.test.ts'],
+      include: ['src/**/*.test.ts', 'worker/src/**/*.test.ts', 'csp.test.ts'],
     },
   };
 });

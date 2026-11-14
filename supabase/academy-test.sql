@@ -77,6 +77,13 @@ insert into auth.users (id, email) values
   ('0a000000-0000-0000-0000-00000000000a', 'admin@matchday.test'),
   ('0a000000-0000-0000-0000-00000000000b', 'priya@third.test');
 insert into public.app_admins (user_id) values ('0a000000-0000-0000-0000-00000000000a') on conflict do nothing;
+do $$ begin
+  if (select column_default from information_schema.columns
+      where table_schema = 'public' and table_name = 'app_settings' and column_name = 'require_verification') <> 'true' then
+    raise exception 'FAIL: a new project does not require academies to be verified';
+  end if;
+  raise notice 'PASS: a new project requires academies to be verified';
+end $$;
 update public.app_settings set require_verification = false;
 
 set role authenticated;

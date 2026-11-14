@@ -271,6 +271,22 @@ as $$
   );
 $$;
 
+-- Whether the caller is the owner of the household this player belongs to.
+create or replace function public.owner_of_player(pid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (
+    select 1
+    from public.players p
+    where p.id = pid
+      and public.is_household_owner(p.household_id)
+  );
+$$;
+
 alter table public.households        enable row level security;
 alter table public.household_members enable row level security;
 alter table public.household_invites enable row level security;
@@ -351,40 +367,48 @@ create policy invites_cancel on public.household_invites
 -- household, invisible to everyone else. Written once here rather than checked
 -- again in app code, so a bug in the app cannot widen it.
 
+--
+-- Deleting for real is the owner's alone. The app never does it - a delete is
+-- an update (rule 2) - so this only takes away the one thing that can't be
+-- undone: removing the player row takes every match, session and team with it.
+
 drop policy if exists players_all on public.players;
-create policy players_all on public.players
-  for all using (public.is_household_member(household_id))
+drop policy if exists players_read on public.players;
+create policy players_read on public.players
+  for select using (public.is_household_member(household_id));
+drop policy if exists players_add on public.players;
+create policy players_add on public.players
+  for insert with check (public.is_household_member(household_id));
+drop policy if exists players_edit on public.players;
+create policy players_edit on public.players
+  for update using (public.is_household_member(household_id))
   with check (public.is_household_member(household_id));
+drop policy if exists players_remove on public.players;
+create policy players_remove on public.players
+  for delete using (public.is_household_owner(household_id));
 
-drop policy if exists player_settings_all on public.player_settings;
-create policy player_settings_all on public.player_settings
-  for all using (public.owns_player(player_id))
-  with check (public.owns_player(player_id));
-
-drop policy if exists matches_all on public.matches;
-create policy matches_all on public.matches
-  for all using (public.owns_player(player_id))
-  with check (public.owns_player(player_id));
-
-drop policy if exists training_all on public.training_sessions;
-create policy training_all on public.training_sessions
-  for all using (public.owns_player(player_id))
-  with check (public.owns_player(player_id));
-
-drop policy if exists teams_all on public.teams;
-create policy teams_all on public.teams
-  for all using (public.owns_player(player_id))
-  with check (public.owns_player(player_id));
-
-drop policy if exists competitions_all on public.competitions;
-create policy competitions_all on public.competitions
-  for all using (public.owns_player(player_id))
-  with check (public.owns_player(player_id));
-
-drop policy if exists results_all on public.results;
-create policy results_all on public.results
-  for all using (public.owns_player(player_id))
-  with check (public.owns_player(player_id));
+-- The same four rules on each table hanging off a player.
+do $$
+declare
+  t text;
+  short text;
+begin
+  for t, short in values
+    ('player_settings', 'player_settings'), ('matches', 'matches'), ('training_sessions', 'training'),
+    ('teams', 'teams'), ('competitions', 'competitions'), ('results', 'results')
+  loop
+    execute format('drop policy if exists %I on public.%I', short || '_all', t);
+    execute format('drop policy if exists %I on public.%I', short || '_read', t);
+    execute format('create policy %I on public.%I for select using (public.owns_player(player_id))', short || '_read', t);
+    execute format('drop policy if exists %I on public.%I', short || '_add', t);
+    execute format('create policy %I on public.%I for insert with check (public.owns_player(player_id))', short || '_add', t);
+    execute format('drop policy if exists %I on public.%I', short || '_edit', t);
+    execute format('create policy %I on public.%I for update using (public.owns_player(player_id)) with check (public.owns_player(player_id))',
+                   short || '_edit', t);
+    execute format('drop policy if exists %I on public.%I', short || '_remove', t);
+    execute format('create policy %I on public.%I for delete using (public.owner_of_player(player_id))', short || '_remove', t);
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- The two things the app cannot do in one statement under RLS.
@@ -725,9 +749,30 @@ create table if not exists public.app_admins (
 create table if not exists public.app_settings (
   id                   boolean primary key default true check (id),
   -- When on, an academy must be verified before it can take on any player.
-  require_verification boolean not null default false
+  require_verification boolean not null default true
 );
 insert into public.app_settings (id) values (true) on conflict (id) do nothing;
+
+-- Verification is on unless Matchday's admin turns it off. Without it, anyone
+-- could make an academy under any name - a real club's included - invite a
+-- child by username, and on one tap from the family see where and when that
+-- child plays every week.
+--
+-- A new project starts with it on (the default above). A project upgraded from
+-- before schema version 6 has it switched on here, once; from then on running
+-- this file again leaves whatever the admin chose alone.
+alter table public.app_settings alter column require_verification set default true;
+do $$
+declare
+  was integer;
+begin
+  if to_regprocedure('public.schema_version()') is not null then
+    execute 'select public.schema_version()' into was;
+  end if;
+  if coalesce(was, 0) < 6 then
+    update public.app_settings set require_verification = true;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Who someone is to an academy.
@@ -1751,11 +1796,13 @@ grant execute on function
 --   4  academies: squads, linking, tables, team picks and verification
 --   5  certificates and logos must be the kind of file they say; household
 --      invites come from their sender, and only an owner makes an owner
+--   6  academies must be verified to take players (switched on once); only a
+--      household's owner can delete its player or records for real
 create or replace function public.schema_version()
 returns integer
 language sql
 immutable
-as $$ select 5 $$;
+as $$ select 6 $$;
 
 revoke all on function public.schema_version() from public;
 grant execute on function public.schema_version() to anon, authenticated;

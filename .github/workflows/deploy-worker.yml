@@ -30,3 +30,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           WORKERS_SUBDOMAIN: ${{ inputs.workers_subdomain }}
+          # The same two the app is built with: the coach only answers people
+          # signed in to this Supabase project. Both are public by design.
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}

@@ -194,6 +194,13 @@ begin
     values (hid_a, 'co.owner@example.com', 'owner', auth.uid());
   delete from public.household_invites where household_id = hid_a and email = 'co.owner@example.com';
   raise notice 'PASS: an owner can invite another owner';
+
+  -- And can delete a record for real.
+  insert into public.matches (player_id, id, data, updated_at)
+    values ((select v from t_ids where k = 'pid_a'), 'match_scratch', '{}', now());
+  delete from public.matches where player_id = (select v from t_ids where k = 'pid_a') and id = 'match_scratch';
+  if found is false then raise exception 'FAIL: the owner could not delete a match'; end if;
+  raise notice 'PASS: the owner can delete a record for real';
 end $$;
 
 reset role;
@@ -268,6 +275,28 @@ begin
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FAIL: B could not cancel their own invite'; end if;
   raise notice 'PASS: a member can cancel an invite';
+end $$;
+
+-- B can edit A's player, but deleting for real - which takes every match with
+-- it - is the owner's alone.
+do $$
+declare n int; pid_a uuid;
+begin
+  select v into pid_a from t_ids where k = 'pid_a';
+  delete from public.players where id = pid_a;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL: a member who is not the owner deleted the player'; end if;
+  delete from public.matches where player_id = pid_a;
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FAIL: a member who is not the owner hard-deleted % matches', n; end if;
+  raise notice 'PASS: only the owner can delete the player or their records for real';
+
+  -- Deleting the app's way - setting deleted_at - still works for everyone.
+  update public.matches set deleted_at = now() where player_id = pid_a and id = 'match_from_b';
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: B could not mark a match deleted'; end if;
+  update public.matches set deleted_at = null where player_id = pid_a and id = 'match_from_b';
+  raise notice 'PASS: any member can still delete a match the app''s way';
 end $$;
 
 -- The member list, with emails, for the household you are in.

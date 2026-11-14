@@ -69,11 +69,19 @@ more than this will use, and needs no card.
 It is deliberately **not** a general Gemini proxy:
 
 - It owns the system prompts and response schemas. Callers send a position and
-  a question, or a clip and a description — not arbitrary prompts. A leaked URL
-  can waste quota but can't be used as a free AI endpoint.
-- Only the app's origin is allowed (`ALLOWED_ORIGINS` in `wrangler.toml`).
-- Each IP gets `DAILY_LIMIT` requests a day (40 by default). Past that, the app
-  tells the player to add their own free key in Setup.
+  a question, or a clip and a description — not arbitrary prompts, so it can't
+  be used as a free AI endpoint.
+- The Coach answers only people signed in to the app's Supabase project
+  (`src/auth.ts`): the deploy passes the `VITE_SUPABASE_URL` and
+  `VITE_SUPABASE_ANON_KEY` repository variables to the worker, and it checks
+  each request's sign-in with Supabase. The "Check AI proxy" workflow gets in by
+  sending a hash of the Gemini key instead. A deploy without those variables
+  answers anyone who has the address, and says so in its log.
+- Only the app's origin is allowed (`ALLOWED_ORIGINS` in `wrangler.toml`) -
+  which stops other websites, not scripts, hence the sign-in.
+- Each account gets `DAILY_LIMIT` requests a day (40 by default), counted
+  exactly by a Durable Object (`src/allowance.ts`) however many arrive at once.
+  Past that, the app tells the player to add their own free key in Setup.
 - Requests over ~22MB are refused before reaching Gemini.
 - Errors say what failed in plain words, then in brackets the status, the model
   and Google's own reason, with anything shaped like a key removed - so a

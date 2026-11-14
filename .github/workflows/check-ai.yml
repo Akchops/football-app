@@ -55,6 +55,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ inputs.google && secrets.GEMINI_API_KEY || '' }}
           PROXY_URL: ${{ inputs.worker && vars.AI_PROXY_URL || '' }}
+          # The worker only answers signed-in people; this proves the check holds the key instead.
+          WORKER_CHECK_KEY: ${{ inputs.worker && secrets.GEMINI_API_KEY || '' }}
           FOCUS: ${{ inputs.focus }}
           IMPORT_ONLY: ${{ inputs.import_only }}
           SPEED: ${{ inputs.speed }}
