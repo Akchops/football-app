@@ -1,4 +1,4 @@
--- Deleting an account, under-13s, and what an academy can learn before a
+-- Deleting an account, children (under 18), and what an academy can learn before a
 -- family says yes.
 --
 -- Run as postgres against a database that has local-auth-stub.sql and

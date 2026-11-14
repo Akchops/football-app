@@ -234,7 +234,7 @@ function Shell() {
   }
 
   // Signed in before the age question existed: asked once, then - if the
-  // person holding the phone is under 13 - whose account this is.
+  // person holding the phone is under 18 - whose account this is.
   if (sync.available && sync.account) {
     if (!gate) return <AgeQuestion />;
     if (childOnly(gate)) return <ChildAccountScreen />;

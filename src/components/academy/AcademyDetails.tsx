@@ -103,7 +103,7 @@ export function AcademyDetailsFields({
             value={value.country}
             maxLength={60}
             onChange={(e) => set({ country: e.target.value })}
-            placeholder="e.g. England"
+            placeholder="e.g. India"
           />
         </Field>
       </div>
