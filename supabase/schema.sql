@@ -240,6 +240,22 @@ as $$
   );
 $$;
 
+create or replace function public.is_household_owner(hid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (
+    select 1
+    from public.household_members
+    where household_id = hid
+      and user_id = auth.uid()
+      and role = 'owner'
+  );
+$$;
+
 create or replace function public.owns_player(pid uuid)
 returns boolean
 language sql
@@ -303,10 +319,33 @@ create policy invites_read on public.household_invites
     or lower(email) = lower(auth.jwt() ->> 'email')
   );
 
+-- Anyone in the household can invite, and cancel an invite. Two things are
+-- held back:
+--   - Only an owner can invite another owner. An owner can remove people, so
+--     otherwise anyone - the player included - could invite a second account
+--     of their own as owner and use it to remove the parent who started it.
+--   - An invite is always from whoever sent it. invited_by is shown to the
+--     person invited, with that account's email (my_invites), so letting it be
+--     set to anyone would hand out the email of any account whose id is known.
 drop policy if exists invites_write on public.household_invites;
-create policy invites_write on public.household_invites
-  for all using (public.is_household_member(household_id))
-  with check (public.is_household_member(household_id));
+drop policy if exists invites_add on public.household_invites;
+create policy invites_add on public.household_invites
+  for insert with check (
+    public.is_household_member(household_id)
+    and invited_by = auth.uid()
+    and (role <> 'owner' or public.is_household_owner(household_id))
+  );
+drop policy if exists invites_change on public.household_invites;
+create policy invites_change on public.household_invites
+  for update using (public.is_household_member(household_id))
+  with check (
+    public.is_household_member(household_id)
+    and invited_by = auth.uid()
+    and (role <> 'owner' or public.is_household_owner(household_id))
+  );
+drop policy if exists invites_cancel on public.household_invites;
+create policy invites_cancel on public.household_invites
+  for delete using (public.is_household_member(household_id));
 
 -- Players and everything hanging off them: readable and writable by the
 -- household, invisible to everyone else. Written once here rather than checked
@@ -656,6 +695,26 @@ create table if not exists public.academy_documents (
   uploaded_by uuid references auth.users(id) on delete set null,
   created_at  timestamptz not null default now()
 );
+
+-- The data has to be the kind of file the mime column says. Whoever uploads a
+-- certificate writes both, and the admin who reviews it opens it inside the
+-- app: a "PDF" whose data was really a web page would run as Matchday, with
+-- the admin signed in. The app checks this too when it opens one; this keeps
+-- such a file from being stored at all.
+--
+-- The same for an academy's logo, which every linked family's phone loads: a
+-- picture carried in the row, never an address somewhere else that would learn
+-- who opened the app and when.
+--
+-- NOT VALID: checked on every new or changed row, without refusing to run on
+-- a database that already holds an older one.
+alter table public.academy_documents drop constraint if exists academy_documents_data_is_mime;
+alter table public.academy_documents add constraint academy_documents_data_is_mime
+  check (starts_with(data, 'data:' || mime || ';base64,')) not valid;
+
+alter table public.academies drop constraint if exists academies_logo_is_picture;
+alter table public.academies add constraint academies_logo_is_picture
+  check (logo = '' or starts_with(logo, 'data:image/png;base64,') or starts_with(logo, 'data:image/jpeg;base64,')) not valid;
 
 -- The app's own admins: whoever runs Matchday, who review academies. Added by
 -- hand in the SQL editor - nothing in the app can add one.
@@ -1690,11 +1749,13 @@ grant execute on function
 --   2  other teams' results, for competition tables
 --   3  academies, first draft
 --   4  academies: squads, linking, tables, team picks and verification
+--   5  certificates and logos must be the kind of file they say; household
+--      invites come from their sender, and only an owner makes an owner
 create or replace function public.schema_version()
 returns integer
 language sql
 immutable
-as $$ select 4 $$;
+as $$ select 5 $$;
 
 revoke all on function public.schema_version() from public;
 grant execute on function public.schema_version() to anon, authenticated;

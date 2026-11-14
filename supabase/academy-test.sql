@@ -565,6 +565,14 @@ select public.t_refused(format($$select public.submit_for_review(%L)$$, public.t
   'asking for review needs a certificate');
 insert into public.academy_documents (academy_id, kind, file_name, mime, data, uploaded_by)
   values (public.t_get('aid')::uuid, 'registration', 'registration.pdf', 'application/pdf', 'data:application/pdf;base64,AAAA', auth.uid());
+-- A certificate is the kind of file it says: a "PDF" that is really a web page
+-- would run inside the app when Matchday's admin opened it.
+select public.t_refused(format($$insert into public.academy_documents (academy_id, kind, file_name, mime, data, uploaded_by)
+  values (%L, 'registration', 'fa.pdf', 'application/pdf', 'data:text/html;base64,PHNjcmlwdD4=', auth.uid())$$, public.t_get('aid')),
+  'academy_documents_data_is_mime', 'a certificate cannot be a web page dressed as a PDF');
+-- And a logo is a picture carried in the row, not an address that sees every family that loads it.
+select public.t_refused(format($$update public.academies set logo = 'https://example.com/pixel.png' where id = %L$$, public.t_get('aid')),
+  'academies_logo_is_picture', 'a logo cannot be a link to somewhere else');
 select public.submit_for_review(public.t_get('aid')::uuid);
 set request.jwt.claim.sub = '0a000000-0000-0000-0000-000000000002';
 select public.t_expect($$select * from public.academy_documents$$, 0, 'certificates are not shown to the manager');

@@ -132,12 +132,44 @@ export async function toDocument(
   return data ? { data, mime: 'image/jpeg' } : { error: "That picture couldn't be read - try a JPEG or PNG." };
 }
 
-/** Opens a file kept as a data URL in a new tab. Browsers refuse to open data URLs directly, so it goes as a blob. */
-export function openDataUrl(dataUrl: string): void {
-  const [head, body] = dataUrl.split(',', 2);
-  const mime = /data:([^;]+)/.exec(head)?.[1] ?? 'application/octet-stream';
-  const bytes = Uint8Array.from(atob(body ?? ''), (c) => c.charCodeAt(0));
-  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+/** The only kinds of file a certificate may be. */
+export type DocumentMime = 'image/jpeg' | 'image/png' | 'application/pdf';
+const DOCUMENT_MIMES: readonly string[] = ['image/jpeg', 'image/png', 'application/pdf'];
+
+/**
+ * A certificate's data URL as a file of the kind the database says it is, or
+ * null when the two disagree.
+ *
+ * The type always comes from the database's own column, never from the data
+ * itself. Whoever uploaded the file wrote the data, and a blob opened from this
+ * page runs as this page: a "PDF" whose data said text/html would run its
+ * script with the viewer's signed-in session - a Matchday admin's, reviewing it.
+ */
+export function documentBlob(dataUrl: string, mime: DocumentMime): Blob | null {
+  if (!DOCUMENT_MIMES.includes(mime)) return null;
+  const prefix = `data:${mime};base64,`;
+  if (!dataUrl.startsWith(prefix)) return null;
+  try {
+    const bytes = Uint8Array.from(atob(dataUrl.slice(prefix.length)), (c) => c.charCodeAt(0));
+    return new Blob([bytes], { type: mime });
+  } catch {
+    return null;
+  }
+}
+
+/** Whether a certificate's data really is the kind of picture it is filed as - for an <img> preview. */
+export function isDocumentImage(dataUrl: string, mime: DocumentMime): boolean {
+  return mime !== 'application/pdf' && DOCUMENT_MIMES.includes(mime) && dataUrl.startsWith(`data:${mime};base64,`);
+}
+
+/**
+ * Opens a certificate in a new tab. Browsers refuse to open data URLs directly,
+ * so it goes as a blob - of the type the database has on record, and nothing else.
+ */
+export function openDataUrl(dataUrl: string, mime: DocumentMime): void {
+  const blob = documentBlob(dataUrl, mime);
+  if (!blob) throw new Error("That file isn't the kind it says it is, so it won't be opened.");
+  const url = URL.createObjectURL(blob);
   window.open(url, '_blank', 'noopener');
   // Long enough for the new tab to load it.
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);

@@ -188,6 +188,12 @@ begin
   insert into public.household_invites (household_id, email, invited_by)
     values (hid_a, 'parent.b@example.com', auth.uid());
   raise notice 'A invited parent.b';
+
+  -- The owner can make another owner.
+  insert into public.household_invites (household_id, email, role, invited_by)
+    values (hid_a, 'co.owner@example.com', 'owner', auth.uid());
+  delete from public.household_invites where household_id = hid_a and email = 'co.owner@example.com';
+  raise notice 'PASS: an owner can invite another owner';
 end $$;
 
 reset role;
@@ -221,6 +227,47 @@ begin
     values ((select v from t_ids where k = 'pid_a'), 'match_from_b',
             '{"date":"2026-11-01","opponent":"Added by mum"}', now());
   raise notice 'PASS: B can add a match to the shared player';
+end $$;
+
+-- B is in A's household now, but not its owner.
+do $$
+declare hid_a uuid; inv uuid; n int;
+begin
+  select v into hid_a from t_ids where k = 'hid_a';
+
+  -- An owner can remove people, so making one is the owner's call alone -
+  -- or anyone could invite a second account as owner and remove the parent.
+  begin
+    insert into public.household_invites (household_id, email, role, invited_by)
+      values (hid_a, 'my.other.account@example.com', 'owner', auth.uid());
+    raise exception 'FAIL: a member who is not the owner invited an owner';
+  exception when insufficient_privilege then
+    raise notice 'PASS: only an owner can invite an owner';
+  end;
+
+  -- An invite is from whoever sent it: my_invites shows the sender's email.
+  begin
+    insert into public.household_invites (household_id, email, invited_by)
+      values (hid_a, 'my.other.account@example.com', 'aaaaaaaa-0000-0000-0000-000000000001');
+    raise exception 'FAIL: B sent an invite in A''s name';
+  exception when insufficient_privilege then
+    raise notice 'PASS: an invite cannot claim to be from someone else';
+  end;
+
+  -- Inviting another parent is still fine, and B cannot turn that into an owner invite afterwards.
+  insert into public.household_invites (household_id, email, invited_by)
+    values (hid_a, 'grandparent@example.com', auth.uid()) returning id into inv;
+  raise notice 'PASS: any member can invite another adult';
+  begin
+    update public.household_invites set role = 'owner' where id = inv;
+    raise exception 'FAIL: B turned an invite into an owner invite';
+  exception when insufficient_privilege then
+    raise notice 'PASS: an invite cannot be changed into an owner invite';
+  end;
+  delete from public.household_invites where id = inv;
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FAIL: B could not cancel their own invite'; end if;
+  raise notice 'PASS: a member can cancel an invite';
 end $$;
 
 -- The member list, with emails, for the household you are in.

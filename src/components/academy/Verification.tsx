@@ -67,7 +67,7 @@ export function VerificationSection({ academy }: { academy: StaffAcademy }) {
     });
   };
 
-  const view = (doc: AcademyDocument) => api && void run(async () => openDataUrl(await api.documentData(doc.id)));
+  const view = (doc: AcademyDocument) => api && void run(async () => openDataUrl(await api.documentData(doc.id), doc.mime));
   const remove = (doc: AcademyDocument) => {
     if (!api || !confirm(`Remove ${doc.fileName}?`)) return;
     void run(async () => {

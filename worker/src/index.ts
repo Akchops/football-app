@@ -7,9 +7,11 @@
  * URL can waste quota but cannot be repurposed as a free LLM endpoint.
  */
 
+import { allowanceKey, type Allowance } from './allowance';
 import { describeFailure, generate } from './gemini';
 import { handlePush, type PushEnv } from './push';
 
+export { CoachAllowance } from './allowance';
 export { PushStore } from './push';
 
 export interface Env extends PushEnv {
@@ -19,6 +21,8 @@ export interface Env extends PushEnv {
   /** Requests allowed per IP per day. */
   DAILY_LIMIT?: string;
   RATE_LIMIT: KVNamespace;
+  /** The exact daily counters (src/allowance.ts). Missing until the worker is redeployed with it. */
+  COACH_ALLOWANCE?: DurableObjectNamespace;
   /** Coach and clip models to try first, best first, comma-separated. */
   GEMINI_MODEL?: string;
   /** Schedule import models to try first, best first, comma-separated. */
@@ -182,13 +186,25 @@ function json(body: unknown, status: number, headers: Record<string, string>): R
   });
 }
 
-/** One counter per IP per UTC day; the key expires on its own. */
-async function checkRateLimit(request: Request, env: Env): Promise<{ ok: boolean; used: number; limit: number }> {
+/**
+ * One counter per person per UTC day. cf-connecting-ip is set by Cloudflare
+ * itself and cannot be sent in by the caller; IPv6 counts by household (see
+ * allowanceKey).
+ */
+async function checkRateLimit(request: Request, env: Env): Promise<Allowance> {
   const limit = Number(env.DAILY_LIMIT ?? DEFAULT_DAILY_LIMIT) || DEFAULT_DAILY_LIMIT;
-  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const who = allowanceKey(request.headers.get('cf-connecting-ip'));
   const day = new Date().toISOString().slice(0, 10);
-  const key = `rl:${day}:${ip}`;
 
+  if (env.COACH_ALLOWANCE) {
+    const counter = env.COACH_ALLOWANCE.get(env.COACH_ALLOWANCE.idFromName(`${day}:${who}`));
+    const reply = await counter.fetch('https://allowance.internal/', { method: 'POST', body: JSON.stringify({ limit }) });
+    return (await reply.json()) as Allowance;
+  }
+
+  // Before the redeploy that brings COACH_ALLOWANCE: the old KV count, which a
+  // burst of requests sent at once can get past.
+  const key = `rl:${day}:${who}`;
   const current = Number((await env.RATE_LIMIT.get(key)) ?? '0');
   if (current >= limit) return { ok: false, used: current, limit };
 

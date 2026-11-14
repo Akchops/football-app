@@ -34,3 +34,13 @@ class_name = "PushStore"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PushStore"]
+
+# The Coach's daily allowance (src/allowance.ts): one Durable Object per person
+# per day, so requests sent all at once are still counted one by one.
+[[durable_objects.bindings]]
+name = "COACH_ALLOWANCE"
+class_name = "CoachAllowance"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["CoachAllowance"]

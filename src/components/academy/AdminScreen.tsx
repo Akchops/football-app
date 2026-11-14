@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DOCUMENT_KIND_LABEL, describeAcademyError, type AcademyDocument, type ReviewItem } from '../../lib/academy';
-import { openDataUrl } from '../../lib/photo';
+import { isDocumentImage, openDataUrl } from '../../lib/photo';
 import { useAcademy } from '../../store/AcademyProvider';
 import { Field, Section, Sheet } from '../ui';
 import { VerificationBadge, useLoad } from './parts';
@@ -135,8 +135,9 @@ function ReviewSheet({ item, onClose, onDone }: { item: ReviewItem; onClose: () 
     setError('');
     try {
       const data = await api.documentData(doc.id);
-      if (doc.mime === 'application/pdf') openDataUrl(data);
-      else setPreviews((p) => ({ ...p, [doc.id]: data }));
+      if (doc.mime === 'application/pdf') openDataUrl(data, doc.mime);
+      else if (isDocumentImage(data, doc.mime)) setPreviews((p) => ({ ...p, [doc.id]: data }));
+      else throw new Error("That file isn't the kind it says it is, so it won't be shown. Turn the academy down.");
     } catch (e) {
       setError(describeAcademyError(e));
     }
