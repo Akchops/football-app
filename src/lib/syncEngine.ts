@@ -65,6 +65,13 @@ export interface Remote {
   sentInvites(householdId: string): Promise<SentInvite[]>;
   invite(householdId: string, email: string): Promise<void>;
   cancelInvite(inviteId: string): Promise<void>;
+  /**
+   * Whether this family, or this account, was deleted with "Delete
+   * everything". False when the server cannot say.
+   */
+  wasWiped(householdId: string, userId: string): Promise<boolean>;
+  /** "Delete everything": the account and, if it is theirs to delete, the family's player and records. */
+  deleteAccount(): Promise<void>;
 }
 
 /** What a phone remembers between syncs. */
@@ -112,6 +119,12 @@ export interface SyncResult {
   joined: boolean;
   /** A new household was made on this sync. */
   created: boolean;
+  /**
+   * The family this phone was in, or the account itself, was deleted on
+   * another phone. Nothing was pulled or pushed: what this phone holds is to
+   * be cleared, not uploaded.
+   */
+  wiped?: boolean;
 }
 
 /**
@@ -141,6 +154,16 @@ export async function syncOnce(h: SyncHooks): Promise<SyncResult> {
   if (state && state.userId !== h.userId) state = null;
 
   const households = await h.remote.households();
+  // The family this phone remembers has gone. Being taken out of it starts
+  // this phone over with its own; but if it was deleted - by "Delete
+  // everything" on another phone - starting over would upload every record
+  // that was just deleted. Asked before anything else is done.
+  if (state && !households.some((x) => x.id === state?.householdId)) {
+    if (await h.remote.wasWiped(state.householdId, state.userId)) {
+      return { household: null, pulled: 0, pushed: 0, joined: false, created: false, wiped: true };
+    }
+  }
+
   // The household to be in is the one joined last, so joining a new one on
   // any phone moves all of that person's phones. Being removed from the one
   // this phone remembers starts it over too.

@@ -19,6 +19,7 @@ import { AvatarPicker } from './Avatar';
 import type { CompetitionFormTarget } from './CompetitionFormSheet';
 import type { TeamFormTarget } from './TeamFormSheet';
 import { ReminderSettings } from './ReminderSettings';
+import { DeleteEverythingSheet } from './DeleteEverythingSheet';
 
 const PROMPT_DELAYS = [
   { value: 0, label: 'At kickoff' },
@@ -42,6 +43,7 @@ export function SetupScreen({
   const signedIn = Boolean(useSync().account);
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [mediaUsage, setMediaUsage] = useState<{ count: number; bytes: number } | null>(null);
 
   useEffect(() => {
@@ -384,18 +386,18 @@ export function SetupScreen({
           >
             Load demo data
           </button>
-          <button
-            className="danger-link"
-            onClick={() => {
-              if (confirm('Delete every match, team, competition and setting? This cannot be undone.')) {
-                store.clearAllData();
-                setMessage('All data cleared.');
-              }
-            }}
-          >
-            Clear all data
+        </div>
+        <p className="muted small">
+          {signedIn
+            ? 'Closing Matchday, or taking it off the phone, never deletes anything: sign in again and it all comes back. To have it gone for good - from this phone, your account and the family\'s phones - delete everything.'
+            : 'To have it gone for good, delete everything.'}
+        </p>
+        <div className="button-row">
+          <button className="danger-link" onClick={() => setDeleting(true)}>
+            Delete everything…
           </button>
         </div>
+        {deleting && <DeleteEverythingSheet onClose={() => setDeleting(false)} onExport={exportBackup} />}
       </Section>
 
       <AiSection />

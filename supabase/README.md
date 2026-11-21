@@ -35,6 +35,7 @@ required to run or build Matchday.
 | `check-setup.mjs` | Checks a real project is ready, using only its public URL and key. Run by the *Check accounts setup* workflow. |
 | `rls-test.sql` | Proves two families cannot see each other's data, and someone signed out sees nothing. Run it after any change to the access rules. |
 | `academy-test.sql` | The same for academies: plays an owner, manager, two coaches, the office admin, two players, a parent, a stranger and a Matchday admin, and has each try what they should and shouldn't. |
+| `delete-test.sql` | Proves "Delete everything" leaves nothing behind: plays a family's owner, an invited parent, an academy owner and another family, deletes each, then looks in every table for anything left. |
 | `local-auth-stub.sql` | Stands in for the Supabase-provided `auth` schema so the files above can run against a plain local Postgres. Never run this against the real project. |
 | `local-api.mjs` | A local stand-in for a whole project, for testing sync in a browser. See the end of this file. Never point it at anything real. |
 
@@ -140,6 +141,7 @@ psql -h localhost -p 5433 -U postgres -f supabase/local-auth-stub.sql
 psql -h localhost -p 5433 -U postgres -f supabase/schema.sql
 psql -h localhost -p 5433 -U postgres -f supabase/rls-test.sql
 psql -h localhost -p 5433 -U postgres -f supabase/academy-test.sql
+psql -h localhost -p 5433 -U postgres -f supabase/delete-test.sql
 ```
 
 The family checks end with `ALL RLS CHECKS PASSED` or stop at the first thing

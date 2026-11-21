@@ -241,8 +241,19 @@ export function loadData(): AppData {
   }
 }
 
+let frozen = false;
+
+/**
+ * Stops anything more being saved, for the moment between "Delete everything"
+ * clearing the phone and the app starting over - so a last render cannot put
+ * back what was just removed.
+ */
+export function freezeStorage(): void {
+  frozen = true;
+}
+
 export function saveData(data: AppData): void {
-  if (typeof localStorage === 'undefined') return;
+  if (frozen || typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {

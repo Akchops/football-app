@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { hasContent } from '../lib/sync';
+import { wipedElsewhere } from '../lib/wipe';
 import { useStore } from '../store/AppStore';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard, SignInForm } from './AccountSettings';
@@ -17,9 +18,16 @@ export function SignInScreen() {
   const { data } = useStore();
   // A phone that was used before accounts came in keeps what it has.
   const hasLocal = hasContent(data);
+  const [wiped] = useState(wipedElsewhere);
   return (
     <Frame>
       <h1>Sign in to Matchday</h1>
+      {wiped && (
+        <p className="notice">
+          Matchday&apos;s data for this family was deleted on another phone, so this phone&apos;s copy has been
+          cleared too.
+        </p>
+      )}
       <p className="onboard-lead">
         {hasLocal
           ? 'Everything on this phone stays where it is. Signing in saves it to your account, so another phone gets it all back by signing in.'

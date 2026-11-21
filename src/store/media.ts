@@ -92,6 +92,26 @@ export async function deleteMediaForMatch(matchId: string): Promise<void> {
   await Promise.all(items.map((item) => deleteMedia(item.id)));
 }
 
+/**
+ * Every photo and clip on this phone, gone - for "Delete everything". The
+ * store is emptied first, which takes effect at once; dropping the database
+ * itself can be held up by the app open in another tab, so that part is only
+ * waited on for a moment.
+ */
+export async function deleteAllMedia(): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  await tx<undefined>('readwrite', (store) => store.clear() as IDBRequest<undefined>).catch(() => undefined);
+  const open = dbPromise;
+  dbPromise = null;
+  await open?.then((db) => db.close()).catch(() => undefined);
+  await new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => resolve();
+    setTimeout(resolve, 1500);
+  });
+}
+
 export async function updateMediaNote(id: string, note: string): Promise<void> {
   const item = await tx<MediaItem | undefined>('readonly', (store) => store.get(id));
   if (!item) return;

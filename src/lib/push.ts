@@ -142,6 +142,24 @@ export async function turnOffReminders(): Promise<void> {
   await existing.unsubscribe();
 }
 
+/**
+ * For "Delete everything": the server's list of this phone's reminders - which
+ * names opponents and dates - removed, and the push address given up. Never
+ * waits on a service worker that isn't there, and never fails.
+ */
+export async function forgetThisPhone(): Promise<void> {
+  try {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const registration = await navigator.serviceWorker.getRegistration();
+    const existing = await registration?.pushManager?.getSubscription();
+    if (!existing) return;
+    if (SERVER) await call('/push/forget', { subscription: existing.toJSON() }).catch(() => undefined);
+    await existing.unsubscribe();
+  } catch {
+    // Nothing more can be done from here; the server drops a list once it's sent anyway.
+  }
+}
+
 export async function setReminderPrefs(prefs: ReminderPrefs, data: { matches: Match[]; competitions: Competition[] }) {
   write({ ...read(), ...prefs });
   await syncReminders(data);

@@ -193,5 +193,31 @@ export function supabaseRemote(sb: SupabaseClient, userId: string): Remote {
     async cancelInvite(inviteId: string): Promise<void> {
       check((await sb.from('household_invites').delete().eq('id', inviteId)) as Result<unknown>);
     },
+
+    wasWiped(householdId: string, user: string): Promise<boolean> {
+      return wasWiped(sb, householdId, user);
+    },
+
+    async deleteAccount(): Promise<void> {
+      check((await sb.rpc('delete_my_account')) as Result<unknown>);
+      // The account no longer exists, so there is nobody left to sign out on
+      // the server; only this phone's copy of the session is dropped.
+      await sb.auth.signOut({ scope: 'local' }).catch(() => undefined);
+    },
   };
+}
+
+/**
+ * Asked signed in or not: a deleted account's other phones lose their sign-in
+ * along with it, and still need to know to clear themselves. A project that
+ * has not run the latest schema.sql cannot say, which counts as no. Anything
+ * else going wrong is thrown, never taken for a no: the sync stops and tries
+ * again later, rather than re-uploading a family that may have been deleted.
+ */
+export async function wasWiped(sb: SupabaseClient, householdId: string, userId: string): Promise<boolean> {
+  if (!householdId || !userId) return false;
+  const result = (await sb.rpc('was_wiped', { hid: householdId, uid: userId })) as Result<boolean>;
+  // PostgREST's "no such function", and Postgres's own.
+  if (result.error && (result.error.code === 'PGRST202' || result.error.code === '42883')) return false;
+  return check(result) === true;
 }

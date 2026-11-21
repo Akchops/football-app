@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNo
 import type {
   AppData, Competition, Match, MatchResult, MatchStage, Profile, Result, Settings, Team, TrainingSession,
 } from '../types';
-import { createId, emptyData, live, loadData, parseData, saveData } from './storage';
+import { createId, live, loadData, parseData, saveData } from './storage';
 import { buildSampleData } from './sample';
 import { mergeRemote, type RemoteChanges } from '../lib/sync';
 
@@ -413,7 +413,6 @@ interface StoreValue {
   /** Calendar dot colour, following the colour-by setting. */
   colorOf(match: Match): string;
   loadSampleData(): void;
-  clearAllData(): void;
   importData(json: string): { ok: true } | { ok: false; error: string };
   exportData(): string;
   /** Records from the server, merged in record by record. */
@@ -609,10 +608,6 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
       loadSampleData() {
         dispatch({ type: 'data/replace', data: buildSampleData() });
-      },
-
-      clearAllData() {
-        dispatch({ type: 'data/replace', data: emptyData() });
       },
 
       applyRemote(changes) {

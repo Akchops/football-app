@@ -2,9 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   accountsAvailable, currentAccount, onAccountChange, rememberedAccount, signOut as endSession, type Account,
 } from '../lib/auth';
-import { supabaseRemote } from '../lib/remote';
+import { supabaseRemote, wasWiped } from '../lib/remote';
 import { supabase } from '../lib/supabase';
 import { syncOnce, type Household, type Invite, type Person, type Remote, type SentInvite, type SyncState } from '../lib/syncEngine';
+import { clearWipedNotice, startOver, wipeThisDevice } from '../lib/wipe';
 import { useStore } from './AppStore';
 
 /**
@@ -53,6 +54,13 @@ export interface SyncValue {
   /** Join a household I was invited to after already being in one. */
   joinInvite(inviteId: string): Promise<void>;
   signOut(): Promise<void>;
+  /**
+   * Setup's "Delete everything", once it has been confirmed three times. The
+   * account and what it is allowed to delete go from the server first; only
+   * once the server has said yes is this phone cleared and the app started
+   * over. With no signal it throws, and nothing anywhere has been touched.
+   */
+  deleteEverything(): Promise<void>;
 }
 
 function loadState(): SyncState | null {
@@ -93,6 +101,10 @@ const OFF: SyncValue = {
   cancelInvite: async () => {},
   joinInvite: async () => {},
   signOut: async () => {},
+  deleteEverything: async () => {
+    await wipeThisDevice('here');
+    startOver();
+  },
 };
 
 const SyncContext = createContext<SyncValue>(OFF);
@@ -119,12 +131,15 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const remoteRef = useRef<Remote | null>(null);
   const running = useRef(false);
   const again = useRef(false);
+  // Set while everything is being deleted: no sync may start, or one could
+  // put back on the server what is being taken off it.
+  const paused = useRef(false);
   const joinAnswer = useRef<((choice: 'merge' | 'replace') => void) | null>(null);
 
   const run = useCallback(async function run(): Promise<void> {
     const remote = remoteRef.current;
     const signedIn = accountRef.current;
-    if (!remote || !signedIn) return;
+    if (!remote || !signedIn || paused.current) return;
     // One at a time; anything asked for meanwhile happens straight after.
     if (running.current) {
       again.current = true;
@@ -157,6 +172,13 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         mayCreate: () => Boolean(storeRef.current.data.profile.onboardedAt),
       });
       if (accountRef.current?.id !== signedIn.id) return;
+      if (result.wiped) {
+        // Deleted on another phone: this phone's copy goes too.
+        paused.current = true;
+        await wipeThisDevice('elsewhere');
+        startOver();
+        return;
+      }
       setHousehold(result.household);
       setCheckedFor(signedIn.id);
       setLastSynced(Date.now());
@@ -192,8 +214,10 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         setHousehold(null);
         setCheckedFor(null);
         setStatus('signed-out');
+        void clearIfDeletedElsewhere();
         return;
       }
+      clearWipedNotice();
       try {
         const client = await supabase();
         if (!live || accountRef.current?.id !== found.id) return;
@@ -203,6 +227,23 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         // The sign-in library could not load - no signal on a first open.
         // Coming back online or to the app will try again.
         setStatus('offline');
+      }
+    };
+
+    // Signed out without asking - which is what happens to every other phone
+    // of an account deleted with "Delete everything", once its sign-in runs
+    // out. Those phones are cleared too, rather than left holding the lot.
+    const clearIfDeletedElsewhere = async () => {
+      const remembered = loadState();
+      if (!remembered || paused.current) return;
+      try {
+        const wiped = await wasWiped(await supabase(), remembered.householdId, remembered.userId);
+        if (!wiped || !live || paused.current) return;
+        paused.current = true;
+        await wipeThisDevice('elsewhere');
+        startOver();
+      } catch {
+        // No signal: asked again next time the app opens.
       }
     };
 
@@ -285,6 +326,32 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     await endSession();
   }, []);
 
+  const deleteEverything = useCallback(async () => {
+    paused.current = true;
+    try {
+      // A sync already on its way finishes first. One stuck waiting on a
+      // question is not waited for: once the account is gone it can neither
+      // send anything nor start a family again.
+      for (let i = 0; i < 50 && running.current; i++) await new Promise((r) => setTimeout(r, 100));
+      const signedIn = accountRef.current;
+      if (available && signedIn) {
+        const remote = remoteRef.current ?? supabaseRemote(await supabase(), signedIn.id);
+        await remote.deleteAccount();
+      }
+    } catch (e) {
+      paused.current = false;
+      throw new Error(
+        isOffline(e)
+          ? 'No signal. Deleting needs one, so the copy in your account goes too - nothing has been deleted yet.'
+          : e instanceof Error
+            ? e.message
+            : String(e),
+      );
+    }
+    await wipeThisDevice('here');
+    startOver();
+  }, [available]);
+
   const value = useMemo<SyncValue>(
     () => ({
       available,
@@ -302,8 +369,9 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       cancelInvite,
       joinInvite,
       signOut,
+      deleteEverything,
     }),
-    [available, account, checkedFor, status, lastSynced, error, household, joinQuestion, answerJoin, run, family, invite, cancelInvite, joinInvite, signOut],
+    [available, account, checkedFor, status, lastSynced, error, household, joinQuestion, answerJoin, run, family, invite, cancelInvite, joinInvite, signOut, deleteEverything],
   );
 
   return <SyncContext.Provider value={value}>{children}</SyncContext.Provider>;

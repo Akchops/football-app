@@ -14,9 +14,10 @@ with family sharing and academies. It is run by [Aarav Chopra]
 
 Everything you enter - the player's name, date of birth, age group, position,
 photo, teams, matches, results, stats, notes and training - is kept in this
-browser on this device, so the app works with no signal. **Setup → Your data →
-Clear all data** removes it from the phone. (A version of Matchday run without
-accounts keeps it only there, and we never see it.)
+browser on this device, so the app works with no signal. Closing the app, or
+taking it off the phone, does not delete anything from your account: sign in
+again and it all comes back. (A version of Matchday run without accounts keeps
+it only there, and we never see it.)
 
 Match photos and videos are always kept only on the phone they were added on,
 signed in or not.
@@ -85,9 +86,35 @@ academy, and we never sell data, show ads or use tracking or analytics.
 
 ## Keeping and deleting
 
-We keep account data while the account is in use. To have an account and
-everything stored with it deleted, email [contact email] from the account's
-address; we will do it within [30] days. Academies can delete themselves, their
+We keep account data while the account is in use - closing or reinstalling the
+app does not end that.
+
+**Setup → Your data → Delete everything** deletes it for good, straight away,
+after three confirmations. It removes, for real rather than hiding it:
+
+- the player's profile, matches, training, teams, competitions, results and
+  settings from our database, and the family itself;
+- the account: email address, username, sign-in sessions and memberships;
+- the player's place on any academy's list, including a "left" entry;
+- invites addressed to the account's email;
+- everything on that phone - including photos and clips - and the match
+  reminders our server was holding for it.
+
+Other phones in the family, and the same account's other phones, clear their
+copies the next time they open Matchday. If you were invited into someone
+else's family, Delete everything removes your own account and your phone's
+copy; the player's records stay with that family, and the person who started
+it can delete them.
+
+What is left afterwards: a random identifier for the deleted family and the
+deleted account, with no name, email or date attached, so the other phones
+know to clear themselves. Our database provider's disaster-recovery backups
+still hold a copy until they are overwritten, within [7] days; nobody can open
+them from the app, and they are only used to recover the whole service after a
+failure. A backup file you downloaded yourself is yours and is not affected.
+
+If you can't use the app, email [contact email] from the account's address and
+we will do the same within [30] days. Academies can delete themselves, their
 squads, competitions and team picks from the app at any time.
 
 ## Children

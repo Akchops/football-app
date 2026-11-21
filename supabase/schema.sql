@@ -14,8 +14,8 @@
 --    is deliberately no such trigger anywhere below.
 --
 -- 2. A delete is an update. Rows are never removed by the app; deleted_at is
---    set instead, so the delete reaches the other phones. Only the household
---    removing itself deletes anything for real.
+--    set instead, so the delete reaches the other phones. Only "Delete
+--    everything" (delete_my_account, near the end) removes anything for real.
 --
 -- 3. The one time the server does own is synced_at: when a row last reached
 --    it, by the server's clock. Phones ask for "everything since the last
@@ -1684,17 +1684,154 @@ grant execute on function
   public.review_academy(uuid, boolean, text), public.academies_for_review()
   to authenticated;
 
+-- ===========================================================================
+-- DELETING EVERYTHING
+--
+-- Setup -> Your data -> Delete everything. Not a tombstone like every other
+-- delete in this file: the rows are removed for real, and the account with
+-- them, so nothing is left to sync back, restore or look at.
+--
+-- What one person can delete:
+--   - The family's player and every record of theirs, if they started the
+--     family (the owner) or are the only one left in it. Everyone else in the
+--     family loses them too - they are the same records - and the app says so
+--     before anyone confirms.
+--   - Only their own account, if they were invited into someone else's
+--     family. The player's records are that family's, not theirs to remove.
+--
+-- Someone who runs an academy has to hand it over or delete it first, so an
+-- academy is never left with nobody in charge of it.
+--
+-- What stays: one random id per deleted family and per deleted account, in
+-- wiped_ids, and nothing else - no name, no email, no date. It is how the
+-- family's other phones find out, the next time they open, that the records
+-- they still hold were deleted, and clear them, instead of taking the missing
+-- family for a fresh start and uploading their copy all over again.
+-- ===========================================================================
+
+create table if not exists public.wiped_ids (
+  id uuid primary key
+);
+alter table public.wiped_ids enable row level security;
+-- No policies and no grants: only the two functions below ever touch it.
+revoke all on public.wiped_ids from public, anon, authenticated;
+
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  me       uuid := auth.uid();
+  my_email text;
+  academy  text;
+  hid      uuid;
+  links    uuid[];
+begin
+  if me is null then
+    raise exception 'must be signed in';
+  end if;
+
+  select a.name into academy
+    from public.academy_members m
+    join public.academies a on a.id = m.academy_id
+   where m.user_id = me and m.role = 'owner'
+   limit 1;
+  if academy is not null then
+    raise exception 'You run %. Hand it over to someone else or delete it in Setup first, then delete your data.', academy;
+  end if;
+
+  select email into my_email from auth.users where id = me;
+
+  for hid in
+    select m.household_id
+      from public.household_members m
+     where m.user_id = me
+       and (m.role = 'owner'
+            or not exists (select 1 from public.household_members o
+                            where o.household_id = m.household_id and o.user_id <> me))
+  loop
+    -- The player's place on any academy's list: linked, invited or asking to
+    -- join. Squad places go with it; team picks lose the id.
+    select coalesce(array_agg(ap.id), '{}') into links
+      from public.academy_players ap
+      join public.players p on p.id = ap.player_id
+     where p.household_id = hid;
+    if cardinality(links) > 0 then
+      update public.academy_selections s
+         set academy_player_ids = array(select x from unnest(s.academy_player_ids) x where x <> all (links))
+       where s.academy_player_ids && links;
+      delete from public.academy_players where id = any (links);
+    end if;
+
+    insert into public.wiped_ids (id) values (hid) on conflict do nothing;
+    -- Cascades to the player, their settings, matches, training, teams,
+    -- competitions, results, the family's members and its invites.
+    delete from public.households where id = hid;
+  end loop;
+
+  -- A name this person agreed to put on an academy's list and later took
+  -- off: the academy kept it, marked as left. It goes now.
+  update public.academy_selections s
+     set academy_player_ids = array(
+           select x from unnest(s.academy_player_ids) x
+            where x not in (select id from public.academy_players
+                             where consent_by = me and status in ('left', 'declined')))
+   where s.academy_player_ids && array(select id from public.academy_players
+                                        where consent_by = me and status in ('left', 'declined'));
+  delete from public.academy_players where consent_by = me and status in ('left', 'declined');
+
+  -- Invites to this address from other families: their email, sitting there.
+  if my_email is not null then
+    delete from public.household_invites where lower(email) = lower(my_email);
+  end if;
+
+  -- Supabase's sign-in log names the account. Not every project keeps one,
+  -- and a plain local Postgres has none at all.
+  begin
+    execute 'delete from auth.audit_log_entries where payload ->> ''actor_id'' = $1' using me::text;
+  exception when undefined_table or insufficient_privilege then
+    null;
+  end;
+
+  insert into public.wiped_ids (id) values (me) on conflict do nothing;
+  -- Cascades to the username, family and academy memberships, coaching,
+  -- admin rights, invites sent, and Supabase's own sessions and sign-ins.
+  delete from auth.users where id = me;
+end;
+$$;
+
+-- Whether a family, or an account, a phone remembers was deleted. Callable
+-- signed out too: the account that was deleted can no longer sign in, and its
+-- other phones still need to know. Both ids are random and the answer is a
+-- yes or no, so it tells nobody anything they did not already hold.
+create or replace function public.was_wiped(hid uuid, uid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public, pg_temp
+stable
+as $$
+  select exists (select 1 from public.wiped_ids where id in (hid, uid));
+$$;
+
+revoke all on function public.delete_my_account(), public.was_wiped(uuid, uuid) from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
+grant execute on function public.was_wiped(uuid, uuid) to anon, authenticated;
+
 -- Which version of this file a project has, so a check can tell whether the
 -- latest one was run. Bump it with any change the app depends on.
 --   1  households, players and their records
 --   2  other teams' results, for competition tables
 --   3  academies, first draft
 --   4  academies: squads, linking, tables, team picks and verification
+--   5  deleting everything: delete_my_account, was_wiped
 create or replace function public.schema_version()
 returns integer
 language sql
 immutable
-as $$ select 4 $$;
+as $$ select 5 $$;
 
 revoke all on function public.schema_version() from public;
 grant execute on function public.schema_version() to anon, authenticated;

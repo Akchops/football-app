@@ -19,6 +19,8 @@ class MemoryServer {
   settings = new Map<string, unknown>();
   rows = new Map<Table, Map<string, { playerId: string; data: unknown; syncedAt: string }>>();
   emails = new Map<string, string>();
+  /** What delete_my_account leaves behind: the random ids of what was deleted, and nothing else. */
+  wiped = new Set<string>();
   failNextPush = false;
 
   private stamp(): string {
@@ -128,6 +130,29 @@ class MemoryServer {
       },
       async cancelInvite(id) {
         server.invites = server.invites.filter((i) => i.id !== id);
+      },
+      async wasWiped(hid, uid) {
+        return server.wiped.has(hid) || server.wiped.has(uid);
+      },
+      async deleteAccount() {
+        // As delete_my_account: the family goes if it was theirs to delete.
+        for (const m of server.members.filter((x) => x.userId === userId)) {
+          const alone = !server.members.some((x) => x.householdId === m.householdId && x.userId !== userId);
+          if (m.role !== 'owner' && !alone) continue;
+          for (const [pid, p] of [...server.players]) {
+            if (p.householdId !== m.householdId) continue;
+            for (const t of TABLES) for (const [k, r] of [...server.table(t)]) if (r.playerId === pid) server.table(t).delete(k);
+            server.settings.delete(pid);
+            server.players.delete(pid);
+          }
+          server.members = server.members.filter((x) => x.householdId !== m.householdId);
+          server.invites = server.invites.filter((i) => i.householdId !== m.householdId);
+          server.households.delete(m.householdId);
+          server.wiped.add(m.householdId);
+        }
+        server.members = server.members.filter((x) => x.userId !== userId);
+        server.invites = server.invites.filter((i) => i.email !== email.toLowerCase());
+        server.wiped.add(userId);
       },
     };
   }
@@ -621,5 +646,70 @@ describe('joining a second household', () => {
     // And they stay there.
     await tablet.sync();
     expect(tablet.state!.householdId).toBe(brother.state!.householdId);
+  });
+});
+
+describe('deleting everything', () => {
+  async function family(server: MemoryServer) {
+    const brother = await brotherSignedIn(server);
+    await brother.remote.invite(brother.state!.householdId, 'mum@example.com');
+    const mum = new Phone(server, 'u-mum', 'mum@example.com');
+    await mum.sync();
+    return { brother, mum };
+  }
+
+  function rowsOnServer(server: MemoryServer) {
+    return TABLES.reduce((n, t) => n + server.count(t), 0);
+  }
+
+  it('by whoever started the family: the rest of the family is told, and uploads nothing back', async () => {
+    const server = new MemoryServer();
+    const { brother, mum } = await family(server);
+    expect(mum.opponents()).toEqual(['Hillcrest Athletic', 'Riverside Rovers']);
+
+    await brother.remote.deleteAccount();
+    expect(rowsOnServer(server)).toBe(0);
+    expect(server.households.size).toBe(0);
+
+    // Mum's phone still holds the whole season. Left to itself it would take
+    // the missing family for a fresh start and upload the lot again.
+    const result = await mum.sync();
+    expect(result.wiped).toBe(true);
+    expect(result.pushed).toBe(0);
+    expect(server.households.size).toBe(0);
+    expect(rowsOnServer(server)).toBe(0);
+  });
+
+  it('by the same person: their other phone is told too', async () => {
+    const server = new MemoryServer();
+    const brother = await brotherSignedIn(server);
+    const tablet = new Phone(server, 'u-brother', 'arjun@example.com');
+    await tablet.sync();
+
+    await brother.remote.deleteAccount();
+    expect((await tablet.sync()).wiped).toBe(true);
+    expect(server.households.size).toBe(0);
+  });
+
+  it('by someone invited into the family: only they go, and the family keeps its season', async () => {
+    const server = new MemoryServer();
+    const { brother, mum } = await family(server);
+    const before = rowsOnServer(server);
+
+    await mum.remote.deleteAccount();
+    expect(rowsOnServer(server)).toBe(before);
+    expect((await brother.sync()).wiped).toBeFalsy();
+    expect(brother.opponents()).toEqual(['Hillcrest Athletic', 'Riverside Rovers']);
+    // Mum's own other phone finds out from her account id.
+    expect(await server.as('u-somebody', 'x@example.com').wasWiped('no-such-family', 'u-mum')).toBe(true);
+  });
+
+  it('is not mistaken for being taken out of a family', async () => {
+    const server = new MemoryServer();
+    const { mum } = await family(server);
+    server.members = server.members.filter((m) => m.userId !== 'u-mum');
+    const result = await mum.sync();
+    expect(result.wiped).toBeFalsy();
+    expect(result.created).toBe(true);
   });
 });
