@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, animate, m, useMotionValue, useTransform, type PanInfo } from 'motion/react';
+import {
+  AnimatePresence, animate, m, useMotionValue, useMotionValueEvent, useTransform,
+  type AnimationPlaybackControls, type PanInfo,
+} from 'motion/react';
 import { useStore } from '../store/AppStore';
 import type { Match } from '../types';
 import { countdown, kickoffAt } from '../lib/date';
 import { isWalkover, outcomeOf, scoreline, shootoutWinner } from '../lib/stats';
 import { stageName } from '../lib/stage';
-import { rememberOrigin, springs } from '../lib/motion';
+import { prefersReducedMotion, project, rememberOrigin, springs } from '../lib/motion';
 import { ChevronIcon, NoEntryIcon, PencilIcon, TrashIcon, WhistleResultIcon } from './icons';
 import { useMatchActions } from './UndoToast';
 
@@ -16,8 +19,10 @@ const HOLD_MS = 480;
 
 /**
  * One match in a Settings-style list. Tap opens it (the page grows out of the
- * row); swipe left for Called off and Delete, or all the way to delete; hold
- * for a menu of everything that can be done to it.
+ * row); swipe left for Called off and Delete, or all the way to delete - past
+ * the point of no return Delete swells to fill the row, so letting go there
+ * clearly deletes; hold for a menu of everything that can be done to it, the
+ * row sinking a little as the hold builds so the menu doesn't come from nowhere.
  */
 export function MatchRow({
   match,
@@ -34,13 +39,31 @@ export function MatchRow({
 }) {
   const { competitionOf, colorOf } = useStore();
   const actions = useMatchActions();
+  const wrapRef = useRef<HTMLDivElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
+  const scale = useMotionValue(1);
   const revealed = useTransform(x, [-ACTIONS_WIDTH, -40, 0], [1, 0.4, 0]);
+  // The buttons stretch to fill whatever the row has uncovered.
+  const actionsWidth = useTransform(x, (v) => Math.max(ACTIONS_WIDTH, -v));
   const [menu, setMenu] = useState<DOMRect | null>(null);
   const hold = useRef<number | null>(null);
+  const sinking = useRef<AnimationPlaybackControls | null>(null);
   const held = useRef(false);
   const dragged = useRef(false);
+  const dragging = useRef(false);
+  // Swiped far enough that letting go deletes.
+  const [armed, setArmed] = useState(false);
+  const armedRef = useRef(false);
+  const rowWidth = () => wrapRef.current?.offsetWidth ?? window.innerWidth;
+  useMotionValueEvent(x, 'change', (v) => {
+    const now = v < -Math.max(ACTIONS_WIDTH + 30, rowWidth() * 0.55);
+    if (now === armedRef.current) return;
+    armedRef.current = now;
+    setArmed(now);
+    // A tick under the finger as it crosses the line, both ways (where phones allow it).
+    if (dragging.current) navigator.vibrate?.(8);
+  });
 
   const competition = competitionOf(match);
   const kickoff = kickoffAt(match.date, match.time);
@@ -52,26 +75,46 @@ export function MatchRow({
     .join(' · ');
 
   const close = () => animate(x, 0, springs.snappy);
+  // Where the row goes is decided by where it is and where the flick was taking
+  // it - not by how far this one drag moved, so pushing an open row further
+  // open keeps it open. Every way out carries on at the finger's speed.
   const onDragEnd = (_: unknown, info: PanInfo) => {
-    // All the way across deletes, as in Mail; partway leaves the buttons showing.
-    if (info.offset.x < -window.innerWidth * 0.55 || (info.velocity.x < -1400 && info.offset.x < -120)) {
-      animate(x, -window.innerWidth, springs.smooth).then(() => actions.remove(match));
-    } else if (info.offset.x < -50 || info.velocity.x < -500) {
-      animate(x, -ACTIONS_WIDTH, springs.snappy);
-    } else close();
+    dragging.current = false;
+    const v = info.velocity.x;
+    if (armedRef.current && v < 300) {
+      // Let go past the line (and not flicking back): all the way across, then delete, as in Mail.
+      animate(x, -rowWidth(), { ...springs.smooth, velocity: v }).then(() => actions.remove(match));
+    } else if (x.get() + project(v, 0.99) < -ACTIONS_WIDTH / 2) {
+      animate(x, -ACTIONS_WIDTH, { ...springs.release, velocity: v });
+    } else {
+      animate(x, 0, { ...springs.release, velocity: v });
+    }
     window.setTimeout(() => (dragged.current = false), 50);
   };
 
+  const openMenu = () => {
+    sinking.current?.stop();
+    scale.set(1);
+    if (wrapRef.current) setMenu(wrapRef.current.getBoundingClientRect());
+  };
   const startHold = () => {
     held.current = false;
+    // After a beat (so a quick tap doesn't flinch), the row sinks while the hold builds.
+    if (!prefersReducedMotion()) {
+      sinking.current = animate(scale, 0.97, { delay: 0.12, duration: (HOLD_MS - 120) / 1000, ease: 'easeOut' });
+    }
     hold.current = window.setTimeout(() => {
       held.current = true;
-      if (rowRef.current) setMenu(rowRef.current.getBoundingClientRect());
+      openMenu();
     }, HOLD_MS);
   };
   const endHold = () => {
     if (hold.current !== null) window.clearTimeout(hold.current);
     hold.current = null;
+    if (!held.current && scale.get() !== 1) {
+      sinking.current?.stop();
+      animate(scale, 1, springs.snappy);
+    }
   };
 
   const result = match.result;
@@ -108,9 +151,13 @@ export function MatchRow({
   );
 
   return (
-    <div className={match.status === 'cancelled' ? 'row-wrap is-cancelled' : 'row-wrap'} data-match={match.id}>
+    <div ref={wrapRef} className={match.status === 'cancelled' ? 'row-wrap is-cancelled' : 'row-wrap'} data-match={match.id}>
       {/* Behind the row: what a swipe uncovers. */}
-      <m.div className="row-actions" style={{ opacity: revealed }} aria-hidden="true">
+      <m.div
+        className={armed ? 'row-actions armed' : 'row-actions'}
+        style={{ opacity: revealed, width: actionsWidth }}
+        aria-hidden="true"
+      >
         <button
           type="button"
           tabIndex={-1}
@@ -131,7 +178,7 @@ export function MatchRow({
       <m.div
         ref={rowRef}
         className="match-row"
-        style={{ x }}
+        style={{ x, scale }}
         drag="x"
         dragDirectionLock
         dragConstraints={{ left: -ACTIONS_WIDTH, right: 0 }}
@@ -139,6 +186,7 @@ export function MatchRow({
         dragMomentum={false}
         onDragStart={() => {
           dragged.current = true;
+          dragging.current = true;
           endHold();
         }}
         onDragEnd={onDragEnd}
@@ -151,7 +199,7 @@ export function MatchRow({
           onPointerLeave={endHold}
           onContextMenu={(e) => {
             e.preventDefault();
-            if (rowRef.current) setMenu(rowRef.current.getBoundingClientRect());
+            openMenu();
           }}
           onClick={() => {
             if (held.current || dragged.current) return;
@@ -228,7 +276,7 @@ function RowMenu({
       <m.div
         className="match-row lifted"
         style={{ top, left: rect.left, width: rect.width }}
-        initial={{ y: rect.top - top, scale: 1 }}
+        initial={{ y: rect.top - top, scale: 0.97 }}
         animate={{ y: 0, scale: 1.03 }}
         exit={{ y: rect.top - top, scale: 1, opacity: 0 }}
         transition={springs.snappy}

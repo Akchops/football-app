@@ -1,7 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, animate, m, useDragControls, useMotionValue, useTransform, type PanInfo } from 'motion/react';
-import { prefersReducedMotion, sheetOpened, springs, takeOrigin } from '../lib/motion';
+import {
+  AnimatePresence, animate, m, useDragControls, useMotionValue, useMotionValueEvent, useTransform,
+  type AnimationPlaybackControlsWithThen, type PanInfo,
+} from 'motion/react';
+import { onlySheet, prefersReducedMotion, project, setSheetPull, sheetOpened, springs, takeOrigin } from '../lib/motion';
 import {
   BallIcon, CalendarIcon, ChartIcon, ChevronIcon, MediaIcon, NoEntryIcon, PencilIcon, RunIcon, ShieldIcon, ShirtIcon, TrophyIcon,
 } from './icons';
@@ -36,9 +39,12 @@ export function Sheet({
 
 /**
  * The iOS sheet: rises on a spring while the screen behind sinks back, and
- * follows a finger pulled down from its top - let go past a third of the way,
- * or with a flick, and it carries on down at that speed; otherwise it springs
- * back. However it closes, it slides away rather than vanishing.
+ * follows a finger pulled down from its top - or from its contents, once
+ * they're scrolled to the top. Let go and it goes where the flick was
+ * heading: down past halfway (counting the flick's momentum) and it carries
+ * on down at the finger's speed, flicked back up and it springs back. The
+ * screen behind comes forward with it the whole way, and a sheet on its way
+ * out can be caught again mid-slide.
  */
 function SheetFrame({
   title,
@@ -55,23 +61,63 @@ function SheetFrame({
   footer?: ReactNode;
   dismissible: boolean;
 }) {
+  const layerRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   // Opened from a tapped match: grow out of that row rather than rise from the bottom.
   const [from] = useState(() => (prefersReducedMotion() ? null : takeOrigin()));
-  const leaving = useRef(false);
-  const y = useMotionValue(0);
+  // The exit under way, if there is one. A finger landing on the sheet stops it.
+  const leaving = useRef<AnimationPlaybackControlsWithThen | null>(null);
+  // Once a finger has moved the sheet, the screen behind follows it rather than its own transition.
+  const tracking = useRef(false);
+  // Rising from the bottom, it starts below the screen on its very first frame.
+  const [rises] = useState(() => !from && !prefersReducedMotion());
+  const y = useMotionValue(rises ? window.innerHeight : 0);
   const drag = useDragControls();
-  // The dimming lifts as the sheet is pulled down, so the gesture reads as "putting it away".
   const height = () => panelRef.current?.offsetHeight ?? 600;
+  // The dimming lifts as the sheet is pulled down, so the gesture reads as "putting it away".
   const dim = useTransform(y, (v) => 1 - Math.min(1, Math.max(0, v) / height()) * 0.9);
 
-  // Slide down and away, then hand over. Starts from the finger's speed when there is one.
+  useMotionValueEvent(y, 'change', (v) => {
+    if (tracking.current && onlySheet()) setSheetPull(v / height());
+  });
+
+  // Slide down and away at the finger's speed, then hand over. With Reduce
+  // Motion, a short fade instead.
   const leave = (velocity = 0) => {
     if (leaving.current) return;
-    leaving.current = true;
-    if (prefersReducedMotion()) return onClose();
-    animate(y, height(), { ...springs.smooth, velocity }).then(onClose);
+    let run: AnimationPlaybackControlsWithThen;
+    if (prefersReducedMotion() && layerRef.current) {
+      run = animate(layerRef.current, { opacity: 0 }, { duration: 0.18 });
+    } else {
+      tracking.current = true;
+      run = animate(y, height(), { ...springs.smooth, velocity });
+    }
+    leaving.current = run;
+    run.then(() => {
+      if (leaving.current === run) onClose();
+    });
+  };
+
+  // A finger on a sheet that's sliding away catches it: it stops where it is
+  // and follows the finger from there. True if there was something to catch.
+  const grab = () => {
+    const run = leaving.current;
+    if (!run || prefersReducedMotion()) return false;
+    leaving.current = null;
+    run.stop();
+    return true;
+  };
+  const dragging = useRef(false);
+
+  // Where the sheet goes when let go: which way the finger was moving decides,
+  // and how far the flick would have carried it.
+  const release = (velocity: number) => {
+    if (!dismissible) return;
+    const landing = y.get() + project(velocity);
+    if (velocity > -200 && landing > height() / 2) leave(velocity);
+    else animate(y, 0, { ...springs.release, velocity });
   };
 
   useEffect(() => {
@@ -89,9 +135,23 @@ function SheetFrame({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dismissible]);
 
+  // In: rise from the bottom, or grow out of the tapped row.
   useLayoutEffect(() => {
     const panel = panelRef.current;
-    if (!from || !panel) return;
+    if (!panel) return;
+    // Rising: the dimming follows the sheet up (it's tied to y), so only the rise needs starting.
+    if (rises) {
+      animate(y, 0, springs.smooth);
+      return;
+    }
+    const backdrop = backdropRef.current;
+    if (prefersReducedMotion()) {
+      animate(panel, { opacity: [0, 1] }, { duration: 0.2 });
+      if (backdrop) animate(backdrop, { opacity: [0, 1] }, { duration: 0.2 });
+      return;
+    }
+    if (backdrop) animate(backdrop, { opacity: [0, 1] }, springs.smooth);
+    if (!from) return;
     const to = panel.getBoundingClientRect();
     const inset = [
       Math.max(0, from.top - to.top),
@@ -107,7 +167,77 @@ function SheetFrame({
     ).then(() => requestAnimationFrame(() => panel.style.removeProperty('clip-path')));
     const body = panel.querySelectorAll<HTMLElement>('.sheet-head, .sheet-body, .sheet-foot');
     animate(body, { opacity: [0.2, 1] }, { duration: 0.35, ease: 'easeOut' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from]);
+
+  // Pulling down on the contents, once they're scrolled to the top, moves the
+  // sheet instead - as on iOS. Touch only: a mouse has the grip and the ✕.
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !dismissible) return;
+    let startX = 0;
+    let startY = 0;
+    let base = 0;
+    let state: 'idle' | 'maybe' | 'pulling' = 'idle';
+    let samples: { y: number; t: number }[] = [];
+    const down = (e: TouchEvent) => {
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      samples = [{ y: t.clientY, t: e.timeStamp }];
+      // Touching a sheet that's sliding away stops it under the finger, there and then.
+      if (e.touches.length === 1 && grab()) {
+        state = 'pulling';
+        base = y.get();
+        return;
+      }
+      state = e.touches.length === 1 && body.scrollTop <= 0 ? 'maybe' : 'idle';
+    };
+    const move = (e: TouchEvent) => {
+      if (state === 'idle') return;
+      const t = e.touches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      if (state === 'maybe') {
+        // Sideways or upwards is the contents' own scroll; leave it alone.
+        if (dy < 0 || Math.abs(dx) > Math.abs(dy) || body.scrollTop > 0) {
+          state = 'idle';
+          return;
+        }
+        // Down at the top would only bounce the contents - hold it while deciding.
+        if (e.cancelable) e.preventDefault();
+        if (dy < 10) return;
+        state = 'pulling';
+        grab();
+        tracking.current = true;
+        // Carry on from wherever the sheet is, so it never jumps to the finger.
+        base = y.get() - dy;
+      }
+      if (e.cancelable) e.preventDefault();
+      y.set(Math.max(0, base + dy));
+      samples.push({ y: t.clientY, t: e.timeStamp });
+      if (samples.length > 5) samples.shift();
+    };
+    const up = () => {
+      if (state !== 'pulling') return void (state = 'idle');
+      state = 'idle';
+      const first = samples[0];
+      const last = samples[samples.length - 1];
+      const dt = last.t - first.t;
+      release(dt > 0 ? ((last.y - first.y) / dt) * 1000 : 0);
+    };
+    body.addEventListener('touchstart', down, { passive: true });
+    body.addEventListener('touchmove', move, { passive: false });
+    body.addEventListener('touchend', up);
+    body.addEventListener('touchcancel', up);
+    return () => {
+      body.removeEventListener('touchstart', down);
+      body.removeEventListener('touchmove', move);
+      body.removeEventListener('touchend', up);
+      body.removeEventListener('touchcancel', up);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dismissible]);
 
   // Closed from outside (saved, or another sheet took over): slide a copy of
   // what was on screen away, so it never just blinks out.
@@ -119,21 +249,12 @@ function SheetFrame({
     };
   }, []);
 
-  const onDragEnd = (_: unknown, info: PanInfo) => {
-    if (!dismissible) return;
-    if (info.offset.y > height() / 3 || info.velocity.y > 650) leave(info.velocity.y);
-    else animate(y, 0, { ...springs.snappy, velocity: info.velocity.y });
-  };
-
   return (
-    <div className="sheet-layer">
+    <div className="sheet-layer" ref={layerRef}>
       <m.div
         ref={backdropRef}
         className="sheet-backdrop"
         style={{ opacity: dim }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={springs.smooth}
         onClick={dismissible ? () => leave() : undefined}
       />
       <m.div
@@ -143,9 +264,6 @@ function SheetFrame({
         aria-modal="true"
         aria-label={title}
         style={{ y }}
-        initial={from ? false : { y: '100%' }}
-        animate={{ y: 0 }}
-        transition={springs.smooth}
         drag={dismissible ? 'y' : false}
         dragListener={false}
         dragControls={drag}
@@ -153,11 +271,35 @@ function SheetFrame({
         // Pulling up gives a little and stops, like the real thing; pulling down follows the finger.
         dragElastic={{ top: 0.04, bottom: 1 }}
         dragMomentum={false}
-        onDragEnd={onDragEnd}
+        onDragStart={() => {
+          tracking.current = true;
+          dragging.current = true;
+        }}
+        onDragEnd={(_: unknown, info: PanInfo) => {
+          dragging.current = false;
+          release(info.velocity.y);
+        }}
       >
         <div
           className="sheet-head"
-          onPointerDown={dismissible ? (e) => drag.start(e) : undefined}
+          onPointerDown={
+            dismissible
+              ? (e) => {
+                  // Caught mid-slide and let go without moving: no drag ever starts,
+                  // so decide here, or it would stay stopped halfway.
+                  if (grab()) {
+                    const up = () => {
+                      window.removeEventListener('pointerup', up);
+                      window.removeEventListener('pointercancel', up);
+                      if (!dragging.current) release(0);
+                    };
+                    window.addEventListener('pointerup', up);
+                    window.addEventListener('pointercancel', up);
+                  }
+                  drag.start(e);
+                }
+              : undefined
+          }
           style={dismissible ? { touchAction: 'none' } : undefined}
         >
           <div className="sheet-grip" />
@@ -176,7 +318,9 @@ function SheetFrame({
             </button>
           )}
         </div>
-        <div className="sheet-body">{children}</div>
+        <div className="sheet-body" ref={bodyRef}>
+          {children}
+        </div>
         {footer && <div className="sheet-foot">{footer}</div>}
       </m.div>
     </div>
@@ -384,7 +528,7 @@ export function EmptyState({
         aria-hidden="true"
         initial={{ scale: 0.6, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ ...springs.bouncy, delay: 0.06 }}
+        transition={{ ...springs.smooth, delay: 0.06 }}
       >
         {Icon ? <Icon /> : icon}
       </m.div>
@@ -398,15 +542,16 @@ export function EmptyState({
 /**
  * A coloured symbol per kind of stat, the way Health colours its categories:
  * goals red, defending green, keeping blue, time orange, discipline yellow.
+ * The system colours, so each is a step brighter in dark mode, as on iOS.
  */
 const TILE_KINDS: { match: RegExp; color: string; Icon: () => JSX.Element }[] = [
-  { match: /goal diff|win|point|record/i, color: '#bf5af2', Icon: TrophyIcon },
-  { match: /clean sheet|conced|against|save|claim|sweep|pen/i, color: '#0a84ff', Icon: ShieldIcon },
-  { match: /goal|shot|target/i, color: '#ff375f', Icon: BallIcon },
-  { match: /assist|chance|pass/i, color: '#ff9f0a', Icon: RunIcon },
-  { match: /tackle|intercept|clear|block|duel/i, color: '#30d158', Icon: ShieldIcon },
-  { match: /minute|session|training|apps|appearance/i, color: '#64d2ff', Icon: CalendarIcon },
-  { match: /card|yellow|red|discipline/i, color: '#ffd60a', Icon: NoEntryIcon },
+  { match: /goal diff|win|point|record/i, color: 'var(--sys-purple)', Icon: TrophyIcon },
+  { match: /clean sheet|conced|against|save|claim|sweep|pen/i, color: 'var(--sys-blue)', Icon: ShieldIcon },
+  { match: /goal|shot|target/i, color: 'var(--sys-pink)', Icon: BallIcon },
+  { match: /assist|chance|pass/i, color: 'var(--sys-orange)', Icon: RunIcon },
+  { match: /tackle|intercept|clear|block|duel/i, color: 'var(--sys-green)', Icon: ShieldIcon },
+  { match: /minute|session|training|apps|appearance/i, color: 'var(--sys-cyan)', Icon: CalendarIcon },
+  { match: /card|yellow|red|discipline/i, color: 'var(--sys-yellow)', Icon: NoEntryIcon },
 ];
 
 /** Labels whose numbers have already counted up this session - they only do it once. */
@@ -427,7 +572,7 @@ function CountUp({ value, id }: { value: number; id: string }) {
 }
 
 export function StatTile({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: string; tone?: 'win' | 'loss' | 'draw' }) {
-  const kind = TILE_KINDS.find((k) => k.match.test(label)) ?? { color: '#8e8e93', Icon: ChartIcon };
+  const kind = TILE_KINDS.find((k) => k.match.test(label)) ?? { color: 'var(--sys-gray)', Icon: ChartIcon };
   return (
     <div className={tone ? `tile tone-${tone}` : 'tile'}>
       <span className="tile-icon" style={{ background: kind.color }} aria-hidden="true">

@@ -16,17 +16,21 @@ export function ResultPrompt({
   pending,
   onEnterResult,
   onDismiss,
+  onSnooze,
 }: {
   pending: Match[];
   onEnterResult: (match: Match) => void;
+  /** Put away: it won't open by itself for these matches again. */
   onDismiss: () => void;
+  /** "Not now": back when the snooze runs out. */
+  onSnooze: () => void;
 }) {
   const { competitionOf, colorOf, snoozeMatch, cancelMatch, profile } = useStore();
   if (pending.length === 0) return null;
 
   const snoozeAll = () => {
     for (const m of pending) snoozeMatch(m.id, SNOOZE_MINUTES);
-    onDismiss();
+    onSnooze();
   };
 
   const first = pending[0];

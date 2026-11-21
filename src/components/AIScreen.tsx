@@ -305,14 +305,14 @@ function Bubble({
   still?: boolean;
   typing?: boolean;
 }) {
-  // A message pops up from its own side, with a little give - Messages' arrival.
+  // A message rises from its own side - Messages' arrival, settling without a wobble.
   return (
     <m.div
       className={`bubble-row ${from}`}
       initial={still ? false : { opacity: 0, y: 14, scale: 0.92 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
-      transition={springs.bouncy}
+      transition={springs.snappy}
       style={{ transformOrigin: from === 'me' ? '100% 100%' : '0% 100%' }}
       layout={typing ? 'position' : undefined}
     >
@@ -563,7 +563,7 @@ function Composer({
               initial={{ scale: 0.4, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.4, opacity: 0 }}
-              transition={springs.bouncy}
+              transition={springs.snappy}
             >
               <SendIcon />
             </m.button>

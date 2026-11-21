@@ -107,7 +107,7 @@ export function TablesScreen({ academy, request }: { academy: StaffAcademy; requ
             {list.map((c, i) => (
               <m.li key={c.id} {...stagger(i)}>
                 <button className="nav-row" onClick={() => setOpenId(c.id)}>
-                  <span className="icon-square" style={{ background: c.type === 'league' ? '#30d158' : '#ff9f0a' }} aria-hidden="true">
+                  <span className="icon-square" style={{ background: c.type === 'league' ? 'var(--sys-green)' : 'var(--sys-orange)' }} aria-hidden="true">
                     {c.type === 'league' ? <TableIcon on /> : <TrophyIcon />}
                   </span>
                   <span className="nav-row-text">

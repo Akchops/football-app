@@ -27,6 +27,16 @@
   --sheet-bg: #f2f2f7;
   --sheet-surface: #ffffff;
   --sheet-surface-2: #e9e9ee;
+  /* iOS system colours, light appearance - for symbol tiles and swipe actions. */
+  --sys-purple: #af52de;
+  --sys-blue: #007aff;
+  --sys-pink: #ff2d55;
+  --sys-orange: #ff9500;
+  --sys-green: #34c759;
+  --sys-cyan: #32ade6;
+  --sys-yellow: #ffcc00;
+  --sys-red: #ff3b30;
+  --sys-gray: #8e8e93;
   --font-display: 'Barlow Condensed', 'Arial Narrow', -apple-system, sans-serif;
   --radius: 16px;
   --radius-sm: 10px;
@@ -68,6 +78,16 @@
     --seg-pill: #636366;
     --seg-pill-shadow: none;
     --chip-ring: transparent;
+    /* iOS system colours, dark appearance: a step brighter. */
+    --sys-purple: #bf5af2;
+    --sys-blue: #0a84ff;
+    --sys-pink: #ff375f;
+    --sys-orange: #ff9f0a;
+    --sys-green: #30d158;
+    --sys-cyan: #64d2ff;
+    --sys-yellow: #ffd60a;
+    --sys-red: #ff453a;
+    --sys-gray: #98989d;
     color-scheme: dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -97,6 +117,16 @@
       --seg-pill: #636366;
       --seg-pill-shadow: none;
       --chip-ring: transparent;
+      /* iOS system colours, dark appearance: a step brighter. */
+      --sys-purple: #bf5af2;
+      --sys-blue: #0a84ff;
+      --sys-pink: #ff375f;
+      --sys-orange: #ff9f0a;
+      --sys-green: #30d158;
+      --sys-cyan: #64d2ff;
+      --sys-yellow: #ffd60a;
+      --sys-red: #ff453a;
+      --sys-gray: #98989d;
       color-scheme: dark;
   }
 }
@@ -491,6 +521,33 @@ p { margin: 0; }
 }
 .chip-scroll::-webkit-scrollbar { display: none; }
 
+/* Rows of chips that scroll sideways fade out at an edge only where there's
+   more to see, instead of a chip cut off by the screen's edge. Browsers that
+   can tie an animation to scrolling move the fade with it; the rest get a
+   fixed fade on the right, where the row starts out cut off. */
+@property --fade-l { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --fade-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.chip-scroll, .quick-row, .suggest-row {
+  --fade-l: 0px;
+  --fade-r: 28px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+}
+@supports (animation-timeline: scroll()) {
+  /* A row that fits has no scroll timeline, so it keeps these: no fade at all. */
+  .chip-scroll, .quick-row, .suggest-row {
+    --fade-r: 0px;
+    animation: edge-fade linear both !important;
+    animation-timeline: scroll(self inline) !important;
+  }
+}
+@keyframes edge-fade {
+  0% { --fade-l: 0px; --fade-r: 28px; }
+  8% { --fade-l: 28px; }
+  92% { --fade-r: 28px; }
+  100% { --fade-l: 28px; --fade-r: 0px; }
+}
+
 .filter-chip {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -736,6 +793,25 @@ p { margin: 0; }
 .empty .primary-btn { margin-top: 6px; }
 
 /* ---------- tab bar: liquid glass ---------- */
+/* Where the page scrolls under the floating tab bar it fades into the
+   background, rather than text showing half-cut in the gap beneath the bar. */
+.app:has(> .tabbar)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--safe-bottom) + 84px);
+  background: linear-gradient(
+    to top,
+    var(--bg) calc(var(--safe-bottom) + 12px),
+    color-mix(in srgb, var(--bg) 75%, transparent) calc(var(--safe-bottom) + 40px),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 4;
+}
+
 .tabbar {
   /* A floating glass capsule over the page, as on iOS 26. */
   position: absolute;
@@ -821,10 +897,15 @@ html[data-sheet-open] body { background: #000; }
     transition: transform 0.55s cubic-bezier(0.32, 0.72, 0, 1);
   }
   html[data-sheet-open] .app {
-    transform: translateY(calc(var(--safe-top) + 10px)) scale(0.93);
+    /* --sheet-pull is set while the sheet is pulled down or sliding away
+       (lib/motion.ts), so the screen comes forward with it, frame for frame. */
+    --sink: calc(1 - var(--sheet-pull, 0));
+    transform: translateY(calc((var(--safe-top) + 10px) * var(--sink))) scale(calc(1 - 0.07 * var(--sink)));
     border-radius: 14px;
     overflow: hidden;
   }
+  /* Following a finger: no transition, or the screen would trail behind it. */
+  html[data-sheet-open] .app[data-sheet-pull] { transition: none; }
 }
 
 .sheet-head {
@@ -1114,9 +1195,21 @@ select.input {
 .prompt-meta { font-size: 12px; color: var(--muted); }
 .prompt-actions { display: flex; gap: 6px; flex: none; }
 
+/* Reduce Motion means less movement, not no feedback. Nothing slides, scales
+   or sweeps (Motion's own springs are handled by MotionConfig in App), but
+   fades and colour changes stay - they help you follow what changed. Spinners
+   keep turning, slowly, so a wait still looks like a wait. */
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  *, *::before, *::after {
+    transition-property: opacity, color, background-color, border-color, box-shadow !important;
+  }
+  /* Drifting backgrounds and shine sweeps: gone. */
+  .wr-glow, .pass-sweep, .typing span { animation: none !important; }
+  /* Slides that rose in now simply fade in. */
+  .wr-in { animation-name: fade-in !important; }
+  .ptr-icon.spinning { animation-duration: 2.4s; }
 }
+@keyframes fade-in { from { opacity: 0; } }
 
 /* ---------- onboarding ---------- */
 .onboarding {
@@ -2407,6 +2500,8 @@ button:disabled:active { transform: none; }
     grid-template-areas: 'top top' 'nav main';
   }
   .academy-app.with-nav > .topbar { grid-area: top; position: static; }
+  /* Tabs down the side here, so nothing floats over the bottom of the page. */
+  .app.academy-app.with-nav::after { display: none; }
   .academy-app.with-nav > .content { grid-area: main; padding-top: 8px; padding-bottom: 24px; }
   .academy-app.with-nav > .tabbar {
     grid-area: nav;
@@ -2611,6 +2706,7 @@ table.compare td.best { color: var(--accent); font-weight: 800; }
 
 /* ---------- directions ---------- */
 a.ground-link { text-decoration: none; }
+.ground-link svg { font-size: 0.95em; vertical-align: -0.12em; }
 .next-ground { align-self: flex-start; font-size: 13px; padding: 2px 0; }
 
 /* ---------- paste a fixture ---------- */
@@ -3224,10 +3320,15 @@ a.ground-link { text-decoration: none; }
 .row-pill.ask { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .row-pill.off { background: var(--surface-2); color: var(--muted); }
 
-/* What a swipe uncovers. */
-.row-actions { position: absolute; inset: 0 0 0 auto; display: flex; }
+/* What a swipe uncovers. Its width follows the row (MatchRow), so the buttons
+   stretch rather than leave a gap; past the line, Delete takes all of it. */
+.row-actions { position: absolute; inset: 0 0 0 auto; display: flex; overflow: hidden; }
 .row-action {
-  width: 84px;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: flex-grow 0.25s cubic-bezier(0.32, 0.72, 0, 1);
   border: 0;
   color: #fff;
   display: flex;
@@ -3239,8 +3340,9 @@ a.ground-link { text-decoration: none; }
   font-weight: 600;
 }
 .row-action svg { font-size: 20px; }
-.row-action.off { background: #ff9f0a; }
-.row-action.delete { background: #ff3b30; }
+.row-action.off { background: var(--sys-orange); }
+.row-action.delete { background: var(--sys-red); }
+.row-actions.armed .row-action.off { flex-grow: 0; }
 
 /* The long-press menu. */
 .row-menu-layer { position: fixed; inset: 0; z-index: 30; }

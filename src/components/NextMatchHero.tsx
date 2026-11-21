@@ -13,27 +13,41 @@ function untilKickoff(at: Date, now: number): { d: number; h: number; m: number;
 }
 
 /**
- * The top of Matches: the next game, big, with a countdown that ticks every
- * second and the team's colour glowing behind it. Tap to open the match.
+ * The top of Matches: the next game, big, with a countdown and the team's
+ * colour glowing behind it. Tap to open the match. The countdown shows only
+ * the units that matter: days, hours and minutes while it's days away; hours
+ * and minutes on the day; and only in the final hour do the seconds tick -
+ * a seconds counter on a match next Tuesday is movement with nothing to say.
  */
 export function NextMatchHero({ match, onOpen }: { match: Match; onOpen: () => void }) {
   const { competitionOf, teamOf } = useStore();
   const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
   const at = kickoffAt(match.date, match.time);
+  const finalHour = at.getTime() - now <= 3600_000;
+  useEffect(() => {
+    // Every second in the final hour; otherwise often enough to turn the minute over on time.
+    const id = window.setInterval(() => setNow(Date.now()), finalHour ? 1000 : 10_000);
+    return () => window.clearInterval(id);
+  }, [finalHour]);
   const left = untilKickoff(at, now);
   const competition = competitionOf(match);
   const team = teamOf(match);
   const eyebrow = ['Next up', competition?.name, stageName(match.stage, match.stageDetail)].filter(Boolean).join(' · ');
-  const units: [number, string][] = [
-    [left.d, 'days'],
-    [left.h, 'hrs'],
-    [left.m, 'min'],
-    [left.s, 'sec'],
-  ];
+  const units: [number, string][] = finalHour
+    ? [
+        [left.m, 'min'],
+        [left.s, 'sec'],
+      ]
+    : left.d === 0
+      ? [
+          [left.h, 'hrs'],
+          [left.m, 'min'],
+        ]
+      : [
+          [left.d, left.d === 1 ? 'day' : 'days'],
+          [left.h, 'hrs'],
+          [left.m, 'min'],
+        ];
 
   return (
     <m.button

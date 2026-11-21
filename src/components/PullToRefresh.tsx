@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { animate, m, useMotionValue, useTransform } from 'motion/react';
-import { springs } from '../lib/motion';
+import { rubberband, springs } from '../lib/motion';
 import { SyncIcon } from './icons';
 
 const TRIGGER = 72;
-const MAX = 120;
 
 /**
  * Pull down from the top of a screen to sync with the family's phones, as in
- * Mail. The page follows the finger with some resistance; let go past the
- * line and it holds there with a spinner until the sync is done.
+ * Mail. The page follows the finger with resistance that grows the further it
+ * goes - it slows, but never hits a wall; let go past the line and it holds
+ * there with a spinner until the sync is done.
  * Only touch starts it - a mouse wheel just scrolls.
  */
 export function PullToRefresh({
@@ -42,7 +42,7 @@ export function PullToRefresh({
       const dy = e.touches[0].clientY - start.current;
       if (dy <= 0) return void pull.set(0);
       // Resistance: the further it goes, the harder it pulls back.
-      pull.set(Math.min(MAX, dy * 0.5));
+      pull.set(rubberband(dy, el.clientHeight));
     };
     const up = async () => {
       if (start.current === null) return;

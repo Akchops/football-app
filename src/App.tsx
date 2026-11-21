@@ -53,6 +53,9 @@ import { Logo } from './components/Logo';
 
 type Tab = 'calendar' | 'matches' | 'media' | 'coach' | 'stats' | 'setup';
 
+/** Matches this phone has already put the "How did it go?" sheet up for, unasked. */
+const RESULT_ASKED_KEY = 'matchday.resultAsked';
+
 /** The last year this phone was invited to watch its Wrapped. */
 const WRAPPED_SEEN_KEY = 'matchday.wrappedSeen';
 
@@ -96,7 +99,27 @@ function Shell() {
   const [importInitial, setImportInitial] = useState<MessageImport | null>(null);
   const [imported, setImported] = useState(0);
   const [trainingForm, setTrainingForm] = useState<TrainingFormTarget | null>(null);
-  const [promptHidden, setPromptHidden] = useState(false);
+  // The "How did it go?" sheet opens by itself once per match; after that the
+  // "to log" pill in the top bar is the way back to it. A "Not now" snooze
+  // is different: that asked to be reminded, so it comes back when it's up.
+  const [promptRequested, setPromptRequested] = useState(false);
+  const [resultAsked, setResultAsked] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(RESULT_ASKED_KEY) ?? '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
+  const markResultAsked = (ids: string[]) => {
+    // Only the recent ones matter - old matches have long since been logged.
+    const next = new Set([...resultAsked, ...ids].slice(-200));
+    setResultAsked(next);
+    try {
+      localStorage.setItem(RESULT_ASKED_KEY, JSON.stringify([...next]));
+    } catch {
+      // Private mode: it may ask once more next time.
+    }
+  };
   const [ageAskHidden, setAgeAskHidden] = useState(false);
   const [wrappedView, setWrappedView] = useState<{ year: number; complete: boolean } | null>(null);
   // The January invitation is shown once per phone - the Stats page has it after that.
@@ -207,7 +230,8 @@ function Shell() {
   // A competition deleted elsewhere can't leave an invisible sheet holding the prompt back.
   const viewing = competitionView && competitions.some((c) => c.id === competitionView.id) ? competitionView : null;
 
-  const showPrompt = !promptHidden && pending.length > 0 && !resultMatch && !matchForm && !viewing;
+  const unasked = pending.some((m) => !resultAsked.has(m.id));
+  const showPrompt = (promptRequested || unasked) && pending.length > 0 && !resultMatch && !matchForm && !viewing;
 
   // Once a year, and never on top of something else - results come first.
   const newSeason = ageGroupCheck(profile, now);
@@ -277,7 +301,7 @@ function Shell() {
         </div>
         <div className="topbar-actions">
           {pending.length > 0 && (
-            <button className="pending-pill" onClick={() => setPromptHidden(false)}>
+            <button className="pending-pill" onClick={() => setPromptRequested(true)}>
               {pending.length} to log
             </button>
           )}
@@ -394,7 +418,15 @@ function Shell() {
       </nav>
 
       {showPrompt && (
-        <ResultPrompt pending={pending} onEnterResult={openResult} onDismiss={() => setPromptHidden(true)} />
+        <ResultPrompt
+          pending={pending}
+          onEnterResult={openResult}
+          onDismiss={() => {
+            markResultAsked(pending.map((m) => m.id));
+            setPromptRequested(false);
+          }}
+          onSnooze={() => setPromptRequested(false)}
+        />
       )}
 
       {showInvite && inviteYear !== null && (

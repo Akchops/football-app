@@ -7,6 +7,11 @@ import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/barlow-condensed/800.css';
 import './styles.css';
 
+// iOS Safari only applies :active (the press dip every button has) when a touch
+// listener sits on the element or above it. Sheets and menus are rendered into
+// <body>, outside the app's root, so without one here they'd show no press at all.
+document.addEventListener('touchstart', () => {}, { passive: true });
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

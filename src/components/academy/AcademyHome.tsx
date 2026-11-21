@@ -147,7 +147,7 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
       <div className="list-group nav-group">
         <NavRow
           icon={<ShirtIcon on />}
-          color="#0a84ff"
+          color="var(--sys-blue)"
           label="Players"
           detail={
             onBooks === null || squadCount === null
@@ -159,16 +159,16 @@ export function AcademyHome({ academy, onGo }: { academy: StaffAcademy; onGo: (t
         />
         <NavRow
           icon={<PeopleIcon on />}
-          color="#bf5af2"
+          color="var(--sys-purple)"
           label="Staff"
           detail={staffCount === null ? staff.error || <Bone /> : `${staffCount}${invited ? ` · ${invited} invited` : ''}`}
           onClick={() => onGo('staff')}
         />
-        <NavRow icon={<TableIcon on />} color="#30d158" label="Tables" detail="" onClick={() => onGo('tables')} />
+        <NavRow icon={<TableIcon on />} color="var(--sys-green)" label="Tables" detail="" onClick={() => onGo('tables')} />
         {academy.role === 'owner' && (academy.verification === 'unverified' || academy.verification === 'rejected') && (
           <NavRow
             icon={<ShieldIcon />}
-            color="#ff9f0a"
+            color="var(--sys-orange)"
             label="Get verified"
             detail="Badge"
             onClick={() => onGo('settings')}

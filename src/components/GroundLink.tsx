@@ -1,4 +1,5 @@
 import { directionsUrl } from '../lib/maps';
+import { PinIcon } from './icons';
 
 /**
  * The ground, tappable straight into the phone's maps app. Just the name when
@@ -9,7 +10,7 @@ export function GroundLink({ location, className = 'link-btn' }: { location: str
   if (!url) return <>{location}</>;
   return (
     <a className={`${className} ground-link`} href={url} target="_blank" rel="noopener noreferrer">
-      <span aria-hidden="true">📍</span> {location}
+      <PinIcon /> {location}
       <span className="sr-only"> (opens in Maps)</span>
     </a>
   );
