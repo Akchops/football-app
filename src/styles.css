@@ -1134,19 +1134,31 @@ select.input {
 .onboard-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: -0.02em; font-size: 15px; color: var(--accent); }
 .onboard-brand .logo { width: 24px; height: 24px; flex: none; }
 
-.onboard-steps { display: flex; gap: 6px; margin-top: 12px; }
+/* The progress track: each segment fills from the left as its step slides in,
+   and empties back towards the left on the way back. Done steps are tappable. */
+.onboard-steps { display: flex; gap: 6px; margin-top: 4px; }
 .ostep {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+  background: none;
+  border: 0;
+  text-align: left;
   font-size: 11px;
   font-weight: 700;
   color: var(--muted);
-  padding-top: 8px;
-  border-top: 3px solid var(--line);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  transition: color 0.2s;
 }
-.ostep.on { color: var(--accent); border-color: var(--accent); }
-.ostep.done { color: var(--text); border-color: var(--accent); opacity: 0.7; }
+.ostep:disabled { opacity: 1; cursor: default; }
+.ostep-track { display: block; height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.ostep-fill { display: block; height: 100%; background: var(--accent); transform-origin: left center; }
+.ostep.on { color: var(--accent); }
+.ostep.done { color: var(--text); }
+.ostep.done .ostep-fill { opacity: 0.7; }
 
 .onboard-body {
   flex: 1;
@@ -1157,6 +1169,34 @@ select.input {
   gap: 16px;
 }
 .onboard-body h1 { font-size: 26px; }
+.onboard-body h1:focus { outline: none; }
+
+/* Setup's steps stack in one cell and slide over each other; each scrolls on
+   its own, and each is opaque so the one arriving covers the one leaving. */
+.onboard-body.staged {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.onboard-step {
+  grid-area: 1 / 1;
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg);
+  box-shadow: -10px 0 28px rgba(0, 0, 0, 0.18);
+}
+.onboard-step > .field-hint.bad { margin-top: -8px; }
+
+/* Not ready yet: dimmed, but still answers a tap with what's missing. */
+.primary-btn.waiting { opacity: 0.5; }
 .onboard-lead { color: var(--muted); font-size: 14px; margin-top: -8px; }
 
 .onboard-foot {

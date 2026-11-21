@@ -221,11 +221,14 @@ function ghostAway(backdrop: HTMLElement): void {
 export function Field({
   label,
   hint,
+  error,
   group = false,
   children,
 }: {
   label: string;
   hint?: string;
+  /** Said right under the field it's about, in place of the hint. */
+  error?: string;
   group?: boolean;
   children: ReactNode;
 }) {
@@ -233,7 +236,13 @@ export function Field({
     <>
       <span className="field-label">{label}</span>
       {children}
-      {hint && <span className="field-hint">{hint}</span>}
+      {error ? (
+        <span className="field-hint bad" role="alert">
+          {error}
+        </span>
+      ) : (
+        hint && <span className="field-hint">{hint}</span>
+      )}
     </>
   );
   return group ? (
