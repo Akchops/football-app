@@ -1,3 +1,5 @@
+import { m, useReducedMotion } from 'motion/react';
+import { springs } from '../lib/motion';
 // Matchday's mark: a faceted ball with one panel lit green. The six panels a
 // regular dodecahedron shows face-on, lit from the top left, flat colours with
 // real gaps for seams - the same artwork as docs/brand/logo/symbol.svg, with
@@ -30,6 +32,35 @@ export function Logo({ size = '1em', className }: { size?: number | string; clas
       {PANELS.map(([d, fill]) => (
         <path key={d} d={d} fill={fill} />
       ))}
+    </svg>
+  );
+}
+
+/**
+ * The ball putting itself together, once, for the welcome: the grey panels
+ * settle in, then the lit one snaps into place last - the ball is the team,
+ * the lit panel is you. Still, with Reduce Motion.
+ */
+export function AssemblingBall({ size = 112 }: { size?: number }) {
+  const reduce = useReducedMotion();
+  let order = 0;
+  return (
+    <svg className="logo" viewBox="16.5 16 223 223" width={size} height={size} aria-hidden="true" focusable="false">
+      {PANELS.map(([d, fill]) => {
+        if (reduce) return <path key={d} d={d} fill={fill} />;
+        const lit = fill === GREEN;
+        const delay = lit ? 0.5 : 0.06 * order++;
+        return (
+          <m.path
+            key={d}
+            d={d}
+            fill={fill}
+            initial={{ opacity: 0, scale: lit ? 0.4 : 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ ...(lit ? springs.bouncy : springs.smooth), delay }}
+          />
+        );
+      })}
     </svg>
   );
 }

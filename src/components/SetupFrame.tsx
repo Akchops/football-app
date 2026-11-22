@@ -2,7 +2,10 @@ import type { ReactNode } from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import { Logo } from './Logo';
 
-export type SetupScreenKey = 'opening' | 'signin' | 'checking' | 'who' | 'setup';
+export type SetupScreenKey = 'opening' | 'welcome' | 'signin' | 'checking' | 'who' | 'setup';
+
+/** Screens that show the brand big themselves, so the small one in the corner steps aside. */
+const HERO: SetupScreenKey[] = ['welcome', 'signin'];
 
 /**
  * One frame for everything before the app: opening, signing in, looking for
@@ -15,10 +18,16 @@ export function SetupFrame({ screen, children }: { screen: SetupScreenKey; child
   return (
     <div className="onboarding">
       <div className="onboard-top">
-        <div className="onboard-brand">
+        <m.div
+          className="onboard-brand"
+          initial={false}
+          animate={{ opacity: HERO.includes(screen) ? 0 : 1 }}
+          transition={{ duration: 0.25 }}
+          aria-hidden={HERO.includes(screen) || undefined}
+        >
           <Logo />
           Matchday
-        </div>
+        </m.div>
       </div>
       <div className="onboard-stage">
         <AnimatePresence initial={false}>

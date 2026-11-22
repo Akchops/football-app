@@ -3,6 +3,7 @@ import { useStore } from '../store/AppStore';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard, SignInForm } from './AccountSettings';
 import { Spinner } from './ui';
+import { BrandHero } from './Welcome';
 
 /**
  * The first screen whenever this build has accounts, and nothing else opens
@@ -17,8 +18,8 @@ export function SignInScreen() {
   const hasLocal = hasContent(data);
   return (
     <div className="onboard-body">
-      <h1>Sign in to Matchday</h1>
-      <p className="onboard-lead">
+      <BrandHero compact />
+      <p className="onboard-lead signin-lead">
         {hasLocal
           ? 'Everything on this phone stays where it is. Signing in saves it to your account, so another phone gets it all back by signing in.'
           : 'New here? Enter your email and the code we send makes your account. Used Matchday before? Use the same email and your player, teams and matches come straight back.'}

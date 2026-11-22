@@ -1184,6 +1184,7 @@ select.input {
 /* Setup's steps stack in one cell and slide over each other; each scrolls on
    its own, and each is opaque so the one arriving covers the one leaving. */
 .onboard-body.staged {
+  position: relative;
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   gap: 0;
@@ -1247,6 +1248,11 @@ select.input {
   min-height: 92px;
 }
 .position-card.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.position-card .pitch { width: 100%; height: auto; margin-bottom: 4px; }
+.pitch-lines { stroke: var(--line); stroke-width: 1.2; }
+.pitch-zone { fill: var(--muted); opacity: 0.18; transition: fill 0.2s, opacity 0.2s; }
+.position-card.on .pitch-zone { fill: var(--accent); opacity: 0.45; }
+.position-card.on .pitch-lines { stroke: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .position-name { font-weight: 800; font-size: 15px; }
 .position-card.on .position-name { color: var(--accent); }
 .position-blurb { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
@@ -4232,4 +4238,86 @@ button.nav-row:active { background: var(--surface-2); }
 @media (prefers-reduced-motion: reduce) {
   .sk::after { display: none; }
   .btn-spinner { animation-duration: 2.1s; }
+}
+
+
+/* ---------- getting started: the brand's moment, and the pass being made ---------- */
+
+/* The ball, the name in condensed capitals, and the line, as on the brand board. */
+.brand-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; }
+.brand-hero .logo { flex: none; }
+.brand-hero-name {
+  font-family: var(--font-display);
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+.onboard-body .brand-hero-name { font-size: 52px; font-weight: 800; letter-spacing: 0.02em; line-height: 0.9; }
+.brand-hero-line {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.brand-hero-line span { color: var(--accent); }
+.brand-hero.compact { gap: 10px; padding-top: 4px; }
+.onboard-body .brand-hero.compact .brand-hero-name { font-size: 40px; }
+.brand-hero.compact .brand-hero-line { font-size: 18px; }
+
+.onboard-body.welcome { justify-content: center; align-items: center; gap: 28px; padding-bottom: 8px; }
+.welcome-lead { max-width: 30ch; text-align: center; color: var(--muted); font-size: 16px; line-height: 1.45; }
+.onboard-foot.stacked { flex-direction: column; align-items: stretch; text-align: center; }
+.onboard-lead.signin-lead { margin-top: 6px; }
+
+/* The pass, small, above setup's steps: it stays while they slide beneath it. */
+.onboard-pass { padding: 2px 20px 10px; }
+.pass.compact {
+  aspect-ratio: auto;
+  height: 128px;
+  max-width: 440px;
+  margin: 0 auto;
+  border-radius: 18px;
+}
+/* Where the steps scroll up under the pass, they fade rather than cut. */
+.onboard-body.staged::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 16px;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(var(--bg), transparent);
+}
+/* Setup's fixed parts keep their size; only the steps give way and scroll. */
+.onboard-progress, .onboard-pass { flex: none; }
+.pass-team-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  margin: 0 5px 1px 0;
+  vertical-align: middle;
+  transition: background-color 0.3s;
+}
+.pass.compact .pass-face { padding: 11px 16px 10px; border-radius: 18px; }
+.pass.compact .pass-brand { font-size: 11px; }
+.pass.compact .pass-tier { font-size: 12px; }
+.pass.compact .pass-main { gap: 12px; }
+.pass.compact .pass-ovr { font-size: 22px; opacity: 0.6; }
+.pass.compact .pass-name { font-size: 20px; }
+.pass.compact .pass-sub { font-size: 13px; }
+.pass.compact .pass-name.is-empty, .pass.compact .pass-sub.is-empty { opacity: 0.35; }
+.pass.compact .pass-stat-value { font-size: 16px; opacity: 0.55; }
+.pass.compact .pass-stat-code { font-size: 9px; }
+/* A quick glint as something lands on it; a brighter one as it's handed over. */
+.pass-sweep.quick { animation-delay: 0s; animation-duration: 0.9s; }
+.pass-sweep.issued {
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.6) 50%, transparent 62%);
+  animation-delay: 0s;
+  animation-duration: 0.75s;
 }

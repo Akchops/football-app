@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { AnimatePresence, animate, m, useReducedMotion, type Variants } from 'motion/react';
 import { useStore } from '../store/AppStore';
 import {
-  AGE_GROUPS, DEFAULT_PROFILE, POSITIONS_BY_GROUP, POSITION_GROUP_BLURB, POSITION_GROUP_LABEL, TEAM_COLORS,
+  AGE_GROUPS, DEFAULT_PROFILE, POSITIONS_BY_GROUP, POSITION_GROUP_LABEL, TEAM_COLORS,
   type PositionGroup,
 } from '../types';
 import { currentAge, suggestAgeGroup } from '../lib/date';
@@ -11,6 +11,7 @@ import { BusyLabel, Field } from './ui';
 import { accountsAvailable } from '../lib/auth';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard } from './AccountSettings';
+import { PassPreview } from './PassPreview';
 
 interface DraftTeam {
   /** Stable across adds and removes, so the right row animates out. */
@@ -28,6 +29,33 @@ const GROUPS: PositionGroup[] = ['goalkeeper', 'defender', 'midfielder', 'forwar
 const STEPS = ['You', 'Position', 'Teams'];
 
 type Errors = { name?: string; group?: string; teams?: string };
+
+/** Where on the pitch each group plays, attacking left to right: [from, to] as fractions of its length. */
+const ZONE: Record<PositionGroup, [number, number]> = {
+  goalkeeper: [0, 0.14],
+  defender: [0.06, 0.4],
+  midfielder: [0.32, 0.68],
+  forward: [0.62, 0.97],
+};
+
+/** A pitch in miniature, with the part this position plays in lit. */
+function PitchZone({ group }: { group: PositionGroup }) {
+  const [from, to] = ZONE[group];
+  const w = 120;
+  const h = 52;
+  return (
+    <svg className="pitch" viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      <rect className="pitch-zone" x={2 + from * (w - 4)} y="2" width={(to - from) * (w - 4)} height={h - 4} rx="3" />
+      <g className="pitch-lines" fill="none">
+        <rect x="2" y="2" width={w - 4} height={h - 4} rx="4" />
+        <line x1={w / 2} y1="2" x2={w / 2} y2={h - 2} />
+        <circle cx={w / 2} cy={h / 2} r="8" />
+        <rect x="2" y={h / 2 - 12} width="14" height="24" />
+        <rect x={w - 16} y={h / 2 - 12} width="14" height="24" />
+      </g>
+    </svg>
+  );
+}
 
 /**
  * The steps move like an iOS navigation push: Continue slides the next one in
@@ -101,6 +129,7 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
   const [position, setPosition] = useState(unchosen ? '' : profile.position);
   const [draftTeams, setDraftTeams] = useState<DraftTeam[]>(() => [newDraft(TEAM_COLORS[0])]);
   const [focusTeam, setFocusTeam] = useState<number | null>(null);
+  const [issued, setIssued] = useState(false);
 
   const [nameRef, shakeName] = useShake<HTMLInputElement>();
   const [groupRef, shakeGroup] = useShake<HTMLDivElement>();
@@ -175,28 +204,34 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
       teamRef.current?.focus();
       return shakeTeam();
     }
-    if (!group) return go(1);
+    if (!group || issued) return;
 
-    // Done: a light double tap, on the frame the app arrives.
+    // Done: the pass is handed over - a sweep of light and a light double tap
+    // on the same frame - then the app. Straight to the app with Reduce Motion.
     if (typeof navigator !== 'undefined') navigator.vibrate?.([12, 60, 18]);
-    for (const team of named) {
-      addTeam({
-        name: team.name.trim(),
-        ageGroup: team.ageGroup || effectiveAgeGroup,
-        position: team.position || position,
-        color: team.color,
-        notes: '',
+    const finish = () => {
+      for (const team of named) {
+        addTeam({
+          name: team.name.trim(),
+          ageGroup: team.ageGroup || effectiveAgeGroup,
+          position: team.position || position,
+          color: team.color,
+          notes: '',
+        });
+      }
+      updateProfile({
+        name: name.trim(),
+        dateOfBirth: dob,
+        ageGroup: effectiveAgeGroup,
+        ageGroupYear: new Date().getFullYear(),
+        position,
+        positionGroup: group,
+        onboardedAt: new Date().toISOString(),
       });
-    }
-    updateProfile({
-      name: name.trim(),
-      dateOfBirth: dob,
-      ageGroup: effectiveAgeGroup,
-      ageGroupYear: new Date().getFullYear(),
-      position,
-      positionGroup: group,
-      onboardedAt: new Date().toISOString(),
-    });
+    };
+    if (reduce) return finish();
+    setIssued(true);
+    window.setTimeout(finish, 750);
   };
 
   const moved = dir !== 0;
@@ -229,6 +264,18 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
         </nav>
       </div>
 
+      <div className="onboard-pass">
+        <PassPreview
+          name={name}
+          group={group}
+          position={position}
+          ageGroup={effectiveAgeGroup}
+          team={draftTeams.find((t) => t.name.trim())?.name.trim() ?? ''}
+          teamColor={draftTeams.find((t) => t.name.trim())?.color ?? draftTeams[0].color}
+          issued={issued}
+        />
+      </div>
+
       <div className="onboard-body staged">
         <AnimatePresence initial={false} custom={dir}>
           <m.div
@@ -248,11 +295,11 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
           >
             {step === 0 && (
               <>
-                <StepTitle focus={moved}>Let's set you up</StepTitle>
+                <StepTitle focus={moved}>Let's make your pass</StepTitle>
                 <p className="onboard-lead">
                   {accountsAvailable()
-                    ? 'Saved to your account, so signing in on another phone brings it all back. You can change any of it later in Setup.'
-                    : "Your details stay on this device — there's no account and nothing gets uploaded."}
+                    ? 'It fills in as you go. Saved to your account, so another phone gets it back by signing in.'
+                    : 'It fills in as you go. It all stays on this phone, and you can change any of it later.'}
                 </p>
                 <SignedInAs />
 
@@ -301,10 +348,7 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
             {step === 1 && (
               <>
                 <StepTitle focus={moved}>Where do you play?</StepTitle>
-                <p className="onboard-lead">
-                  This decides which stats the app tracks. A keeper gets saves and clean sheets, not shots and
-                  conversion.
-                </p>
+                <p className="onboard-lead">Your pass tracks what matters in that position.</p>
 
                 <div className="position-grid" ref={groupRef} role="radiogroup" aria-label="Where you play">
                   {GROUPS.map((g) => (
@@ -316,8 +360,8 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
                       className={g === group ? 'position-card on' : 'position-card'}
                       onClick={() => pickGroup(g)}
                     >
+                      <PitchZone group={g} />
                       <span className="position-name">{POSITION_GROUP_LABEL[g]}</span>
-                      <span className="position-blurb">{POSITION_GROUP_BLURB[g]}</span>
                     </button>
                   ))}
                 </div>
@@ -462,7 +506,7 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
           <span className="wide" />
         )}
         {/* Dimmed until the step has what it needs, but never dead: a tap says what's missing. */}
-        <button className={ready ? 'primary-btn wide' : 'primary-btn wide waiting'} onClick={next}>
+        <button className={ready ? 'primary-btn wide' : 'primary-btn wide waiting'} onClick={next} disabled={issued}>
           {step === 2 ? "Let's go" : 'Continue'}
         </button>
       </div>

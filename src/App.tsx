@@ -34,6 +34,7 @@ import { OnboardingScreen } from './components/OnboardingScreen';
 import { CheckingAccount, OpeningSplash, SignInScreen } from './components/SignInScreen';
 import { WhoIsThisFor } from './components/WhoIsThisFor';
 import { SetupFrame } from './components/SetupFrame';
+import { WelcomeScreen } from './components/Welcome';
 import { ACADEMY } from './lib/features';
 import { MediaScreen } from './components/MediaScreen';
 import { AcademyShellSkeleton, CoachSkeleton } from './components/Skeletons';
@@ -227,6 +228,8 @@ function Shell() {
   // Whether this visit started in getting started (signing in, setup), so the
   // app can arrive from it rather than cut in.
   const cameThroughSetup = useRef(false);
+  // Without accounts there's no sign-in to open on, so a welcome comes first.
+  const [welcomed, setWelcomed] = useState(false);
 
   // With accounts in this build, nothing opens until someone signs in. A phone
   // that has signed in before opens at once, signal or not.
@@ -276,6 +279,13 @@ function Shell() {
   // once it is clear this phone is for a player rather than an academy.
   if (!profile.onboardedAt) {
     cameThroughSetup.current = true;
+    if (!sync.available && !welcomed) {
+      return (
+        <SetupFrame screen="welcome">
+          <WelcomeScreen onStart={() => setWelcomed(true)} />
+        </SetupFrame>
+      );
+    }
     if (ACADEMY && academy.enabled && academy.mode === null) {
       return (
         <SetupFrame screen="who">
@@ -285,7 +295,15 @@ function Shell() {
     }
     return (
       <SetupFrame screen="setup">
-        <OnboardingScreen onBack={ACADEMY && academy.enabled ? () => academy.setMode(null) : undefined} />
+        <OnboardingScreen
+          onBack={
+            ACADEMY && academy.enabled
+              ? () => academy.setMode(null)
+              : !sync.available
+                ? () => setWelcomed(false)
+                : undefined
+          }
+        />
       </SetupFrame>
     );
   }
