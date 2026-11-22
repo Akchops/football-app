@@ -4321,3 +4321,82 @@ button.nav-row:active { background: var(--surface-2); }
   animation-delay: 0s;
   animation-duration: 0.75s;
 }
+
+/* ---------- setup's fields, as pills ----------
+   No dropdowns: text goes in capsules, choices are the app's pills, and a
+   birthday is a pill that opens the phone's own date wheel. */
+.input.capsule { border-radius: 999px; padding-inline: 20px; min-height: 52px; }
+.capsule-field { position: relative; flex: 1; min-width: 0; display: block; }
+.capsule-field .input.capsule { padding-left: 42px; }
+.capsule-swatch {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border-radius: 50%;
+  pointer-events: none;
+  transition: background-color 0.25s;
+}
+
+.pill-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pill-line-label { font-size: 13px; font-weight: 600; color: var(--muted); margin-right: 2px; }
+
+.date-pill { position: relative; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.date-pill svg { width: 18px; height: 18px; flex: none; }
+.date-pill:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.date-pill-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 16px; /* never small enough for iOS to zoom on focus */
+  -webkit-appearance: none;
+  appearance: none;
+}
+.date-pill-input::-webkit-calendar-picker-indicator { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+
+/* Says something, isn't a button: tinted, no ring. */
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.select-pill { display: inline-flex; align-items: center; gap: 6px; }
+.select-pill svg { width: 13px; height: 13px; opacity: 0.55; transform: rotate(90deg); transition: transform 0.25s; }
+.select-pill.open svg { transform: rotate(-90deg); }
+.select-pill.open { box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* Pill rows run to the screen's edges and fade there, so it's plain they scroll. */
+.onboard-step .chip-scroll {
+  margin: -4px -20px;
+  padding: 4px 20px 6px;
+  scroll-padding-inline: 20px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 20px, #000 calc(100% - 20px), transparent);
+}
+.team-draft .chip-scroll.in-card {
+  margin: -4px -12px;
+  padding: 4px 12px 6px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+}
+
+/* In a team's card, its controls sit a shade up from the card so they read. */
+.team-draft { gap: 12px; }
+.team-draft .input.capsule, .team-draft .filter-chip:not(.on) { background: var(--surface-2); }
+.team-draft .color-row { gap: 10px; }
+.team-draft .color-dot { width: 28px; height: 28px; border-radius: 50%; }
+.team-draft .color-dot.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); border-color: transparent; }

@@ -2,16 +2,18 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { AnimatePresence, animate, m, useReducedMotion, type Variants } from 'motion/react';
 import { useStore } from '../store/AppStore';
 import {
-  AGE_GROUPS, DEFAULT_PROFILE, POSITIONS_BY_GROUP, POSITION_GROUP_LABEL, TEAM_COLORS,
+  AGE_GROUPS, ALL_POSITIONS, DEFAULT_PROFILE, POSITIONS_BY_GROUP, POSITION_GROUP_LABEL, TEAM_COLORS,
   type PositionGroup,
 } from '../types';
-import { currentAge, suggestAgeGroup } from '../lib/date';
+import { MONTH_NAMES, currentAge, fromISODate, suggestAgeGroup, todayISO } from '../lib/date';
 import { springs } from '../lib/motion';
 import { BusyLabel, Field } from './ui';
 import { accountsAvailable } from '../lib/auth';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard } from './AccountSettings';
 import { PassPreview } from './PassPreview';
+import { PillRow } from './PillRow';
+import { CalendarIcon, ChevronIcon } from './icons';
 
 interface DraftTeam {
   /** Stable across adds and removes, so the right row animates out. */
@@ -29,6 +31,16 @@ const GROUPS: PositionGroup[] = ['goalkeeper', 'defender', 'midfielder', 'forwar
 const STEPS = ['You', 'Position', 'Teams'];
 
 type Errors = { name?: string; group?: string; teams?: string };
+
+const AGE_GROUP_PILLS = [{ value: '', label: 'Not sure' }, ...AGE_GROUPS.map((g) => ({ value: g, label: g }))];
+const TEAM_AGE_PILLS = AGE_GROUPS.map((g) => ({ value: g, label: g }));
+const POSITION_PILLS = ALL_POSITIONS.map((p) => ({ value: p, label: p }));
+
+/** '14 March 2013' */
+function birthdayLabel(iso: string): string {
+  const d = fromISODate(iso);
+  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
 
 /** Where on the pitch each group plays, attacking left to right: [from, to] as fractions of its length. */
 const ZONE: Record<PositionGroup, [number, number]> = {
@@ -130,6 +142,10 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
   const [draftTeams, setDraftTeams] = useState<DraftTeam[]>(() => [newDraft(TEAM_COLORS[0])]);
   const [focusTeam, setFocusTeam] = useState<number | null>(null);
   const [issued, setIssued] = useState(false);
+  // Which team's age group or position is open for changing, if any.
+  const [picker, setPicker] = useState<{ id: number; kind: 'age' | 'position' } | null>(null);
+  const togglePicker = (id: number, kind: 'age' | 'position') =>
+    setPicker((p) => (p?.id === id && p.kind === kind ? null : { id, kind }));
 
   const [nameRef, shakeName] = useShake<HTMLInputElement>();
   const [groupRef, shakeGroup] = useShake<HTMLDivElement>();
@@ -306,41 +322,60 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
                 <Field label="Your name" error={errors.name}>
                   <input
                     ref={nameRef}
-                    className="input"
+                    className="input capsule"
                     value={name}
                     onChange={(e) => {
                       setName(e.target.value);
                       if (errors.name) setErrors({});
                     }}
                     placeholder="e.g. Sam"
+                    autoComplete="given-name"
+                    enterKeyHint="next"
                     aria-invalid={errors.name ? true : undefined}
                     autoFocus={!moved}
                   />
                 </Field>
 
-                <Field label="Date of birth" hint={age !== null ? `You're ${age}` : 'Used to suggest your age group'}>
-                  <input className="input" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                <Field group label="Birthday" hint={dob ? undefined : 'Optional. It suggests your age group.'}>
+                  <div className="pill-line">
+                    {/* The phone's own date wheel, opened from a pill: the input sits invisibly over it. */}
+                    <label className={dob ? 'filter-chip on date-pill' : 'filter-chip date-pill'}>
+                      <CalendarIcon />
+                      {dob ? birthdayLabel(dob) : 'Add your birthday'}
+                      <input
+                        type="date"
+                        className="date-pill-input"
+                        value={dob}
+                        max={todayISO()}
+                        onChange={(e) => setDob(e.target.value)}
+                        onClick={(e) => {
+                          try {
+                            e.currentTarget.showPicker();
+                          } catch {
+                            // Older browsers open it on tap anyway.
+                          }
+                        }}
+                        aria-label="Birthday"
+                      />
+                    </label>
+                    {age !== null && <span className="tag-pill">{age} years old</span>}
+                  </div>
                 </Field>
 
                 <Field
-                  label="Age group you play in"
-                  hint={suggested && !touchedAgeGroup ? `Suggested from your date of birth: ${suggested}` : undefined}
+                  group
+                  label="Age group"
+                  hint={suggested && !touchedAgeGroup ? 'Suggested from your birthday' : undefined}
                 >
-                  <select
-                    className="input"
+                  <PillRow
+                    label="Age group you play in"
+                    options={AGE_GROUP_PILLS}
                     value={effectiveAgeGroup}
-                    onChange={(e) => {
+                    onChange={(v) => {
                       setTouchedAgeGroup(true);
-                      setAgeGroup(e.target.value);
+                      setAgeGroup(v);
                     }}
-                  >
-                    <option value="">Not sure yet</option>
-                    {AGE_GROUPS.map((g) => (
-                      <option key={g} value={g}>
-                        {g}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </Field>
               </>
             )}
@@ -403,7 +438,8 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
                   {draftTeams.map((team, i) => (
                     <m.div
                       key={team.id}
-                      layout
+                      // Position only: the card changing height (a pill row opening) shouldn't stretch its contents.
+                      layout="position"
                       className="team-draft"
                       initial={{ opacity: 0, scale: 0.96, y: -8 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -411,17 +447,19 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
                       transition={springs.smooth}
                     >
                       <div className="team-draft-head">
-                        <span className="swatch lg" style={{ background: team.color }} />
-                        <input
-                          ref={i === 0 ? teamRef : undefined}
-                          className="input"
-                          value={team.name}
-                          onChange={(e) => setTeam(i, { name: e.target.value })}
-                          placeholder={i === 0 ? 'e.g. Wanderers FC' : 'Another team'}
-                          aria-label="Team name"
-                          aria-invalid={i === 0 && errors.teams ? true : undefined}
-                          autoFocus={team.id === focusTeam}
-                        />
+                        <span className="capsule-field">
+                          <span className="capsule-swatch" style={{ background: team.color }} />
+                          <input
+                            ref={i === 0 ? teamRef : undefined}
+                            className="input capsule"
+                            value={team.name}
+                            onChange={(e) => setTeam(i, { name: e.target.value })}
+                            placeholder={i === 0 ? 'e.g. Wanderers FC' : 'Another team'}
+                            aria-label="Team name"
+                            aria-invalid={i === 0 && errors.teams ? true : undefined}
+                            autoFocus={team.id === focusTeam}
+                          />
+                        </span>
                         {draftTeams.length > 1 && (
                           <button
                             type="button"
@@ -438,35 +476,42 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
                           {errors.teams}
                         </p>
                       )}
-                      <div className="row two">
-                        <select
-                          className="input"
-                          value={team.ageGroup || effectiveAgeGroup}
-                          onChange={(e) => setTeam(i, { ageGroup: e.target.value })}
-                          aria-label="Age group"
-                        >
-                          <option value="">Age group</option>
-                          {AGE_GROUPS.map((g) => (
-                            <option key={g} value={g}>
-                              {g}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className="input"
-                          value={team.position || position}
-                          onChange={(e) => setTeam(i, { position: e.target.value })}
-                          aria-label="Position"
-                        >
-                          {Object.values(POSITIONS_BY_GROUP)
-                            .flat()
-                            .map((p) => (
-                              <option key={p} value={p}>
-                                {p}
-                              </option>
-                            ))}
-                        </select>
+                      {/* Yours unless you say otherwise: two pills that open into a row to change them. */}
+                      <div className="pill-line">
+                        <span className="pill-line-label">Plays</span>
+                        {(['age', 'position'] as const).map((kind) => {
+                          const open = picker?.id === team.id && picker.kind === kind;
+                          const shown =
+                            kind === 'age' ? team.ageGroup || effectiveAgeGroup || 'Age group' : team.position || position;
+                          return (
+                            <button
+                              key={kind}
+                              type="button"
+                              className={open ? 'filter-chip select-pill open' : 'filter-chip select-pill'}
+                              aria-expanded={open}
+                              aria-label={`${kind === 'age' ? 'Age group' : 'Position'} for this team: ${shown}. Change`}
+                              onClick={() => togglePicker(team.id, kind)}
+                            >
+                              {shown}
+                              <ChevronIcon />
+                            </button>
+                          );
+                        })}
                       </div>
+                      {picker?.id === team.id && (
+                        <PillRow
+                          key={picker.kind}
+                          className="in-card"
+                          reveal
+                          label={picker.kind === 'age' ? 'Age group for this team' : 'Position for this team'}
+                          options={picker.kind === 'age' ? TEAM_AGE_PILLS : POSITION_PILLS}
+                          value={picker.kind === 'age' ? team.ageGroup || effectiveAgeGroup : team.position || position}
+                          onChange={(v) => {
+                            setTeam(i, picker.kind === 'age' ? { ageGroup: v } : { position: v });
+                            setPicker(null);
+                          }}
+                        />
+                      )}
                       <div className="color-row">
                         {TEAM_COLORS.map((c) => (
                           <button
