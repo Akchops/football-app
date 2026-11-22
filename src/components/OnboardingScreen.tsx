@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, animate, m, useReducedMotion, type Variants } from 'motion/react';
 import { useStore } from '../store/AppStore';
 import {
@@ -11,7 +11,6 @@ import { BusyLabel, Field } from './ui';
 import { accountsAvailable } from '../lib/auth';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard } from './AccountSettings';
-import { Logo } from './Logo';
 
 interface DraftTeam {
   /** Stable across adds and removes, so the right row animates out. */
@@ -112,6 +111,22 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
   const effectiveAgeGroup = touchedAgeGroup ? ageGroup : suggested;
   const variants = useMemo(() => slideVariants(reduce), [reduce]);
 
+  // Is any of the step hidden under the footer? Only then does the footer get
+  // its soft edge - a line under nothing is just noise.
+  const stepEl = useRef<HTMLDivElement | null>(null);
+  const [under, setUnder] = useState(false);
+  const measure = () => {
+    const el = stepEl.current;
+    // A few pixels of padding past the edge isn't content.
+    if (el) setUnder(el.scrollHeight - el.scrollTop - el.clientHeight > 8);
+  };
+  // After every render: a step, an error or a team row changes what fits.
+  useLayoutEffect(measure);
+  useEffect(() => {
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
   const ready = step === 0 ? Boolean(name.trim()) : step === 1 ? group !== null : draftTeams.some((t) => t.name.trim());
 
   const go = (to: number) => {
@@ -162,6 +177,8 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
     }
     if (!group) return go(1);
 
+    // Done: a light double tap, on the frame the app arrives.
+    if (typeof navigator !== 'undefined') navigator.vibrate?.([12, 60, 18]);
     for (const team of named) {
       addTeam({
         name: team.name.trim(),
@@ -185,12 +202,8 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
   const moved = dir !== 0;
 
   return (
-    <div className="onboarding">
-      <div className="onboard-top">
-        <div className="onboard-brand">
-          <Logo />
-          Matchday
-        </div>
+    <>
+      <div className="onboard-progress">
         <nav className="onboard-steps" aria-label="Setup steps">
           {STEPS.map((label, i) => (
             <button
@@ -220,6 +233,11 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
         <AnimatePresence initial={false} custom={dir}>
           <m.div
             key={step}
+            ref={(el: HTMLDivElement | null) => {
+              // The step sliding in, not the one leaving.
+              if (el) stepEl.current = el;
+            }}
+            onScroll={measure}
             className="onboard-step"
             custom={dir}
             variants={variants}
@@ -435,7 +453,7 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
         </AnimatePresence>
       </div>
 
-      <div className="onboard-foot">
+      <div className={under ? 'onboard-foot under' : 'onboard-foot'}>
         {step > 0 || onBack ? (
           <button className="ghost-btn wide" onClick={step > 0 ? () => go(step - 1) : onBack}>
             Back
@@ -448,7 +466,7 @@ export function OnboardingScreen({ onBack }: { onBack?: () => void } = {}) {
           {step === 2 ? "Let's go" : 'Continue'}
         </button>
       </div>
-    </div>
+    </>
   );
 }
 

@@ -1131,12 +1131,22 @@ select.input {
 }
 
 .onboard-top { padding: calc(var(--safe-top) + 16px) 20px 8px; }
+
+/* Under the brand, which stays still: screens cross-fade in one cell. */
+.onboard-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
+.onboard-screen { grid-area: 1 / 1; min-height: 0; display: flex; flex-direction: column; }
+.onboard-progress { padding: 0 20px 8px; margin-top: -4px; }
 .onboard-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; letter-spacing: -0.02em; font-size: 15px; color: var(--accent); }
 .onboard-brand .logo { width: 24px; height: 24px; flex: none; }
 
 /* The progress track: each segment fills from the left as its step slides in,
    and empties back towards the left on the way back. Done steps are tappable. */
-.onboard-steps { display: flex; gap: 6px; margin-top: 4px; }
+.onboard-steps { display: flex; gap: 6px; }
 .ostep {
   flex: 1;
   display: flex;
@@ -1168,7 +1178,7 @@ select.input {
   flex-direction: column;
   gap: 16px;
 }
-.onboard-body h1 { font-size: 26px; }
+.onboard-body h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; text-wrap: balance; }
 .onboard-body h1:focus { outline: none; }
 
 /* Setup's steps stack in one cell and slide over each other; each scrolls on
@@ -1200,11 +1210,28 @@ select.input {
 .onboard-lead { color: var(--muted); font-size: 14px; margin-top: -8px; }
 
 .onboard-foot {
+  position: relative;
+  z-index: 2;
   display: flex;
   gap: 10px;
   padding: 12px 20px calc(14px + var(--safe-bottom));
-  border-top: 1px solid var(--line-soft);
+  background: var(--bg);
 }
+/* A scroll edge, not a divider: content fades into the footer, and only
+   while some of it is actually underneath. */
+.onboard-foot::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 28px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.onboard-foot.under::before { opacity: 1; }
 
 .position-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
@@ -2080,6 +2107,8 @@ select.input {
 /* Importing a schedule someone was sent - the review list before anything is added. */
 .reading-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 28px 0; }
 .reading-state p { margin: 0; text-align: center; }
+/* A check that's over quickly never flashes a spinner (as .skeleton). */
+.reading-state.after-a-moment { animation: sk-in 0.3s ease 0.4s both; }
 
 .spinner {
   width: 28px;

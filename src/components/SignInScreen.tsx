@@ -1,9 +1,7 @@
-import type { ReactNode } from 'react';
 import { hasContent } from '../lib/sync';
 import { useStore } from '../store/AppStore';
 import { useSync } from '../store/SyncProvider';
 import { JoinQuestionCard, SignInForm } from './AccountSettings';
-import { Logo } from './Logo';
 import { Spinner } from './ui';
 
 /**
@@ -18,7 +16,7 @@ export function SignInScreen() {
   // A phone that was used before accounts came in keeps what it has.
   const hasLocal = hasContent(data);
   return (
-    <Frame>
+    <div className="onboard-body">
       <h1>Sign in to Matchday</h1>
       <p className="onboard-lead">
         {hasLocal
@@ -29,7 +27,7 @@ export function SignInScreen() {
         intro={false}
         footnote="No password - a code by email, once on each phone. Your email is only for signing in."
       />
-    </Frame>
+    </div>
   );
 }
 
@@ -50,16 +48,16 @@ export function CheckingAccount({ onCarryOn }: { onCarryOn: () => void }) {
 
   if (sync.joinQuestion) {
     return (
-      <Frame>
+      <div className="onboard-body">
         <h1>One thing first</h1>
         <JoinQuestionCard sync={sync} />
-      </Frame>
+      </div>
     );
   }
 
   if (sync.status === 'offline' || sync.status === 'error') {
     return (
-      <Frame>
+      <div className="onboard-body">
         <h1>Couldn&apos;t reach your account</h1>
         <p className="onboard-lead">
           {sync.status === 'offline'
@@ -78,42 +76,28 @@ export function CheckingAccount({ onCarryOn }: { onCarryOn: () => void }) {
           </button>
         </div>
         {different}
-      </Frame>
+      </div>
     );
   }
 
   return (
-    <Frame>
-      <div className="reading-state" role="status">
+    <div className="onboard-body">
+      <div className="reading-state after-a-moment" role="status">
         <Spinner />
         <p className="muted small">Looking for your matches…</p>
         <p className="muted small">Signed in as {email}</p>
       </div>
-    </Frame>
+    </div>
   );
 }
 
 /** While the phone works out whether anyone has signed in on it - a moment at most. */
 export function OpeningSplash() {
   return (
-    <Frame>
-      <div className="reading-state" role="status">
+    <div className="onboard-body">
+      <div className="reading-state after-a-moment" role="status">
         <Spinner />
       </div>
-    </Frame>
-  );
-}
-
-function Frame({ children }: { children: ReactNode }) {
-  return (
-    <div className="onboarding">
-      <div className="onboard-top">
-        <div className="onboard-brand">
-          <Logo />
-          Matchday
-        </div>
-      </div>
-      <div className="onboard-body">{children}</div>
     </div>
   );
 }

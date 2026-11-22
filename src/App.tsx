@@ -33,6 +33,7 @@ import { TrainingFormSheet, type TrainingFormTarget } from './components/Trainin
 import { OnboardingScreen } from './components/OnboardingScreen';
 import { CheckingAccount, OpeningSplash, SignInScreen } from './components/SignInScreen';
 import { WhoIsThisFor } from './components/WhoIsThisFor';
+import { SetupFrame } from './components/SetupFrame';
 import { ACADEMY } from './lib/features';
 import { MediaScreen } from './components/MediaScreen';
 import { AcademyShellSkeleton, CoachSkeleton } from './components/Skeletons';
@@ -223,10 +224,23 @@ function Shell() {
   );
   const showInvite = inviteYear !== null && !showPrompt && !sheetOpen && !showAgeAsk && !wrappedView;
 
+  // Whether this visit started in getting started (signing in, setup), so the
+  // app can arrive from it rather than cut in.
+  const cameThroughSetup = useRef(false);
+
   // With accounts in this build, nothing opens until someone signs in. A phone
   // that has signed in before opens at once, signal or not.
   if (sync.available && !sync.account) {
-    return sync.status === 'checking' ? <OpeningSplash /> : <SignInScreen />;
+    cameThroughSetup.current = true;
+    return sync.status === 'checking' ? (
+      <SetupFrame screen="opening">
+        <OpeningSplash />
+      </SetupFrame>
+    ) : (
+      <SetupFrame screen="signin">
+        <SignInScreen />
+      </SetupFrame>
+    );
   }
 
   // Academy staff: their half of the app, with no player's calendar unless this phone has one.
@@ -250,18 +264,41 @@ function Shell() {
     ((!sync.checked && (!profile.onboardedAt || signedInHere === accountId)) ||
       (!profile.onboardedAt && sync.checked && academyUnknown))
   ) {
-    return <CheckingAccount onCarryOn={() => setCarryOn(true)} />;
+    cameThroughSetup.current = true;
+    return (
+      <SetupFrame screen="checking">
+        <CheckingAccount onCarryOn={() => setCarryOn(true)} />
+      </SetupFrame>
+    );
   }
 
   // First run: collect the player's details before showing the app proper -
   // once it is clear this phone is for a player rather than an academy.
   if (!profile.onboardedAt) {
-    if (ACADEMY && academy.enabled && academy.mode === null) return <WhoIsThisFor onPick={academy.setMode} />;
-    return <OnboardingScreen onBack={ACADEMY && academy.enabled ? () => academy.setMode(null) : undefined} />;
+    cameThroughSetup.current = true;
+    if (ACADEMY && academy.enabled && academy.mode === null) {
+      return (
+        <SetupFrame screen="who">
+          <WhoIsThisFor onPick={academy.setMode} />
+        </SetupFrame>
+      );
+    }
+    return (
+      <SetupFrame screen="setup">
+        <OnboardingScreen onBack={ACADEMY && academy.enabled ? () => academy.setMode(null) : undefined} />
+      </SetupFrame>
+    );
   }
 
   return (
-    <div className="app">
+    // Straight from getting started, the app materialises rather than cutting
+    // in; opened any other time, it's simply there.
+    <m.div
+      className="app"
+      initial={cameThroughSetup.current ? { opacity: 0, scale: 0.98 } : false}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={springs.smooth}
+    >
       <header className="topbar">
         <m.div className="topbar-glass" style={{ opacity: barGlass }} aria-hidden="true" />
         <div className="topbar-titles">
@@ -512,7 +549,7 @@ function Shell() {
       )}
 
       <TrainingFormSheet target={trainingForm} onClose={() => setTrainingForm(null)} />
-    </div>
+    </m.div>
   );
 }
 
